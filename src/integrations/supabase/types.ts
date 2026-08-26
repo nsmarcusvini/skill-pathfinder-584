@@ -1152,6 +1152,35 @@ export type Database = {
           },
         ]
       }
+      user_followed_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_followed_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_skills: {
         Row: {
           created_at: string
@@ -1393,6 +1422,55 @@ export type Database = {
       }
     }
     Functions: {
+      company_monthly: {
+        Args: {
+          _company_id: string
+          _months?: number
+          _segments: string[]
+          _track_id: string
+        }
+        Returns: {
+          jobs: number
+          month: string
+        }[]
+      }
+      company_ranking: {
+        Args: {
+          _segments: string[]
+          _seniorities?: string[]
+          _since: string
+          _track_id: string
+        }
+        Returns: {
+          avg_salary_max: number
+          avg_salary_min: number
+          company_id: string
+          currency: string
+          industry: string
+          jobs: number
+          last_posted_at: string
+          logo_url: string
+          name: string
+          remote_jobs: number
+          segments: string[]
+          slug: string
+          top_skills: Json
+          website: string
+        }[]
+      }
+      company_skill_demand: {
+        Args: {
+          _company_id: string
+          _segments: string[]
+          _since: string
+          _track_id: string
+        }
+        Returns: {
+          jobs: number
+          skill_id: string
+          total_jobs: number
+        }[]
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       landing_stats: { Args: never; Returns: Json }
       market_demand: {
@@ -1425,6 +1503,65 @@ export type Database = {
       refresh_market_views: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      tool_detail: {
+        Args: {
+          _segments: string[]
+          _seniorities?: string[]
+          _since: string
+          _skill_id: string
+          _track_id: string
+        }
+        Returns: {
+          companies: Json
+          cooccurrence: Json
+          demand: number
+          jobs: number
+          salary_currency: string
+          salary_p25: number
+          salary_p50: number
+          salary_p75: number
+          salary_sample: number
+          total_jobs: number
+        }[]
+      }
+      tool_monthly: {
+        Args: {
+          _months?: number
+          _segments: string[]
+          _seniorities?: string[]
+          _skill_ids: string[]
+          _track_id: string
+        }
+        Returns: {
+          demand: number
+          jobs: number
+          month: string
+          skill_id: string
+          total_jobs: number
+        }[]
+      }
+      tool_ranking: {
+        Args: {
+          _categories?: string[]
+          _segments: string[]
+          _seniorities?: string[]
+          _since: string
+          _track_id: string
+        }
+        Returns: {
+          category_key: string
+          category_name: string
+          demand: number
+          is_certifiable: boolean
+          jobs: number
+          name: string
+          skill_id: string
+          slug: string
+          total_jobs: number
+          trend: number
+          website_url: string
+        }[]
+      }
       unaccent: { Args: { "": string }; Returns: string }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }
     }
