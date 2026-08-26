@@ -248,8 +248,20 @@ export interface ExtractionHealth {
 
 /** Métrica de qualidade: mediana de skills/vaga e % de vagas com menos de 3. */
 export async function extractionHealth(): Promise<ExtractionHealth> {
-  const [{ data: counts }, { count: pendingTerms }] = await Promise.all([
-    supabaseAdmin.from("job_posting_skills").select("job_posting_id"),
+  // PostgREST limita a 1000 linhas por página: pagina até esgotar.
+  const counts: Array<{ job_posting_id: string }> = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("job_posting_skills")
+      .select("job_posting_id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    counts.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+
+  const [{ count: pendingTerms }] = await Promise.all([
     supabaseAdmin
       .from("pending_skill_terms")
       .select("id", { count: "exact", head: true })
@@ -267,7 +279,7 @@ export async function extractionHealth(): Promise<ExtractionHealth> {
   ]);
 
   const perJob = new Map<string, number>();
-  for (const row of counts ?? []) perJob.set(row.job_posting_id, (perJob.get(row.job_posting_id) ?? 0) + 1);
+  for (const row of counts) perJob.set(row.job_posting_id, (perJob.get(row.job_posting_id) ?? 0) + 1);
 
   const extracted = jobsExtracted ?? 0;
   const values: number[] = [];
