@@ -227,13 +227,13 @@ export function matchCatalogSegments<S extends string>(
       const prevConfidence: number = best === null ? -1 : best.confidence;
       const prevSegments: S[] = best === null ? [] : Array.from(best.segments);
 
-      if (best === null || candidate.confidence > prevConfidence || count > prevCount) {
+      if (best === null || candidate.confidence > prevConfidence) {
         best = {
           skill_id: skill.id,
           raw_term: candidate.term,
           matched_alias: candidate.alias,
           matched_by: candidate.matchedBy,
-          confidence: Math.max(candidate.confidence, prevConfidence < 0 ? 0 : prevConfidence),
+          confidence: candidate.confidence,
           evidence,
           count: prevCount + count,
           segments: new Set<S>([...prevSegments, ...segs]),
