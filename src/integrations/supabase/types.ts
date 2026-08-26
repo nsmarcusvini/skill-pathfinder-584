@@ -1394,6 +1394,7 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      landing_stats: { Args: never; Returns: Json }
       market_demand: {
         Args: {
           _segments: string[]
