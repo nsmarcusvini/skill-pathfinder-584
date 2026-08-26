@@ -20,11 +20,11 @@ export interface AppShellProps {
   /** Trilha de carreira selecionada. Opções vêm do banco, nunca do código. */
   trackOptions?: SelectOption[] | undefined;
   track?: string | undefined;
-  onTrackChange?: (value: string) => void | undefined;
+  onTrackChange?: ((value: string) => void) | undefined;
   /** Segmento de mercado: 'br' ou 'remoto_global'. Nunca misture os dois. */
   segmentOptions?: SelectOption[] | undefined;
   segment?: string | undefined;
-  onSegmentChange?: (value: string) => void | undefined;
+  onSegmentChange?: ((value: string) => void) | undefined;
   topbarExtra?: React.ReactNode | undefined;
 }
 
