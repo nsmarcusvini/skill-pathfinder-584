@@ -1,45 +1,151 @@
+import * as React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+} from "recharts";
+import { AlertTriangle, Briefcase, Building2, CircleCheck, CircleSlash, Wallet } from "lucide-react";
 
 import { PageHeader } from "@/components/rumvia/page-header";
 import { Blueprint } from "@/components/rumvia/blueprint";
+import { ChartCard } from "@/components/rumvia/chart-card";
 import { GapRing } from "@/components/rumvia/gap-ring";
+import { MetricCard } from "@/components/rumvia/metric-card";
 import { EmptyState, LoadingState } from "@/components/rumvia/states";
 import { SkillBadge } from "@/components/rumvia/skill-badge";
 import { Button } from "@/components/ui/button";
-import { useMarket, SEGMENT_LABEL } from "@/hooks/use-market";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  PERIOD_LABEL,
+  PERIOD_OPTIONS,
+  SEGMENT_LABEL,
+  SENIORITIES,
+  SENIORITY_LABEL,
+  useMarket,
+  type MarketSegment,
+  type Seniority,
+} from "@/hooks/use-market";
 import { useGap } from "@/hooks/use-gap";
+import { WIDENING_LABEL, type GapItem } from "@/lib/gap.functions";
+import { addToStudyPlan } from "@/lib/study-plan";
 
 export const Route = createFileRoute("/_conta/dashboard")({
   head: () => ({
     meta: [
       { title: "Dashboard — RUMVIA" },
-      { name: "description", content: "Sua aderência à trilha escolhida e as principais lacunas." },
+      {
+        name: "description",
+        content: "Sua aderência à trilha escolhida, lacunas prioritárias e demanda real do mercado.",
+      },
       { property: "og:title", content: "Dashboard — RUMVIA" },
       { property: "og:description", content: "Panorama da sua aderência ao mercado." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DashboardPage,
 });
 
-function DashboardPage() {
-  const { track, segment } = useMarket();
-  const gap = useGap();
+function formatCurrency(value: number, currency: string) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
+function DashboardPage() {
+  const {
+    track,
+    segment,
+    setSegment,
+    seniority,
+    setSeniority,
+    periodDays,
+    setPeriodDays,
+  } = useMarket();
+  const gap = useGap();
   const data = gap.data;
-  const lacunas = (data?.items ?? []).filter((i) => i.coverage < 1).slice(0, 8);
+
+  const lacunas = React.useMemo(
+    () => (data?.items ?? []).filter((i) => i.status !== "extra" && i.coverage < 1).slice(0, 10),
+    [data],
+  );
+  const forcas = React.useMemo(
+    () =>
+      (data?.items ?? [])
+        .filter((i) => i.status === "dominada" && i.marketDemand >= 0.15)
+        .sort((a, b) => b.marketDemand - a.marketDemand)
+        .slice(0, 12),
+    [data],
+  );
+  const extras = React.useMemo(
+    () => (data?.items ?? []).filter((i) => i.status === "extra").slice(0, 12),
+    [data],
+  );
+  const dominadas = (data?.items ?? []).filter((i) => i.status === "dominada").length;
+  const faltantes = (data?.items ?? []).filter((i) => i.status === "faltante").length;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Visão geral"
         title="Dashboard"
-        subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]}`}
+        subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]} · ${SENIORITY_LABEL[seniority]}`}
         actions={
           <Button asChild variant="outline">
             <Link to="/minhas-skills">Ajustar minhas skills</Link>
           </Button>
         }
       />
+
+      <Blueprint className="flex flex-wrap items-center gap-3 p-3">
+        <span className="caption">Filtros</span>
+        <Select value={seniority} onValueChange={(v) => void setSeniority(v as Seniority)}>
+          <SelectTrigger className="w-[180px]" aria-label="Senioridade">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SENIORITIES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {SENIORITY_LABEL[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={segment} onValueChange={(v) => void setSegment(v as MarketSegment)}>
+          <SelectTrigger className="w-[200px]" aria-label="Segmento de mercado">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="br">{SEGMENT_LABEL.br}</SelectItem>
+            <SelectItem value="remoto_global">{SEGMENT_LABEL.remoto_global}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
+          <SelectTrigger className="w-[190px]" aria-label="Período">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((d) => (
+              <SelectItem key={d} value={String(d)}>
+                {PERIOD_LABEL[d]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Blueprint>
 
       {gap.isLoading ? (
         <LoadingState />
@@ -49,39 +155,178 @@ function DashboardPage() {
           description="Envie seu currículo ou preencha suas skills para calcularmos sua aderência à trilha ativa."
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          <Blueprint className="flex flex-col items-center gap-2 p-5">
-            <GapRing value={data.score} label="Aderência" />
-            <p className="text-caption text-neutral-700">
-              {data.items.length} skills no baseline · {data.seniority}
-            </p>
+        <>
+          {data.lowConfidence ? (
+            <Blueprint className="flex items-start gap-3 border-warning p-3">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <p className="text-body">
+                Amostra pequena: <span className="num">{data.postingsSample}</span> vagas entraram
+                nesta conta. Para chegar a esse número usamos {WIDENING_LABEL[data.wideningStep]}.
+                Isso é comum no segmento {SEGMENT_LABEL[data.marketSegment as MarketSegment]} com
+                fontes gratuitas — o número segue válido, só com menos precisão.
+              </p>
+            </Blueprint>
+          ) : null}
+
+          <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <Blueprint className="flex flex-col items-center justify-center gap-3 p-5">
+              <GapRing value={data.score} size={180} thickness={12} label="Aderência" />
+              {data.delta === null ? (
+                <p className="caption">Primeira análise deste recorte</p>
+              ) : (
+                <p className="caption">
+                  <span className="num">
+                    {data.delta > 0 ? "+" : ""}
+                    {data.delta}
+                  </span>{" "}
+                  p.p. vs. análise anterior
+                </p>
+              )}
+            </Blueprint>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <MetricCard
+                label="Vagas analisadas"
+                value={data.postingsSample}
+                icon={<Briefcase className="size-4" />}
+                hint={PERIOD_LABEL[data.periodDays] ?? `${data.periodDays} dias`}
+              />
+              <MetricCard
+                label="Skills dominadas"
+                value={dominadas}
+                icon={<CircleCheck className="size-4" />}
+              />
+              <MetricCard
+                label="Skills faltantes"
+                value={faltantes}
+                icon={<CircleSlash className="size-4" />}
+              />
+              <MetricCard
+                label="Mediana salarial da trilha"
+                value={
+                  data.salaryMedian === null
+                    ? "—"
+                    : formatCurrency(data.salaryMedian, data.currency)
+                }
+                icon={<Wallet className="size-4" />}
+                hint={SEGMENT_LABEL[data.marketSegment as MarketSegment]}
+              />
+              <MetricCard
+                label="Empresas contratando (30d)"
+                value={data.companiesHiring30d}
+                icon={<Building2 className="size-4" />}
+              />
+            </div>
+          </div>
+
+          <ChartCard
+            title="Aderência por categoria"
+            description="Sub-scores calculados pela mesma fórmula, por categoria de skill."
+          >
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={data.categoryScores} outerRadius="72%">
+                  <PolarGrid stroke="var(--color-divider)" />
+                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <Radar
+                    name="Aderência"
+                    dataKey="score"
+                    stroke="var(--color-accent-600)"
+                    fill="var(--color-accent-400)"
+                    fillOpacity={0.35}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          <Blueprint className="flex flex-col">
+            <div className="border-b border-divider p-3">
+              <h6 className="text-neutral-700">Top 10 lacunas prioritárias</h6>
+              <p className="caption mt-1">Ordenado pelo peso da lacuna (demanda + baseline).</p>
+            </div>
+            <ul className="divide-y divide-divider">
+              {lacunas.map((item) => (
+                <GapRow key={item.skillId} item={item} />
+              ))}
+              {lacunas.length === 0 ? (
+                <li className="p-3 text-body text-neutral-600">Nenhuma lacuna neste recorte.</li>
+              ) : null}
+            </ul>
           </Blueprint>
 
-          <Blueprint className="p-5">
-            <h2 className="label-h6 text-neutral-700">Maiores lacunas</h2>
-            <div className="mt-3 flex flex-col">
-              {lacunas.length === 0 ? (
-                <p className="text-caption text-neutral-500">Baseline coberto por completo.</p>
-              ) : (
-                lacunas.map((item) => (
-                  <div
-                    key={item.skillId}
-                    className="flex items-center gap-3 border-t border-neutral-200 py-2 first:border-t-0"
-                  >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Blueprint className="flex flex-col">
+              <div className="border-b border-divider p-3">
+                <h6 className="text-neutral-700">Suas forças</h6>
+                <p className="caption mt-1">Skills dominadas com alta demanda no recorte atual.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 p-3">
+                {forcas.length === 0 ? (
+                  <p className="text-body text-neutral-600">
+                    Ainda não há skills dominadas de alta demanda.
+                  </p>
+                ) : (
+                  forcas.map((i) => (
                     <SkillBadge
-                      name={item.name}
-                      status={item.userLevel > 0 ? "parcial" : "faltante"}
+                      key={i.skillId}
+                      name={`${i.name} · ${Math.round(i.marketDemand * 100)}%`}
+                      status="dominada"
                     />
-                    <span className="num ml-auto text-caption text-neutral-700">
-                      nível {item.userLevel}/{item.requiredLevel} · peso {item.importance}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </Blueprint>
-        </div>
+                  ))
+                )}
+              </div>
+            </Blueprint>
+
+            <Blueprint className="flex flex-col">
+              <div className="border-b border-divider p-3">
+                <h6 className="text-neutral-700">Skills extras</h6>
+                <p className="caption mt-1">
+                  O que você tem e este recorte do mercado pouco pede. É informação de
+                  posicionamento, não demérito.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 p-3">
+                {extras.length === 0 ? (
+                  <p className="text-body text-neutral-600">Nada fora do radar da trilha.</p>
+                ) : (
+                  extras.map((i) => <SkillBadge key={i.skillId} name={i.name} status="extra" />)
+                )}
+              </div>
+            </Blueprint>
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+function GapRow({ item }: { item: GapItem }) {
+  return (
+    <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+      <div className="min-w-0">
+        <SkillBadge name={item.name} status={item.status} />
+        {item.categoryName ? <span className="caption ml-2">{item.categoryName}</span> : null}
+      </div>
+      <span className="num text-caption text-neutral-700">
+        {Math.round(item.marketDemand * 100)}% das vagas
+      </span>
+      <span className="num text-caption text-neutral-700">
+        nível {item.userLevel}/{item.requiredLevel}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          const added = addToStudyPlan({ skillId: item.skillId, name: item.name });
+          toast[added ? "success" : "info"](
+            added ? `${item.name} adicionada ao plano de estudos` : `${item.name} já está no plano`,
+          );
+        }}
+      >
+        Adicionar ao plano de estudos
+      </Button>
+    </li>
   );
 }
