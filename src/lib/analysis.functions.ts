@@ -37,11 +37,16 @@ export const applyCvAnalysis = createServerFn({ method: "POST" })
     const trackId = data.trackId ?? version?.detected_track_id ?? null;
     const seniority = data.seniority ?? version?.detected_seniority ?? "pleno";
 
-    const profileUpdate: Record<string, unknown> = { seniority };
-    if (trackId) profileUpdate["current_track_id"] = trackId;
+    const profileUpdate: {
+      seniority: string;
+      current_track_id?: string;
+      target_region?: string;
+      target_currency?: string;
+    } = { seniority };
+    if (trackId) profileUpdate.current_track_id = trackId;
     if (data.marketSegment) {
-      profileUpdate["target_region"] = data.marketSegment;
-      profileUpdate["target_currency"] = data.marketSegment === "remoto_global" ? "USD" : "BRL";
+      profileUpdate.target_region = data.marketSegment;
+      profileUpdate.target_currency = data.marketSegment === "remoto_global" ? "USD" : "BRL";
     }
     await supabase.from("profiles").update(profileUpdate).eq("id", userId);
 
