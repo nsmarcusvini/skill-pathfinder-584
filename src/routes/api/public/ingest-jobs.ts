@@ -13,14 +13,24 @@ export const Route = createFileRoute("/api/public/ingest-jobs")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["LOVABLE_CRON_SECRET"];
         const provided = request.headers.get("x-cron-secret");
-        if (!secret || !provided || provided !== secret) {
+        const envSecret = process.env["LOVABLE_CRON_SECRET"];
+        let authorized = Boolean(provided && envSecret && provided === envSecret);
+
+        if (!authorized && provided) {
+          // Segredo do agendamento fica no cofre do banco, nunca no front.
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data } = await supabaseAdmin.rpc("verify_cron_secret", { _token: provided });
+          authorized = data === true;
+        }
+
+        if (!authorized) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
             headers: { "content-type": "application/json" },
           });
         }
+
 
         let parsed: { source_keys?: string[] } = {};
         try {
