@@ -16,6 +16,7 @@ const TABS = [
   { to: "/admin", label: "Visão geral", exact: true },
   { to: "/admin/fontes", label: "Fontes" },
   { to: "/admin/importar", label: "Importar CSV" },
+  { to: "/admin/skills", label: "Curadoria de skills" },
   { to: "/admin/descobrir-ats", label: "Descobrir ATS" },
 ] as const;
 
