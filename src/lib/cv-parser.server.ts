@@ -281,87 +281,16 @@ export function matchSkills(
   const blocks = parseExperienceBlocks(sectioned.sections.experiencia);
   const totalYears = Math.round((blocks.reduce((s, b) => s + b.months, 0) / 12) * 10) / 10;
 
-  const aliasBySkill = new Map<string, string[]>();
-  for (const a of aliases) {
-    const list = aliasBySkill.get(a.skill_id) ?? [];
-    list.push(a.alias);
-    aliasBySkill.set(a.skill_id, list);
-  }
+  const index = buildCatalogIndex(skills, aliases);
+  const segments: Array<[Section, string]> = [...sectionEntries, ["outro", headline]];
+  const { matches, matchedTerms } = matchCatalogSegments<Section>(segments, index);
 
   const extracted: ExtractedSkill[] = [];
-  const matchedTerms = new Set<string>();
+  const skillById = new Map(skills.map((s) => [s.id, s]));
 
-  for (const skill of skills) {
-    const candidates: Array<{ term: string; matchedBy: MatchedBy; confidence: number; re: RegExp }> = [
-      {
-        term: skill.canonical_name,
-        matchedBy: "exact",
-        confidence: 1,
-        re: new RegExp(`(?<![\\p{L}\\d])${escapeRegExp(skill.canonical_name)}(?![\\p{L}\\d])`, "u"),
-      },
-    ];
-    for (const alias of aliasBySkill.get(skill.id) ?? []) {
-      candidates.push({
-        term: alias,
-        matchedBy: "alias",
-        confidence: 0.95,
-        re: new RegExp(`(?<![\\p{L}\\d])${escapeRegExp(alias)}(?![\\p{L}\\d])`, "u"),
-      });
-    }
-    if (skill.is_ambiguous) {
-      for (const pattern of skill.match_patterns ?? []) {
-        try {
-          candidates.push({
-            term: skill.canonical_name,
-            matchedBy: "regex",
-            confidence: 0.9,
-            re: new RegExp(pattern, "u"),
-          });
-        } catch {
-          /* padrão inválido é ignorado */
-        }
-      }
-    }
-
-    let best: Occurrence & { matchedBy: MatchedBy; confidence: number } | null = null;
-    for (const candidate of candidates) {
-      let count = 0;
-      let evidence: string | null = null;
-      const sections = new Set<Section>();
-      for (const [section, text] of sectionEntries) {
-        const found = findOccurrences(candidate.re, text);
-        if (found.count > 0) {
-          count += found.count;
-          sections.add(section);
-          if (!evidence) evidence = found.evidence;
-        }
-      }
-      const inHeadline = findOccurrences(candidate.re, headline);
-      count += inHeadline.count;
-      if (inHeadline.count > 0 && !evidence) evidence = inHeadline.evidence;
-
-      if (count > 0) {
-        matchedTerms.add(normalize(candidate.term));
-        if (
-          !best ||
-          candidate.confidence > best.confidence ||
-          (candidate.confidence === best.confidence && count > best.count)
-        ) {
-          best = {
-            count,
-            sections,
-            evidence: evidence ?? "",
-            rawTerm: candidate.term,
-            matchedBy: candidate.matchedBy,
-            confidence: candidate.confidence,
-          };
-        } else {
-          best.count += count;
-        }
-      }
-    }
-
-    if (!best) continue;
+  for (const match of matches) {
+    const skill = skillById.get(match.skill_id);
+    if (!skill) continue;
 
     // anos: soma dos blocos de experiência em que a skill aparece
     const skillRe = new RegExp(
@@ -381,41 +310,42 @@ export function matchSkills(
     const years = months > 0 ? Math.round((months / 12) * 10) / 10 : null;
 
     let level = levelFromYears(years);
-    if (best.sections.has("certificacoes")) level += 1;
-    if (best.count >= 4) level += 1;
+    if (match.segments.has("certificacoes")) level += 1;
+    if (match.count >= 4) level += 1;
     level = Math.min(5, level);
 
-    const evidence = best.evidence || null;
+    const evidence = match.evidence || null;
     if (evidence) {
       if (LEVEL_MARKERS.expert.test(evidence)) level = 5;
       else if (LEVEL_MARKERS.advanced.test(evidence)) level = Math.max(4, level);
       else if (LEVEL_MARKERS.basic.test(evidence)) level = Math.min(2, level);
     }
 
-    const section: Section = best.sections.has("skills")
+    const section: Section = match.segments.has("skills")
       ? "skills"
-      : best.sections.has("experiencia")
+      : match.segments.has("experiencia")
         ? "experiencia"
-        : best.sections.has("certificacoes")
+        : match.segments.has("certificacoes")
           ? "certificacoes"
-          : best.sections.has("formacao")
+          : match.segments.has("formacao")
             ? "formacao"
             : "outro";
 
     extracted.push({
       skill_id: skill.id,
-      raw_term: best.rawTerm,
-      matched_by: best.matchedBy,
-      confidence: best.confidence,
+      raw_term: match.raw_term,
+      matched_by: match.matched_by,
+      confidence: match.confidence,
       evidence_snippet: evidence,
       section,
-      mention_count: best.count,
+      mention_count: match.count,
       first_year: firstYear,
       last_year: lastYear,
       years_hint: years,
       level_hint: level,
     });
   }
+
 
   // termos da seção de skills que não casaram: trigram e, por fim, curadoria
   const rawTerms = sectioned.sections.skills
