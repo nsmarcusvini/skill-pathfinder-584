@@ -87,6 +87,24 @@ function hashParams(parts: Array<string | number | null>): string {
   return `${h.toString(36)}-${raw.length.toString(36)}`;
 }
 
+function stepConfig(
+  step: WideningStep,
+  periodDays: number,
+  seniority: string,
+  marketSegment: string,
+): { days: number; sen: string[]; seg: string[] } {
+  switch (step) {
+    case "janela_180":
+      return { days: 180, sen: [seniority], seg: [marketSegment] };
+    case "senioridades_adjacentes":
+      return { days: 180, sen: adjacentSeniorities(seniority), seg: [marketSegment] };
+    case "ambos_segmentos":
+      return { days: 180, sen: adjacentSeniorities(seniority), seg: ["br", "remoto_global"] };
+    default:
+      return { days: periodDays, sen: [seniority], seg: [marketSegment] };
+  }
+}
+
 interface ComputeInput {
   seniority?: string;
   marketSegment?: "br" | "remoto_global";
@@ -173,6 +191,15 @@ export const computeGap = createServerFn({ method: "POST" })
         !lastSkill?.updated_at ||
         new Date(latest.computed_at).getTime() >= new Date(lastSkill.updated_at).getTime();
       if (fresh && skillsUnchanged) {
+        const cachedStep = ((latest.widening_step as WideningStep) ?? "base");
+        const cfg = stepConfig(cachedStep, periodDays, seniority, marketSegment);
+        const { data: cachedStats } = await supabase.rpc("market_scope_stats", {
+          _track_id: trackId,
+          _seniorities: cfg.sen,
+          _segments: cfg.seg,
+          _since: new Date(Date.now() - cfg.days * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        const cs = cachedStats?.[0];
         const { data: items } = await supabase
           .from("gap_analysis_items")
           .select("*, skills(canonical_name, skill_categories(key, name))")
@@ -190,8 +217,11 @@ export const computeGap = createServerFn({ method: "POST" })
           postingsSample: latest.postings_sample,
           lowConfidence: latest.low_confidence,
           wideningStep: (latest.widening_step as WideningStep) ?? "base",
-          companiesHiring30d: 0,
-          salaryMedian: null,
+          companiesHiring30d: Number(cs?.companies_30d ?? 0),
+          salaryMedian:
+            cs?.salary_median === null || cs?.salary_median === undefined
+              ? null
+              : Number(cs.salary_median),
           computedAt: latest.computed_at,
           cached: true,
           items: (items ?? []).map((it) => {
@@ -219,22 +249,9 @@ export const computeGap = createServerFn({ method: "POST" })
     }
 
     // ---- recorte de mercado, com degraus de ampliação ----
-    const steps: Array<{ step: WideningStep; days: number; sen: string[]; seg: string[] }> = [
-      { step: "base", days: periodDays, sen: [seniority], seg: [marketSegment] },
-      { step: "janela_180", days: 180, sen: [seniority], seg: [marketSegment] },
-      {
-        step: "senioridades_adjacentes",
-        days: 180,
-        sen: adjacentSeniorities(seniority),
-        seg: [marketSegment],
-      },
-      {
-        step: "ambos_segmentos",
-        days: 180,
-        sen: adjacentSeniorities(seniority),
-        seg: ["br", "remoto_global"],
-      },
-    ];
+    const steps = (["base", "janela_180", "senioridades_adjacentes", "ambos_segmentos"] as const).map(
+      (step) => ({ step, ...stepConfig(step, periodDays, seniority, marketSegment) }),
+    );
 
     let usedStep: WideningStep = "base";
     let totalJobs = 0;
