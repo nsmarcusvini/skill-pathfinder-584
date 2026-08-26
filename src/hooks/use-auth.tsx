@@ -190,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: fullName ? { full_name: fullName } : undefined,
+            ...(fullName ? { data: { full_name: fullName } } : {}),
             ...(captchaToken ? { captchaToken } : {}),
           },
         });
