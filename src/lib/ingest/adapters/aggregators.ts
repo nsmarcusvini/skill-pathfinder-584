@@ -16,7 +16,7 @@ export const remotiveAdapter: JobAdapter = {
   key: "remotive",
   async fetchJobs(cfg) {
     const search = cfg.query ? `?search=${encodeURIComponent(String(cfg.query))}&limit=200` : "?limit=200";
-    const data = await fetchJson<{ jobs: Array<Record<string, any>> }>(`https://remotive.com/api/remote-jobs${search}`);
+    const data = await fetchJson<{ jobs: Array<any> }>(`https://remotive.com/api/remote-jobs${search}`);
     return (data.jobs ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.description ?? null);
       return {
@@ -46,7 +46,7 @@ export const remotiveAdapter: JobAdapter = {
 export const remoteokAdapter: JobAdapter = {
   key: "remoteok",
   async fetchJobs() {
-    const data = await fetchJson<Array<Record<string, any>>>("https://remoteok.com/api");
+    const data = await fetchJson<Array<any>>("https://remoteok.com/api");
     return (data ?? [])
       .filter((job) => job && job.id && job.position)
       .map((job): NormalizedJob => {
@@ -79,7 +79,7 @@ export const remoteokAdapter: JobAdapter = {
 export const himalayasAdapter: JobAdapter = {
   key: "himalayas",
   async fetchJobs() {
-    const data = await fetchJson<{ jobs: Array<Record<string, any>> }>("https://himalayas.app/jobs/api?limit=200");
+    const data = await fetchJson<{ jobs: Array<any> }>("https://himalayas.app/jobs/api?limit=200");
     return (data.jobs ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.description ?? null);
       const salary = toAnnual(parseMoney(job.minSalary), parseMoney(job.maxSalary), "year");
@@ -112,7 +112,7 @@ export const himalayasAdapter: JobAdapter = {
 export const jobicyAdapter: JobAdapter = {
   key: "jobicy",
   async fetchJobs() {
-    const data = await fetchJson<{ jobs: Array<Record<string, any>> }>("https://jobicy.com/api/v2/remote-jobs?count=100");
+    const data = await fetchJson<{ jobs: Array<any> }>("https://jobicy.com/api/v2/remote-jobs?count=100");
     return (data.jobs ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.jobDescription ?? job.jobExcerpt ?? null);
       const salary = toAnnual(
@@ -147,7 +147,7 @@ export const jobicyAdapter: JobAdapter = {
 export const arbeitnowAdapter: JobAdapter = {
   key: "arbeitnow",
   async fetchJobs() {
-    const data = await fetchJson<{ data: Array<Record<string, any>> }>("https://www.arbeitnow.com/api/job-board-api");
+    const data = await fetchJson<{ data: Array<any> }>("https://www.arbeitnow.com/api/job-board-api");
     return (data.data ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.description ?? null);
       return {

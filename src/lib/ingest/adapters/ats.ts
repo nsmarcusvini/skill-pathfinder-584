@@ -23,7 +23,7 @@ export const greenhouseAdapter: JobAdapter = {
   key: "greenhouse",
   async fetchJobs(cfg) {
     return collect(cfg, async (token) => {
-      const data = await fetchJson<{ jobs: Array<Record<string, any>> }>(
+      const data = await fetchJson<{ jobs: Array<any> }>(
         `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(token)}/jobs?content=true`,
       );
       return (data.jobs ?? []).map((job): NormalizedJob => {
@@ -59,7 +59,7 @@ export const leverAdapter: JobAdapter = {
   key: "lever",
   async fetchJobs(cfg) {
     return collect(cfg, async (token) => {
-      const data = await fetchJson<Array<Record<string, any>>>(
+      const data = await fetchJson<Array<any>>(
         `https://api.lever.co/v0/postings/${encodeURIComponent(token)}?mode=json`,
       );
       return (data ?? []).map((job): NormalizedJob => {
@@ -95,7 +95,7 @@ export const ashbyAdapter: JobAdapter = {
   key: "ashby",
   async fetchJobs(cfg) {
     return collect(cfg, async (token) => {
-      const data = await fetchJson<{ jobs: Array<Record<string, any>> }>(
+      const data = await fetchJson<{ jobs: Array<any> }>(
         `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(token)}?includeCompensation=true`,
       );
       return (data.jobs ?? []).map((job): NormalizedJob => {
@@ -137,7 +137,7 @@ export const workableAdapter: JobAdapter = {
   key: "workable",
   async fetchJobs(cfg) {
     return collect(cfg, async (token) => {
-      const data = await fetchJson<{ name?: string; jobs: Array<Record<string, any>> }>(
+      const data = await fetchJson<{ name?: string; jobs: Array<any> }>(
         `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(token)}?details=true`,
       );
       return (data.jobs ?? []).map((job): NormalizedJob => {
@@ -173,7 +173,7 @@ export const smartrecruitersAdapter: JobAdapter = {
   key: "smartrecruiters",
   async fetchJobs(cfg) {
     return collect(cfg, async (token) => {
-      const data = await fetchJson<{ content: Array<Record<string, any>> }>(
+      const data = await fetchJson<{ content: Array<any> }>(
         `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(token)}/postings?limit=100`,
       );
       return (data.content ?? []).map((job): NormalizedJob => {
