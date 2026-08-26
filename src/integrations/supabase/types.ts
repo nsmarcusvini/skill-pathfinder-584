@@ -546,12 +546,14 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          ingest_token_hash: string | null
           is_active: boolean
           key: string
           last_run_at: string | null
           last_run_count: number
           last_run_status: string | null
           name: string
+          source_type: string
           updated_at: string
         }
         Insert: {
@@ -560,12 +562,14 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          ingest_token_hash?: string | null
           is_active?: boolean
           key: string
           last_run_at?: string | null
           last_run_count?: number
           last_run_status?: string | null
           name: string
+          source_type?: string
           updated_at?: string
         }
         Update: {
@@ -574,12 +578,14 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          ingest_token_hash?: string | null
           is_active?: boolean
           key?: string
           last_run_at?: string | null
           last_run_count?: number
           last_run_status?: string | null
           name?: string
+          source_type?: string
           updated_at?: string
         }
         Relationships: []
@@ -645,6 +651,7 @@ export type Database = {
           full_name: string | null
           headline: string | null
           id: string
+          is_admin: boolean
           is_anonymous: boolean
           onboarding_completed: boolean
           seniority: string | null
@@ -663,6 +670,7 @@ export type Database = {
           full_name?: string | null
           headline?: string | null
           id: string
+          is_admin?: boolean
           is_anonymous?: boolean
           onboarding_completed?: boolean
           seniority?: string | null
@@ -681,6 +689,7 @@ export type Database = {
           full_name?: string | null
           headline?: string | null
           id?: string
+          is_admin?: boolean
           is_anonymous?: boolean
           onboarding_completed?: boolean
           seniority?: string | null
@@ -1172,6 +1181,7 @@ export type Database = {
       }
     }
     Functions: {
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       refresh_market_views: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
