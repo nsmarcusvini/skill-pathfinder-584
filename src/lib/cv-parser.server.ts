@@ -353,8 +353,6 @@ export function matchSkills(
     .map((t) => t.replace(/^[\s\-–—*·]+|[\s.:;]+$/g, "").trim())
     .filter((t) => t.length >= 2 && t.length <= 40 && /[\p{L}]/u.test(t));
 
-  const canonicalIndex = skills.map((s) => ({ skill: s, norm: normalize(s.canonical_name) }));
-  const aliasIndex = aliases.map((a) => ({ skillId: a.skill_id, norm: normalize(a.alias) }));
   const already = new Set(extracted.map((e) => e.skill_id));
 
   for (const term of Array.from(new Set(rawTerms))) {
@@ -362,24 +360,11 @@ export function matchSkills(
     if (matchedTerms.has(norm)) continue;
     if (fullText.length === 0) continue;
 
-    let bestScore = 0;
-    let bestSkillId: string | null = null;
-    for (const c of canonicalIndex) {
-      const score = similarity(norm, c.norm);
-      if (score > bestScore) {
-        bestScore = score;
-        bestSkillId = c.skill.id;
-      }
-    }
-    for (const a of aliasIndex) {
-      const score = similarity(norm, a.norm);
-      if (score > bestScore) {
-        bestScore = score;
-        bestSkillId = a.skillId;
-      }
-    }
+    const suggestion = bestTrigram(term, index);
+    const bestScore = suggestion.score;
+    const bestSkillId = suggestion.skillId;
 
-    if (bestScore >= 0.86 && bestSkillId && !already.has(bestSkillId)) {
+    if (bestScore >= TRIGRAM_THRESHOLD && bestSkillId && !already.has(bestSkillId)) {
       already.add(bestSkillId);
       extracted.push({
         skill_id: bestSkillId,
@@ -394,7 +379,7 @@ export function matchSkills(
         years_hint: null,
         level_hint: 2,
       });
-    } else if (bestScore < 0.86) {
+    } else if (bestScore < TRIGRAM_THRESHOLD) {
       extracted.push({
         skill_id: null,
         raw_term: term,
@@ -409,6 +394,7 @@ export function matchSkills(
         level_hint: null,
       });
     }
+
   }
 
   const titles = (sectioned.headline + "\n" + sectioned.sections.experiencia)
