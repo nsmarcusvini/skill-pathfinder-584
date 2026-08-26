@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           {
             email,
             password,
-            data: fullName ? { full_name: fullName } : undefined,
+            ...(fullName ? { data: { full_name: fullName } } : {}),
           },
           { emailRedirectTo: `${window.location.origin}/auth/callback` },
         );
