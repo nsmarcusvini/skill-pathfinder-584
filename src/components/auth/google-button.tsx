@@ -7,8 +7,8 @@ export function GoogleButton({
   label = "Continuar com Google",
 }: {
   onClick: () => void | Promise<void>;
-  loading?: boolean;
-  label?: string;
+  loading?: boolean | undefined;
+  label?: string | undefined;
 }) {
   const [busy, setBusy] = React.useState(false);
 

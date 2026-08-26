@@ -22,7 +22,7 @@ export interface AuthDialogProps {
   onSuccess?: () => void;
 }
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message }: { message?: string | undefined }) {
   if (!message) return null;
   return <p className="mt-1 text-caption text-danger">{message}</p>;
 }
