@@ -32,6 +32,8 @@ import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index'
 import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
+import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
+import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
 import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
 
@@ -149,6 +151,16 @@ const ContaAdminDescobrirAtsRoute = ContaAdminDescobrirAtsRouteImport.update({
   path: '/descobrir-ats',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminFontesRoute = ContaAdminFontesRouteImport.update({
+  id: '/fontes',
+  path: '/fontes',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ContaAdminImportarRoute = ContaAdminImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
 const ApiPublicIngestJobsRoute = ApiPublicIngestJobsRouteImport.update({
   id: '/api/public/ingest-jobs',
   path: '/api/public/ingest-jobs',
@@ -182,6 +194,8 @@ export interface FileRoutesByFullPath {
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/admin/fontes': typeof ContaAdminFontesRoute
+  '/admin/importar': typeof ContaAdminImportarRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/admin/': typeof ContaAdminIndexRoute
@@ -207,6 +221,8 @@ export interface FileRoutesByTo {
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/admin/fontes': typeof ContaAdminFontesRoute
+  '/admin/importar': typeof ContaAdminImportarRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/admin': typeof ContaAdminIndexRoute
@@ -235,6 +251,8 @@ export interface FileRoutesById {
   '/_conta/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/_conta/admin/fontes': typeof ContaAdminFontesRoute
+  '/_conta/admin/importar': typeof ContaAdminImportarRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/_conta/admin/': typeof ContaAdminIndexRoute
@@ -263,6 +281,8 @@ export interface FileRouteTypes {
     | '/salarios'
     | '/auth/callback'
     | '/admin/descobrir-ats'
+    | '/admin/fontes'
+    | '/admin/importar'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/admin/'
@@ -288,6 +308,8 @@ export interface FileRouteTypes {
     | '/salarios'
     | '/auth/callback'
     | '/admin/descobrir-ats'
+    | '/admin/fontes'
+    | '/admin/importar'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/admin'
@@ -315,6 +337,8 @@ export interface FileRouteTypes {
     | '/_conta/salarios'
     | '/auth/callback'
     | '/_conta/admin/descobrir-ats'
+    | '/_conta/admin/fontes'
+    | '/_conta/admin/importar'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/_conta/admin/'
@@ -498,6 +522,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminDescobrirAtsRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/fontes': {
+      id: '/_conta/admin/fontes'
+      path: '/fontes'
+      fullPath: '/admin/fontes'
+      preLoaderRoute: typeof ContaAdminFontesRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/_conta/admin/importar': {
+      id: '/_conta/admin/importar'
+      path: '/importar'
+      fullPath: '/admin/importar'
+      preLoaderRoute: typeof ContaAdminImportarRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
     '/api/public/ingest-jobs': {
       id: '/api/public/ingest-jobs'
       path: '/api/public/ingest-jobs'
@@ -517,11 +555,15 @@ declare module '@tanstack/react-router' {
 
 interface ContaAdminRouteChildren {
   ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
+  ContaAdminFontesRoute: typeof ContaAdminFontesRoute
+  ContaAdminImportarRoute: typeof ContaAdminImportarRoute
   ContaAdminIndexRoute: typeof ContaAdminIndexRoute
 }
 
 const ContaAdminRouteChildren: ContaAdminRouteChildren = {
   ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
+  ContaAdminFontesRoute: ContaAdminFontesRoute,
+  ContaAdminImportarRoute: ContaAdminImportarRoute,
   ContaAdminIndexRoute: ContaAdminIndexRoute,
 }
 
