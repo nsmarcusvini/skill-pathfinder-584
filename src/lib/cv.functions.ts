@@ -1,4 +1,5 @@
-import { createServerFn, getRequestHeader } from "@tanstack/react-start";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -104,7 +105,7 @@ export const parseCv = createServerFn({ method: "POST" })
 
       const result = parser.matchSkills(
         sectioned,
-        (skills ?? []) as parser.CatalogSkill[],
+        (skills ?? []) as Parameters<typeof parser.matchSkills>[1],
         (aliases ?? []).map((a) => ({ skill_id: a.skill_id, alias: String(a.alias) })),
       );
 
@@ -115,8 +116,8 @@ export const parseCv = createServerFn({ method: "POST" })
       const detection = parser.detectTrackAndSeniority(
         result.titles,
         matchedIds,
-        (variants ?? []) as parser.RoleVariantRow[],
-        (baselines ?? []) as parser.BaselineRow[],
+        (variants ?? []) as Parameters<typeof parser.detectTrackAndSeniority>[2],
+        (baselines ?? []) as Parameters<typeof parser.detectTrackAndSeniority>[3],
         result.totalYears,
       );
 

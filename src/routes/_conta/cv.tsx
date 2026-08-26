@@ -284,7 +284,7 @@ function CvPage() {
                     <td className="flex items-center gap-2">
                       <FileText className="size-4 text-neutral-700" aria-hidden />
                       {cv.original_filename}
-                      {cv.is_current ? <Badge variant="secondary">atual</Badge> : null}
+                      {cv.is_current ? <Badge variant="neutral">atual</Badge> : null}
                     </td>
                     <td className="num">{new Date(cv.created_at).toLocaleDateString("pt-BR")}</td>
                     <td className="num">{formatBytes(cv.file_size)}</td>
@@ -462,7 +462,7 @@ function ReviewPanel({ cv }: { cv: CvRow }) {
               </span>
               <span className="text-caption text-neutral-700">seção: {row.section}</span>
               {row.accepted === true ? (
-                <Badge variant="secondary">
+                <Badge variant="neutral">
                   <CheckCircle2 className="mr-1 size-3" aria-hidden /> aceita
                 </Badge>
               ) : null}
