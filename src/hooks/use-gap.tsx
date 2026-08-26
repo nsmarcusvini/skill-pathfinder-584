@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { computeGap } from "@/lib/gap.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { useMarket } from "@/hooks/use-market";
 
 export const GAP_QUERY_KEY = ["gap"] as const;
 
@@ -13,11 +14,13 @@ export const GAP_QUERY_KEY = ["gap"] as const;
 export function useGap() {
   const { user } = useAuth();
   const run = useServerFn(computeGap);
+  const { seniority, segment, periodDays } = useMarket();
   return useQuery({
-    queryKey: [...GAP_QUERY_KEY, user?.id ?? null],
+    queryKey: [...GAP_QUERY_KEY, user?.id ?? null, seniority, segment, periodDays],
     enabled: Boolean(user),
     staleTime: 30 * 1000,
-    queryFn: () => run(),
+    queryFn: () =>
+      run({ data: { seniority, marketSegment: segment, periodDays } }),
   });
 }
 

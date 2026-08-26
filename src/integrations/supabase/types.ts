@@ -281,6 +281,129 @@ export type Database = {
         }
         Relationships: []
       }
+      gap_analyses: {
+        Row: {
+          category_scores: Json
+          computed_at: string
+          currency: string
+          id: string
+          low_confidence: boolean
+          market_segment: string
+          overall_score: number
+          params_hash: string
+          postings_sample: number
+          role_variant_id: string | null
+          seniority: string | null
+          track_id: string | null
+          user_id: string
+          widening_step: string
+        }
+        Insert: {
+          category_scores?: Json
+          computed_at?: string
+          currency?: string
+          id?: string
+          low_confidence?: boolean
+          market_segment?: string
+          overall_score?: number
+          params_hash: string
+          postings_sample?: number
+          role_variant_id?: string | null
+          seniority?: string | null
+          track_id?: string | null
+          user_id: string
+          widening_step?: string
+        }
+        Update: {
+          category_scores?: Json
+          computed_at?: string
+          currency?: string
+          id?: string
+          low_confidence?: boolean
+          market_segment?: string
+          overall_score?: number
+          params_hash?: string
+          postings_sample?: number
+          role_variant_id?: string | null
+          seniority?: string | null
+          track_id?: string | null
+          user_id?: string
+          widening_step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gap_analyses_role_variant_id_fkey"
+            columns: ["role_variant_id"]
+            isOneToOne: false
+            referencedRelation: "track_role_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gap_analyses_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gap_analysis_items: {
+        Row: {
+          baseline_importance: number
+          coverage: number
+          gap_analysis_id: string
+          gap_score: number
+          id: string
+          market_demand: number
+          required_level: number
+          skill_id: string
+          status: string
+          user_level: number
+          weight: number
+        }
+        Insert: {
+          baseline_importance?: number
+          coverage?: number
+          gap_analysis_id: string
+          gap_score?: number
+          id?: string
+          market_demand?: number
+          required_level?: number
+          skill_id: string
+          status: string
+          user_level?: number
+          weight?: number
+        }
+        Update: {
+          baseline_importance?: number
+          coverage?: number
+          gap_analysis_id?: string
+          gap_score?: number
+          id?: string
+          market_demand?: number
+          required_level?: number
+          skill_id?: string
+          status?: string
+          user_level?: number
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gap_analysis_items_gap_analysis_id_fkey"
+            columns: ["gap_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "gap_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gap_analysis_items_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingestion_runs: {
         Row: {
           error: string | null
@@ -1271,6 +1394,32 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      market_demand: {
+        Args: {
+          _segments: string[]
+          _seniorities: string[]
+          _since: string
+          _track_id: string
+        }
+        Returns: {
+          jobs: number
+          skill_id: string
+          total_jobs: number
+        }[]
+      }
+      market_scope_stats: {
+        Args: {
+          _segments: string[]
+          _seniorities: string[]
+          _since: string
+          _track_id: string
+        }
+        Returns: {
+          companies_30d: number
+          salary_median: number
+          total_jobs: number
+        }[]
+      }
       match_company: { Args: { _name: string }; Returns: string }
       refresh_market_views: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
