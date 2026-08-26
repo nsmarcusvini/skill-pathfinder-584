@@ -10,11 +10,44 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ContaRouteImport } from './routes/_conta'
+import { Route as AnaliseRouteImport } from './routes/analise'
+import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as DesignSystemRouteImport } from './routes/design-system'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as RecuperarSenhaRouteImport } from './routes/recuperar-senha'
+import { Route as ContaAdminRouteImport } from './routes/_conta/admin'
+import { Route as ContaCertificacoesRouteImport } from './routes/_conta/certificacoes'
+import { Route as ContaContaRouteImport } from './routes/_conta/conta'
+import { Route as ContaCursosRouteImport } from './routes/_conta/cursos'
+import { Route as ContaCvRouteImport } from './routes/_conta/cv'
+import { Route as ContaDashboardRouteImport } from './routes/_conta/dashboard'
+import { Route as ContaEmpresasRouteImport } from './routes/_conta/empresas'
+import { Route as ContaFerramentasRouteImport } from './routes/_conta/ferramentas'
+import { Route as ContaMinhasSkillsRouteImport } from './routes/_conta/minhas-skills'
+import { Route as ContaProgressoRouteImport } from './routes/_conta/progresso'
+import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContaRoute = ContaRouteImport.update({
+  id: '/_conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnaliseRoute = AnaliseRouteImport.update({
+  id: '/analise',
+  path: '/analise',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignSystemRoute = DesignSystemRouteImport.update({
@@ -22,31 +55,236 @@ const DesignSystemRoute = DesignSystemRouteImport.update({
   path: '/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecuperarSenhaRoute = RecuperarSenhaRouteImport.update({
+  id: '/recuperar-senha',
+  path: '/recuperar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContaAdminRoute = ContaAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaCertificacoesRoute = ContaCertificacoesRouteImport.update({
+  id: '/certificacoes',
+  path: '/certificacoes',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaContaRoute = ContaContaRouteImport.update({
+  id: '/conta',
+  path: '/conta',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaCursosRoute = ContaCursosRouteImport.update({
+  id: '/cursos',
+  path: '/cursos',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaCvRoute = ContaCvRouteImport.update({
+  id: '/cv',
+  path: '/cv',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaDashboardRoute = ContaDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaEmpresasRoute = ContaEmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaFerramentasRoute = ContaFerramentasRouteImport.update({
+  id: '/ferramentas',
+  path: '/ferramentas',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaMinhasSkillsRoute = ContaMinhasSkillsRouteImport.update({
+  id: '/minhas-skills',
+  path: '/minhas-skills',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaProgressoRoute = ContaProgressoRouteImport.update({
+  id: '/progresso',
+  path: '/progresso',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaSalariosRoute = ContaSalariosRouteImport.update({
+  id: '/salarios',
+  path: '/salarios',
+  getParentRoute: () => ContaRoute,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analise': typeof AnaliseRoute
+  '/cadastro': typeof CadastroRoute
   '/design-system': typeof DesignSystemRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/admin': typeof ContaAdminRoute
+  '/certificacoes': typeof ContaCertificacoesRoute
+  '/conta': typeof ContaContaRoute
+  '/cursos': typeof ContaCursosRoute
+  '/cv': typeof ContaCvRoute
+  '/dashboard': typeof ContaDashboardRoute
+  '/empresas': typeof ContaEmpresasRoute
+  '/ferramentas': typeof ContaFerramentasRoute
+  '/minhas-skills': typeof ContaMinhasSkillsRoute
+  '/progresso': typeof ContaProgressoRoute
+  '/salarios': typeof ContaSalariosRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analise': typeof AnaliseRoute
+  '/cadastro': typeof CadastroRoute
   '/design-system': typeof DesignSystemRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/admin': typeof ContaAdminRoute
+  '/certificacoes': typeof ContaCertificacoesRoute
+  '/conta': typeof ContaContaRoute
+  '/cursos': typeof ContaCursosRoute
+  '/cv': typeof ContaCvRoute
+  '/dashboard': typeof ContaDashboardRoute
+  '/empresas': typeof ContaEmpresasRoute
+  '/ferramentas': typeof ContaFerramentasRoute
+  '/minhas-skills': typeof ContaMinhasSkillsRoute
+  '/progresso': typeof ContaProgressoRoute
+  '/salarios': typeof ContaSalariosRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_conta': typeof ContaRouteWithChildren
+  '/analise': typeof AnaliseRoute
+  '/cadastro': typeof CadastroRoute
   '/design-system': typeof DesignSystemRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/_conta/admin': typeof ContaAdminRoute
+  '/_conta/certificacoes': typeof ContaCertificacoesRoute
+  '/_conta/conta': typeof ContaContaRoute
+  '/_conta/cursos': typeof ContaCursosRoute
+  '/_conta/cv': typeof ContaCvRoute
+  '/_conta/dashboard': typeof ContaDashboardRoute
+  '/_conta/empresas': typeof ContaEmpresasRoute
+  '/_conta/ferramentas': typeof ContaFerramentasRoute
+  '/_conta/minhas-skills': typeof ContaMinhasSkillsRoute
+  '/_conta/progresso': typeof ContaProgressoRoute
+  '/_conta/salarios': typeof ContaSalariosRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design-system'
+  fullPaths:
+    | '/'
+    | '/analise'
+    | '/cadastro'
+    | '/design-system'
+    | '/login'
+    | '/onboarding'
+    | '/privacidade'
+    | '/recuperar-senha'
+    | '/admin'
+    | '/certificacoes'
+    | '/conta'
+    | '/cursos'
+    | '/cv'
+    | '/dashboard'
+    | '/empresas'
+    | '/ferramentas'
+    | '/minhas-skills'
+    | '/progresso'
+    | '/salarios'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design-system'
-  id: '__root__' | '/' | '/design-system'
+  to:
+    | '/'
+    | '/analise'
+    | '/cadastro'
+    | '/design-system'
+    | '/login'
+    | '/onboarding'
+    | '/privacidade'
+    | '/recuperar-senha'
+    | '/admin'
+    | '/certificacoes'
+    | '/conta'
+    | '/cursos'
+    | '/cv'
+    | '/dashboard'
+    | '/empresas'
+    | '/ferramentas'
+    | '/minhas-skills'
+    | '/progresso'
+    | '/salarios'
+    | '/auth/callback'
+  id:
+    | '__root__'
+    | '/'
+    | '/_conta'
+    | '/analise'
+    | '/cadastro'
+    | '/design-system'
+    | '/login'
+    | '/onboarding'
+    | '/privacidade'
+    | '/recuperar-senha'
+    | '/_conta/admin'
+    | '/_conta/certificacoes'
+    | '/_conta/conta'
+    | '/_conta/cursos'
+    | '/_conta/cv'
+    | '/_conta/dashboard'
+    | '/_conta/empresas'
+    | '/_conta/ferramentas'
+    | '/_conta/minhas-skills'
+    | '/_conta/progresso'
+    | '/_conta/salarios'
+    | '/auth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ContaRoute: typeof ContaRouteWithChildren
+  AnaliseRoute: typeof AnaliseRoute
+  CadastroRoute: typeof CadastroRoute
   DesignSystemRoute: typeof DesignSystemRoute
+  LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  RecuperarSenhaRoute: typeof RecuperarSenhaRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +296,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_conta': {
+      id: '/_conta'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analise': {
+      id: '/analise'
+      path: '/analise'
+      fullPath: '/analise'
+      preLoaderRoute: typeof AnaliseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design-system': {
       id: '/design-system'
       path: '/design-system'
@@ -65,12 +324,162 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignSystemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recuperar-senha': {
+      id: '/recuperar-senha'
+      path: '/recuperar-senha'
+      fullPath: '/recuperar-senha'
+      preLoaderRoute: typeof RecuperarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_conta/admin': {
+      id: '/_conta/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof ContaAdminRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/certificacoes': {
+      id: '/_conta/certificacoes'
+      path: '/certificacoes'
+      fullPath: '/certificacoes'
+      preLoaderRoute: typeof ContaCertificacoesRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/conta': {
+      id: '/_conta/conta'
+      path: '/conta'
+      fullPath: '/conta'
+      preLoaderRoute: typeof ContaContaRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/cursos': {
+      id: '/_conta/cursos'
+      path: '/cursos'
+      fullPath: '/cursos'
+      preLoaderRoute: typeof ContaCursosRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/cv': {
+      id: '/_conta/cv'
+      path: '/cv'
+      fullPath: '/cv'
+      preLoaderRoute: typeof ContaCvRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/dashboard': {
+      id: '/_conta/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof ContaDashboardRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/empresas': {
+      id: '/_conta/empresas'
+      path: '/empresas'
+      fullPath: '/empresas'
+      preLoaderRoute: typeof ContaEmpresasRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/ferramentas': {
+      id: '/_conta/ferramentas'
+      path: '/ferramentas'
+      fullPath: '/ferramentas'
+      preLoaderRoute: typeof ContaFerramentasRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/minhas-skills': {
+      id: '/_conta/minhas-skills'
+      path: '/minhas-skills'
+      fullPath: '/minhas-skills'
+      preLoaderRoute: typeof ContaMinhasSkillsRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/progresso': {
+      id: '/_conta/progresso'
+      path: '/progresso'
+      fullPath: '/progresso'
+      preLoaderRoute: typeof ContaProgressoRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/salarios': {
+      id: '/_conta/salarios'
+      path: '/salarios'
+      fullPath: '/salarios'
+      preLoaderRoute: typeof ContaSalariosRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface ContaRouteChildren {
+  ContaAdminRoute: typeof ContaAdminRoute
+  ContaCertificacoesRoute: typeof ContaCertificacoesRoute
+  ContaContaRoute: typeof ContaContaRoute
+  ContaCursosRoute: typeof ContaCursosRoute
+  ContaCvRoute: typeof ContaCvRoute
+  ContaDashboardRoute: typeof ContaDashboardRoute
+  ContaEmpresasRoute: typeof ContaEmpresasRoute
+  ContaFerramentasRoute: typeof ContaFerramentasRoute
+  ContaMinhasSkillsRoute: typeof ContaMinhasSkillsRoute
+  ContaProgressoRoute: typeof ContaProgressoRoute
+  ContaSalariosRoute: typeof ContaSalariosRoute
+}
+
+const ContaRouteChildren: ContaRouteChildren = {
+  ContaAdminRoute: ContaAdminRoute,
+  ContaCertificacoesRoute: ContaCertificacoesRoute,
+  ContaContaRoute: ContaContaRoute,
+  ContaCursosRoute: ContaCursosRoute,
+  ContaCvRoute: ContaCvRoute,
+  ContaDashboardRoute: ContaDashboardRoute,
+  ContaEmpresasRoute: ContaEmpresasRoute,
+  ContaFerramentasRoute: ContaFerramentasRoute,
+  ContaMinhasSkillsRoute: ContaMinhasSkillsRoute,
+  ContaProgressoRoute: ContaProgressoRoute,
+  ContaSalariosRoute: ContaSalariosRoute,
+}
+
+const ContaRouteWithChildren = ContaRoute._addFileChildren(ContaRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ContaRoute: ContaRouteWithChildren,
+  AnaliseRoute: AnaliseRoute,
+  CadastroRoute: CadastroRoute,
   DesignSystemRoute: DesignSystemRoute,
+  LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  RecuperarSenhaRoute: RecuperarSenhaRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 
 export interface PageHeaderProps {
   title: string;
-  subtitle?: string;
-  eyebrow?: string;
-  actions?: ReactNode;
-  className?: string;
+  subtitle?: string | undefined;
+  eyebrow?: string | undefined;
+  actions?: ReactNode | undefined;
+  className?: string | undefined;
 }
 
 export function PageHeader({ title, subtitle, eyebrow, actions, className }: PageHeaderProps) {

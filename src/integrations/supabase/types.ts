@@ -429,6 +429,7 @@ export type Database = {
           full_name: string | null
           headline: string | null
           id: string
+          is_anonymous: boolean
           onboarding_completed: boolean
           seniority: string | null
           state: string | null
@@ -446,6 +447,7 @@ export type Database = {
           full_name?: string | null
           headline?: string | null
           id: string
+          is_anonymous?: boolean
           onboarding_completed?: boolean
           seniority?: string | null
           state?: string | null
@@ -463,6 +465,7 @@ export type Database = {
           full_name?: string | null
           headline?: string | null
           id?: string
+          is_anonymous?: boolean
           onboarding_completed?: boolean
           seniority?: string | null
           state?: string | null
@@ -748,6 +751,7 @@ export type Database = {
           currency: string
           id: string
           is_primary: boolean
+          market_segment: string
           region: string
           role_variant_id: string | null
           seniority_target: string | null
@@ -759,6 +763,7 @@ export type Database = {
           currency?: string
           id?: string
           is_primary?: boolean
+          market_segment?: string
           region?: string
           role_variant_id?: string | null
           seniority_target?: string | null
@@ -770,6 +775,7 @@ export type Database = {
           currency?: string
           id?: string
           is_primary?: boolean
+          market_segment?: string
           region?: string
           role_variant_id?: string | null
           seniority_target?: string | null

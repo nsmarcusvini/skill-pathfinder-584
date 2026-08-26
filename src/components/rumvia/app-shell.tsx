@@ -18,14 +18,14 @@ export interface AppShellProps {
   nav: NavItem[];
   children: React.ReactNode;
   /** Trilha de carreira selecionada. Opções vêm do banco, nunca do código. */
-  trackOptions?: SelectOption[];
-  track?: string;
-  onTrackChange?: (value: string) => void;
+  trackOptions?: SelectOption[] | undefined;
+  track?: string | undefined;
+  onTrackChange?: ((value: string) => void) | undefined;
   /** Segmento de mercado: 'br' ou 'remoto_global'. Nunca misture os dois. */
-  segmentOptions?: SelectOption[];
-  segment?: string;
-  onSegmentChange?: (value: string) => void;
-  topbarExtra?: React.ReactNode;
+  segmentOptions?: SelectOption[] | undefined;
+  segment?: string | undefined;
+  onSegmentChange?: ((value: string) => void) | undefined;
+  topbarExtra?: React.ReactNode | undefined;
 }
 
 const DEFAULT_SEGMENTS: SelectOption[] = [
