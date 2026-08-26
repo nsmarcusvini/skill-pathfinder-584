@@ -30,6 +30,8 @@ import { Route as ContaMinhasSkillsRouteImport } from './routes/_conta/minhas-sk
 import { Route as ContaProgressoRouteImport } from './routes/_conta/progresso'
 import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
+import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -135,6 +137,16 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicIngestJobsRoute = ApiPublicIngestJobsRouteImport.update({
+  id: '/api/public/ingest-jobs',
+  path: '/api/public/ingest-jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicIngestWebhookRoute = ApiPublicIngestWebhookRouteImport.update({
+  id: '/api/public/ingest-webhook',
+  path: '/api/public/ingest-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -157,6 +169,8 @@ export interface FileRoutesByFullPath {
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -179,6 +193,8 @@ export interface FileRoutesByTo {
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -203,6 +219,8 @@ export interface FileRoutesById {
   '/_conta/progresso': typeof ContaProgressoRoute
   '/_conta/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -227,6 +245,8 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/salarios'
     | '/auth/callback'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -249,6 +269,8 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/salarios'
     | '/auth/callback'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
   id:
     | '__root__'
     | '/'
@@ -272,6 +294,8 @@ export interface FileRouteTypes {
     | '/_conta/progresso'
     | '/_conta/salarios'
     | '/auth/callback'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -285,6 +309,8 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
+  ApiPublicIngestWebhookRoute: typeof ApiPublicIngestWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -436,6 +462,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ingest-jobs': {
+      id: '/api/public/ingest-jobs'
+      path: '/api/public/ingest-jobs'
+      fullPath: '/api/public/ingest-jobs'
+      preLoaderRoute: typeof ApiPublicIngestJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ingest-webhook': {
+      id: '/api/public/ingest-webhook'
+      path: '/api/public/ingest-webhook'
+      fullPath: '/api/public/ingest-webhook'
+      preLoaderRoute: typeof ApiPublicIngestWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -480,6 +520,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,
+  ApiPublicIngestWebhookRoute: ApiPublicIngestWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
