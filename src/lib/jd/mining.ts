@@ -40,6 +40,13 @@ const PLACES = new Set(
   ],
 );
 
+/** Palavras genéricas de anúncio que nunca são skill sozinhas (mas podem compor bigrama). */
+const GENERIC_SINGLE = new Set(
+  `solid strong familiarity familiar proficiency proficient understanding ability hands-on deep advanced basic good great excellent solida forte dominio profundo cloud nuvem platform plataforma software hardware data dados sistema sistemas systems stack tools tooling ambiente arquitetura architecture engineering engenharia development desenvolvimento apache`.split(
+    /\s+/,
+  ),
+);
+
 /** Símbolos que indicam token técnico (k8s, ci/cd, node.js, c#, .net). */
 const TECHY = /[#+./\d]/;
 
@@ -73,9 +80,14 @@ function addCandidate(map: Map<string, MinedTerm>, term: string, source: string,
   const clean = term.replace(/^[^\p{L}\d.#+]+|[^\p{L}\d#+]+$/gu, "").trim();
   if (clean.length < 2 || clean.length > 40) return;
   if (/[@]|https?:/i.test(clean)) return;
-  // bigrama com palavra vazia em qualquer posição não vira candidato
   const parts = clean.split(/\s+/);
-  if (parts.length > 1 && parts.some((w) => w.length < 3 || isStopword(w))) return;
+  if (parts.length === 1 && GENERIC_SINGLE.has(normalize(clean))) return;
+  // bigrama só vale se as bordas não forem palavra vazia
+  if (parts.length > 1) {
+    const first = parts[0]!;
+    const last = parts[parts.length - 1]!;
+    if ([first, last].some((w) => w.length < 3 || isStopword(w) || GENERIC_SINGLE.has(normalize(w)))) return;
+  }
   if (!/[\p{L}]/u.test(clean)) return;
   if (isStopword(clean) || isPlace(clean)) return;
   const key = normalize(clean);
