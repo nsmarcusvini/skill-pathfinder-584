@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/public/ingest-jobs")({
         }
 
 
-        let parsed: { source_keys?: string[] } = {};
+        let parsed: { source_keys?: string[] | undefined } = {};
         try {
           const raw = await request.text();
           parsed = bodySchema.parse(raw ? JSON.parse(raw) : {});

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import type { Json } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /** Toda função aqui exige profiles.is_admin = true (checado sob RLS do próprio usuário). */
@@ -17,7 +18,7 @@ export interface AdminSource {
   source_type: string;
   is_active: boolean;
   has_token: boolean;
-  config: Record<string, unknown>;
+  config: Json;
   last_run_at: string | null;
   last_run_status: string | null;
   last_run_count: number;
@@ -53,7 +54,7 @@ export const listSources = createServerFn({ method: "GET" })
       source_type: s.source_type ?? "pull",
       is_active: s.is_active,
       has_token: Boolean(s.ingest_token_hash),
-      config: (s.config ?? {}) as Record<string, unknown>,
+      config: (s.config ?? {}) as Json,
       last_run_at: s.last_run_at,
       last_run_status: s.last_run_status,
       last_run_count: s.last_run_count ?? 0,

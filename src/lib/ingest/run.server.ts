@@ -18,7 +18,7 @@ export interface SourceResult {
   created: number;
   updated: number;
   rejected: number;
-  error?: string;
+  error?: string | undefined;
 }
 
 export async function runIngest(sourceKeys?: string[]): Promise<{
@@ -63,7 +63,7 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
         defaultCountry: (cfg.country as string) ?? null,
       });
       await finishRun(runId, source.id, counters, "success");
-      results.push({ source_key: source.key, status: "success", ...counters, error: undefined });
+      results.push({ source_key: source.key, status: "success", ...counters });
     } catch (err) {
       // Falha em uma fonte não derruba as outras.
       const message = err instanceof Error ? err.message : String(err);

@@ -16,6 +16,7 @@ import {
   normalizeTitle,
   toAnnual,
 } from "./normalize";
+import type { Json } from "@/integrations/supabase/types";
 import type { NormalizedJob } from "./types";
 
 export interface IngestCounters {
@@ -183,7 +184,7 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
           market_segment: segment.market_segment,
           remote_restriction: segment.remote_restriction,
           source_key: job.source_key,
-        },
+        } as unknown as Json,
       });
 
       if (row.salary_min || row.salary_max) {
