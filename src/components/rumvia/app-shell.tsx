@@ -66,7 +66,7 @@ export function AppShell({
           {nav.map((item) => (
             <Link
               key={item.to}
-              to={item.to}
+              to={item.to as never}
               activeProps={{ "data-active": "true" }}
               title={item.label}
             >
