@@ -14,13 +14,364 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      career_tracks: {
+        Row: {
+          color_token: string
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color_token?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color_token?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          current_track_id: string | null
+          full_name: string | null
+          headline: string | null
+          id: string
+          onboarding_completed: boolean
+          seniority: string | null
+          state: string | null
+          target_currency: string
+          target_region: string
+          updated_at: string
+          years_experience: number | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          current_track_id?: string | null
+          full_name?: string | null
+          headline?: string | null
+          id: string
+          onboarding_completed?: boolean
+          seniority?: string | null
+          state?: string | null
+          target_currency?: string
+          target_region?: string
+          updated_at?: string
+          years_experience?: number | null
+        }
+        Update: {
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          current_track_id?: string | null
+          full_name?: string | null
+          headline?: string | null
+          id?: string
+          onboarding_completed?: boolean
+          seniority?: string | null
+          state?: string | null
+          target_currency?: string
+          target_region?: string
+          updated_at?: string
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_current_track_id_fkey"
+            columns: ["current_track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skill_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          id: string
+          lang: string
+          skill_id: string
+          source: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          id?: string
+          lang?: string
+          skill_id: string
+          source?: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          id?: string
+          lang?: string
+          skill_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_aliases_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skill_categories: {
+        Row: {
+          color_token: string
+          id: string
+          key: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          color_token?: string
+          id?: string
+          key: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          color_token?: string
+          id?: string
+          key?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      skills: {
+        Row: {
+          canonical_name: string
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_ambiguous: boolean
+          is_certifiable: boolean
+          is_tool: boolean
+          match_patterns: string[]
+          slug: string
+          website_url: string | null
+        }
+        Insert: {
+          canonical_name: string
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_ambiguous?: boolean
+          is_certifiable?: boolean
+          is_tool?: boolean
+          match_patterns?: string[]
+          slug: string
+          website_url?: string | null
+        }
+        Update: {
+          canonical_name?: string
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_ambiguous?: boolean
+          is_certifiable?: boolean
+          is_tool?: boolean
+          match_patterns?: string[]
+          slug?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skills_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "skill_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      track_role_variants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          search_terms: string[]
+          sort_order: number
+          track_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          search_terms?: string[]
+          sort_order?: number
+          track_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          search_terms?: string[]
+          sort_order?: number
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_role_variants_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      track_skill_baselines: {
+        Row: {
+          created_at: string
+          id: string
+          importance: number
+          is_core: boolean
+          required_level: number
+          seniority: string
+          skill_id: string
+          track_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          importance?: number
+          is_core?: boolean
+          required_level?: number
+          seniority: string
+          skill_id: string
+          track_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          importance?: number
+          is_core?: boolean
+          required_level?: number
+          seniority?: string
+          skill_id?: string
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_skill_baselines_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_skill_baselines_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_track_preferences: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          is_primary: boolean
+          region: string
+          role_variant_id: string | null
+          seniority_target: string | null
+          track_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          id?: string
+          is_primary?: boolean
+          region?: string
+          role_variant_id?: string | null
+          seniority_target?: string | null
+          track_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          is_primary?: boolean
+          region?: string
+          role_variant_id?: string | null
+          seniority_target?: string | null
+          track_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_track_preferences_role_variant_id_fkey"
+            columns: ["role_variant_id"]
+            isOneToOne: false
+            referencedRelation: "track_role_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_track_preferences_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
