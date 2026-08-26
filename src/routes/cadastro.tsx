@@ -76,7 +76,7 @@ function CadastroPage() {
             variant="destructive"
             onClick={async () => {
               await auth.signOut();
-              void navigate({ to: "/login", search: { redirect: undefined }, replace: true });
+              void navigate({ to: "/login", replace: true });
             }}
           >
             Descartar e entrar na conta existente
