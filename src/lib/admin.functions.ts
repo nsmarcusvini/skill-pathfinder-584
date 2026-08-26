@@ -144,3 +144,180 @@ export const importCsvJobs = createServerFn({ method: "POST" })
     await finishRun(runId, source.id, counters, "success");
     return counters;
   });
+
+/* ------------------------------------------------- curadoria de skills (JD) */
+
+export const jdHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { extractionHealth } = await import("@/lib/jd/extract.server");
+    return extractionHealth();
+  });
+
+export const listPendingTerms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { MIN_DISTINCT_JOBS } = await import("@/lib/jd/extract.server");
+
+    const { data, error } = await supabaseAdmin
+      .from("pending_skill_terms")
+      .select("id, term, lang, occurrences, distinct_jobs, example_snippet, suggested_skill_id, first_seen, last_seen")
+      .eq("status", "novo")
+      .gte("distinct_jobs", MIN_DISTINCT_JOBS)
+      .order("distinct_jobs", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    const ids = Array.from(new Set((data ?? []).map((t) => t.suggested_skill_id).filter(Boolean) as string[]));
+    const names = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: skills } = await supabaseAdmin.from("skills").select("id, canonical_name").in("id", ids);
+      for (const s of skills ?? []) names.set(s.id, s.canonical_name);
+    }
+
+    return (data ?? []).map((t) => ({
+      ...t,
+      suggested_skill_name: t.suggested_skill_id ? (names.get(t.suggested_skill_id) ?? null) : null,
+    }));
+  });
+
+export const runJdExtraction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ force: z.boolean().optional(), since: z.string().optional() }).parse(data ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { extractJdSkills } = await import("@/lib/jd/extract.server");
+    return extractJdSkills({
+      ...(data.force ? { force: true } : {}),
+      ...(data.since ? { since: data.since } : {}),
+    });
+  });
+
+/** Aprova o termo: vira alias de uma skill existente ou uma skill nova, e reprocessa as vagas afetadas. */
+export const approvePendingTerm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        mode: z.enum(["alias", "new_skill"]),
+        skill_id: z.string().uuid().optional(),
+        category_id: z.string().uuid().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: term } = await supabaseAdmin
+      .from("pending_skill_terms")
+      .select("id, term, lang")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!term) throw new Error("Termo não encontrado.");
+
+    let skillId = data.skill_id ?? null;
+
+    if (data.mode === "new_skill") {
+      const slug = term.term
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const { data: created, error } = await supabaseAdmin
+        .from("skills")
+        .insert({
+          canonical_name: term.term,
+          slug,
+          category_id: data.category_id ?? null,
+          match_patterns: [],
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      skillId = created.id;
+    } else {
+      if (!skillId) throw new Error("Selecione a skill para receber o alias.");
+      const { error } = await supabaseAdmin
+        .from("skill_aliases")
+        .insert({ skill_id: skillId, alias: term.term, lang: term.lang ?? "pt", source: "curadoria" });
+      if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+    }
+
+    await supabaseAdmin
+      .from("pending_skill_terms")
+      .update({
+        status: "aprovado",
+        suggested_skill_id: skillId,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: context.userId,
+      })
+      .eq("id", data.id);
+
+    // enfileira reprocessamento: vagas que citam o termo perdem skills_extracted_at
+    const { data: affected } = await supabaseAdmin
+      .from("job_postings")
+      .select("id")
+      .eq("is_active", true)
+      .ilike("description_text", `%${term.term}%`)
+      .limit(2000);
+    const ids = (affected ?? []).map((j) => j.id);
+    for (let i = 0; i < ids.length; i += 500) {
+      await supabaseAdmin
+        .from("job_postings")
+        .update({ skills_extracted_at: null })
+        .in("id", ids.slice(i, i + 500));
+    }
+
+    return { skill_id: skillId, requeued: ids.length };
+  });
+
+/** Rejeita: vai para a blocklist e não volta a aparecer na fila. */
+export const rejectPendingTerm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ id: z.string().uuid(), reason: z.string().max(200).optional() }).parse(data),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: term } = await supabaseAdmin
+      .from("pending_skill_terms")
+      .select("id, term")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!term) throw new Error("Termo não encontrado.");
+
+    await supabaseAdmin
+      .from("skill_term_blocklist")
+      .insert({ term: term.term, reason: data.reason ?? null, created_by: context.userId });
+    await supabaseAdmin
+      .from("pending_skill_terms")
+      .update({ status: "rejeitado", reviewed_at: new Date().toISOString(), reviewed_by: context.userId })
+      .eq("id", data.id);
+
+    return { ok: true };
+  });
+
+export const searchSkillsAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ q: z.string().min(1).max(60) }).parse(data))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: skills } = await supabaseAdmin
+      .from("skills")
+      .select("id, canonical_name")
+      .ilike("canonical_name", `%${data.q}%`)
+      .order("canonical_name")
+      .limit(20);
+    return skills ?? [];
+  });

@@ -34,8 +34,11 @@ import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index
 import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
 import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
 import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
+import { Route as ContaAdminSkillsRouteImport } from './routes/_conta/admin.skills'
+import { Route as ApiPublicExtractJdSkillsRouteImport } from './routes/api/public/extract-jd-skills'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
 import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
+import { Route as ApiPublicRefreshMarketViewsRouteImport } from './routes/api/public/refresh-market-views'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -161,6 +164,17 @@ const ContaAdminImportarRoute = ContaAdminImportarRouteImport.update({
   path: '/importar',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminSkillsRoute = ContaAdminSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ApiPublicExtractJdSkillsRoute =
+  ApiPublicExtractJdSkillsRouteImport.update({
+    id: '/api/public/extract-jd-skills',
+    path: '/api/public/extract-jd-skills',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicIngestJobsRoute = ApiPublicIngestJobsRouteImport.update({
   id: '/api/public/ingest-jobs',
   path: '/api/public/ingest-jobs',
@@ -171,6 +185,12 @@ const ApiPublicIngestWebhookRoute = ApiPublicIngestWebhookRouteImport.update({
   path: '/api/public/ingest-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRefreshMarketViewsRoute =
+  ApiPublicRefreshMarketViewsRouteImport.update({
+    id: '/api/public/refresh-market-views',
+    path: '/api/public/refresh-market-views',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -196,8 +216,11 @@ export interface FileRoutesByFullPath {
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/skills': typeof ContaAdminSkillsRoute
+  '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
   '/admin/': typeof ContaAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -223,8 +246,11 @@ export interface FileRoutesByTo {
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/skills': typeof ContaAdminSkillsRoute
+  '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
   '/admin': typeof ContaAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -253,8 +279,11 @@ export interface FileRoutesById {
   '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/_conta/admin/fontes': typeof ContaAdminFontesRoute
   '/_conta/admin/importar': typeof ContaAdminImportarRoute
+  '/_conta/admin/skills': typeof ContaAdminSkillsRoute
+  '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
   '/_conta/admin/': typeof ContaAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -283,8 +312,11 @@ export interface FileRouteTypes {
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/skills'
+    | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
+    | '/api/public/refresh-market-views'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -310,8 +342,11 @@ export interface FileRouteTypes {
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/skills'
+    | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
+    | '/api/public/refresh-market-views'
     | '/admin'
   id:
     | '__root__'
@@ -339,8 +374,11 @@ export interface FileRouteTypes {
     | '/_conta/admin/descobrir-ats'
     | '/_conta/admin/fontes'
     | '/_conta/admin/importar'
+    | '/_conta/admin/skills'
+    | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
+    | '/api/public/refresh-market-views'
     | '/_conta/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -355,8 +393,10 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ApiPublicExtractJdSkillsRoute: typeof ApiPublicExtractJdSkillsRoute
   ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
   ApiPublicIngestWebhookRoute: typeof ApiPublicIngestWebhookRoute
+  ApiPublicRefreshMarketViewsRoute: typeof ApiPublicRefreshMarketViewsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -536,6 +576,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminImportarRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/skills': {
+      id: '/_conta/admin/skills'
+      path: '/skills'
+      fullPath: '/admin/skills'
+      preLoaderRoute: typeof ContaAdminSkillsRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/api/public/extract-jd-skills': {
+      id: '/api/public/extract-jd-skills'
+      path: '/api/public/extract-jd-skills'
+      fullPath: '/api/public/extract-jd-skills'
+      preLoaderRoute: typeof ApiPublicExtractJdSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ingest-jobs': {
       id: '/api/public/ingest-jobs'
       path: '/api/public/ingest-jobs'
@@ -550,6 +604,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIngestWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/refresh-market-views': {
+      id: '/api/public/refresh-market-views'
+      path: '/api/public/refresh-market-views'
+      fullPath: '/api/public/refresh-market-views'
+      preLoaderRoute: typeof ApiPublicRefreshMarketViewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -557,6 +618,7 @@ interface ContaAdminRouteChildren {
   ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
   ContaAdminFontesRoute: typeof ContaAdminFontesRoute
   ContaAdminImportarRoute: typeof ContaAdminImportarRoute
+  ContaAdminSkillsRoute: typeof ContaAdminSkillsRoute
   ContaAdminIndexRoute: typeof ContaAdminIndexRoute
 }
 
@@ -564,6 +626,7 @@ const ContaAdminRouteChildren: ContaAdminRouteChildren = {
   ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
   ContaAdminFontesRoute: ContaAdminFontesRoute,
   ContaAdminImportarRoute: ContaAdminImportarRoute,
+  ContaAdminSkillsRoute: ContaAdminSkillsRoute,
   ContaAdminIndexRoute: ContaAdminIndexRoute,
 }
 
@@ -612,8 +675,10 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ApiPublicExtractJdSkillsRoute: ApiPublicExtractJdSkillsRoute,
   ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,
   ApiPublicIngestWebhookRoute: ApiPublicIngestWebhookRoute,
+  ApiPublicRefreshMarketViewsRoute: ApiPublicRefreshMarketViewsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

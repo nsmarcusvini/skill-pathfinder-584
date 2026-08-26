@@ -360,7 +360,7 @@ export type Database = {
           created_at: string
           extraction_method: string
           id: string
-          is_required: boolean
+          is_required: boolean | null
           job_posting_id: string
           matched_alias: string | null
           mention_count: number
@@ -371,7 +371,7 @@ export type Database = {
           created_at?: string
           extraction_method: string
           id?: string
-          is_required?: boolean
+          is_required?: boolean | null
           job_posting_id: string
           matched_alias?: string | null
           mention_count?: number
@@ -382,7 +382,7 @@ export type Database = {
           created_at?: string
           extraction_method?: string
           id?: string
-          is_required?: boolean
+          is_required?: boolean | null
           job_posting_id?: string
           matched_alias?: string | null
           mention_count?: number
@@ -434,6 +434,7 @@ export type Database = {
           salary_min: number | null
           salary_period: string | null
           seniority: string | null
+          skills_extracted_at: string | null
           source_id: string
           state: string | null
           title: string
@@ -468,6 +469,7 @@ export type Database = {
           salary_min?: number | null
           salary_period?: string | null
           seniority?: string | null
+          skills_extracted_at?: string | null
           source_id: string
           state?: string | null
           title: string
@@ -502,6 +504,7 @@ export type Database = {
           salary_min?: number | null
           salary_period?: string | null
           seniority?: string | null
+          skills_extracted_at?: string | null
           source_id?: string
           state?: string | null
           title?: string
@@ -615,31 +618,63 @@ export type Database = {
         Row: {
           context: string | null
           created_at: string
+          distinct_jobs: number
+          example_snippet: string | null
+          first_seen: string
           id: string
+          lang: string
+          last_seen: string
           occurrences: number
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
           suggested_by: string | null
+          suggested_skill_id: string | null
           term: string
         }
         Insert: {
           context?: string | null
           created_at?: string
+          distinct_jobs?: number
+          example_snippet?: string | null
+          first_seen?: string
           id?: string
+          lang?: string
+          last_seen?: string
           occurrences?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           suggested_by?: string | null
+          suggested_skill_id?: string | null
           term: string
         }
         Update: {
           context?: string | null
           created_at?: string
+          distinct_jobs?: number
+          example_snippet?: string | null
+          first_seen?: string
           id?: string
+          lang?: string
+          last_seen?: string
           occurrences?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           suggested_by?: string | null
+          suggested_skill_id?: string | null
           term?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pending_skill_terms_suggested_skill_id_fkey"
+            columns: ["suggested_skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -828,6 +863,30 @@ export type Database = {
           key?: string
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      skill_term_blocklist: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          reason: string | null
+          term: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          term: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          term?: string
         }
         Relationships: []
       }
@@ -1073,6 +1132,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      view_refresh_log: {
+        Row: {
+          duration_ms: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          started_at: string
+          status: string
+          views_refreshed: number
+        }
+        Insert: {
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          views_refreshed?: number
+        }
+        Update: {
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          views_refreshed?: number
+        }
+        Relationships: []
       }
     }
     Views: {

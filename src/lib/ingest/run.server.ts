@@ -23,6 +23,7 @@ export interface SourceResult {
 
 export async function runIngest(sourceKeys?: string[]): Promise<{
   sources: SourceResult[];
+  extraction?: Array<{ processed: number; skills_written: number; remaining: number }>;
   deactivated: number;
 }> {
   let query = supabaseAdmin.from("job_sources").select("id, key, adapter, config, is_active, source_type");
@@ -73,5 +74,15 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
   }
 
   const deactivated = await deactivateStaleJobs();
-  return { sources: results, deactivated };
+
+  // Extração de skills em lote logo após a ingestão (idempotente, sem LLM).
+  const { extractJdSkills } = await import("@/lib/jd/extract.server");
+  const extraction = [] as Array<Awaited<ReturnType<typeof extractJdSkills>>>;
+  for (let batch = 0; batch < 10; batch++) {
+    const result = await extractJdSkills({});
+    extraction.push(result);
+    if (result.processed === 0 || result.remaining === 0) break;
+  }
+
+  return { sources: results, deactivated, extraction };
 }
