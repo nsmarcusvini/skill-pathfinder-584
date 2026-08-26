@@ -43,10 +43,36 @@ function PrivacidadePage() {
             </p>
           </section>
           <section>
+            <h2 className="label-h6 text-neutral-900">O que é lido do currículo</h2>
+            <p className="mt-1 text-body text-neutral-700">
+              Lemos o texto do arquivo para identificar termos técnicos do nosso dicionário, títulos
+              de cargo e datas usadas para estimar anos de experiência. Não fazemos envio a
+              terceiros: nenhum provedor externo, nenhum modelo de linguagem, nenhuma API de IA
+              recebe o conteúdo do seu CV.
+            </p>
+          </section>
+          <section>
+            <h2 className="label-h6 text-neutral-900">Consentimento e retenção</h2>
+            <p className="mt-1 text-body text-neutral-700">
+              O arquivo só é aceito após seu consentimento explícito, e a data do aceite fica
+              registrada. Currículos de visitantes sem conta são <strong>apagados em 7 dias</strong>.
+              Se você criar conta, o arquivo fica guardado até você excluí-lo.
+            </p>
+          </section>
+          <section>
+            <h2 className="label-h6 text-neutral-900">Limites de uso</h2>
+            <p className="mt-1 text-body text-neutral-700">
+              Para evitar abuso, visitantes têm limite de 2 leituras de currículo por hora e 1
+              currículo ativo por sessão.
+            </p>
+          </section>
+          <section>
             <h2 className="label-h6 text-neutral-900">Seus direitos</h2>
             <p className="mt-1 text-body text-neutral-700">
               Você pode exportar todos os seus dados em JSON ou excluir sua conta a qualquer momento
-              em Minha conta. A exclusão apaga também os arquivos armazenados.
+              em Minha conta — a exclusão apaga também os arquivos armazenados. Sem conta, basta
+              pedir a exclusão pelo e-mail de contato informado no rodapé e apagamos a sessão e o
+              currículo vinculados.
             </p>
           </section>
         </Blueprint>
@@ -54,3 +80,4 @@ function PrivacidadePage() {
     </div>
   );
 }
+
