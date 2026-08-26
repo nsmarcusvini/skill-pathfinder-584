@@ -116,6 +116,171 @@ export type Database = {
         }
         Relationships: []
       }
+      cv_extracted_skills: {
+        Row: {
+          accepted: boolean | null
+          confidence: number
+          created_at: string
+          cv_id: string
+          evidence_snippet: string | null
+          first_year: number | null
+          id: string
+          last_year: number | null
+          level_hint: number | null
+          matched_by: string
+          mention_count: number
+          raw_term: string
+          section: string
+          skill_id: string | null
+          years_hint: number | null
+        }
+        Insert: {
+          accepted?: boolean | null
+          confidence?: number
+          created_at?: string
+          cv_id: string
+          evidence_snippet?: string | null
+          first_year?: number | null
+          id?: string
+          last_year?: number | null
+          level_hint?: number | null
+          matched_by: string
+          mention_count?: number
+          raw_term: string
+          section?: string
+          skill_id?: string | null
+          years_hint?: number | null
+        }
+        Update: {
+          accepted?: boolean | null
+          confidence?: number
+          created_at?: string
+          cv_id?: string
+          evidence_snippet?: string | null
+          first_year?: number | null
+          id?: string
+          last_year?: number | null
+          level_hint?: number | null
+          matched_by?: string
+          mention_count?: number
+          raw_term?: string
+          section?: string
+          skill_id?: string | null
+          years_hint?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cv_extracted_skills_cv_id_fkey"
+            columns: ["cv_id"]
+            isOneToOne: false
+            referencedRelation: "cvs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cv_extracted_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cv_versions: {
+        Row: {
+          cv_id: string
+          detected_seniority: string | null
+          detected_track_id: string | null
+          detection_confidence: number | null
+          extracted_text: string | null
+          id: string
+          parsed_at: string
+          parsed_json: Json
+          parser_version: string
+          version: number
+        }
+        Insert: {
+          cv_id: string
+          detected_seniority?: string | null
+          detected_track_id?: string | null
+          detection_confidence?: number | null
+          extracted_text?: string | null
+          id?: string
+          parsed_at?: string
+          parsed_json?: Json
+          parser_version?: string
+          version?: number
+        }
+        Update: {
+          cv_id?: string
+          detected_seniority?: string | null
+          detected_track_id?: string | null
+          detection_confidence?: number | null
+          extracted_text?: string | null
+          id?: string
+          parsed_at?: string
+          parsed_json?: Json
+          parser_version?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cv_versions_cv_id_fkey"
+            columns: ["cv_id"]
+            isOneToOne: false
+            referencedRelation: "cvs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cv_versions_detected_track_id_fkey"
+            columns: ["detected_track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cvs: {
+        Row: {
+          consent_at: string | null
+          created_at: string
+          file_size: number
+          id: string
+          is_current: boolean
+          mime_type: string
+          original_filename: string
+          parse_error: string | null
+          status: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          consent_at?: string | null
+          created_at?: string
+          file_size: number
+          id?: string
+          is_current?: boolean
+          mime_type: string
+          original_filename: string
+          parse_error?: string | null
+          status?: string
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          consent_at?: string | null
+          created_at?: string
+          file_size?: number
+          id?: string
+          is_current?: boolean
+          mime_type?: string
+          original_filename?: string
+          parse_error?: string | null
+          status?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ingestion_runs: {
         Row: {
           error: string | null
@@ -416,6 +581,57 @@ export type Database = {
           last_run_status?: string | null
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      parse_rate_limits: {
+        Row: {
+          count: number
+          id: string
+          ip_hash: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          id?: string
+          ip_hash: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          id?: string
+          ip_hash?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      pending_skill_terms: {
+        Row: {
+          context: string | null
+          created_at: string
+          id: string
+          occurrences: number
+          status: string
+          suggested_by: string | null
+          term: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          id?: string
+          occurrences?: number
+          status?: string
+          suggested_by?: string | null
+          term: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          id?: string
+          occurrences?: number
+          status?: string
+          suggested_by?: string | null
+          term?: string
         }
         Relationships: []
       }
@@ -741,6 +957,56 @@ export type Database = {
             columns: ["track_id"]
             isOneToOne: false
             referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_skills: {
+        Row: {
+          created_at: string
+          evidence: string | null
+          id: string
+          is_verified: boolean
+          last_used_year: number | null
+          level: number
+          skill_id: string
+          source: string
+          updated_at: string
+          user_id: string
+          years: number | null
+        }
+        Insert: {
+          created_at?: string
+          evidence?: string | null
+          id?: string
+          is_verified?: boolean
+          last_used_year?: number | null
+          level?: number
+          skill_id: string
+          source?: string
+          updated_at?: string
+          user_id: string
+          years?: number | null
+        }
+        Update: {
+          created_at?: string
+          evidence?: string | null
+          id?: string
+          is_verified?: boolean
+          last_used_year?: number | null
+          level?: number
+          skill_id?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          years?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
             referencedColumns: ["id"]
           },
         ]
