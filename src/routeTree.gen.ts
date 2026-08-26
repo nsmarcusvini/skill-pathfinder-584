@@ -30,6 +30,12 @@ import { Route as ContaMinhasSkillsRouteImport } from './routes/_conta/minhas-sk
 import { Route as ContaProgressoRouteImport } from './routes/_conta/progresso'
 import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index'
+import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
+import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
+import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
+import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
+import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -135,6 +141,36 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContaAdminIndexRoute = ContaAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ContaAdminDescobrirAtsRoute = ContaAdminDescobrirAtsRouteImport.update({
+  id: '/descobrir-ats',
+  path: '/descobrir-ats',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ContaAdminFontesRoute = ContaAdminFontesRouteImport.update({
+  id: '/fontes',
+  path: '/fontes',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ContaAdminImportarRoute = ContaAdminImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ApiPublicIngestJobsRoute = ApiPublicIngestJobsRouteImport.update({
+  id: '/api/public/ingest-jobs',
+  path: '/api/public/ingest-jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicIngestWebhookRoute = ApiPublicIngestWebhookRouteImport.update({
+  id: '/api/public/ingest-webhook',
+  path: '/api/public/ingest-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -145,7 +181,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
-  '/admin': typeof ContaAdminRoute
+  '/admin': typeof ContaAdminRouteWithChildren
   '/certificacoes': typeof ContaCertificacoesRoute
   '/conta': typeof ContaContaRoute
   '/cursos': typeof ContaCursosRoute
@@ -157,6 +193,12 @@ export interface FileRoutesByFullPath {
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/admin/fontes': typeof ContaAdminFontesRoute
+  '/admin/importar': typeof ContaAdminImportarRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/admin/': typeof ContaAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -167,7 +209,6 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
-  '/admin': typeof ContaAdminRoute
   '/certificacoes': typeof ContaCertificacoesRoute
   '/conta': typeof ContaContaRoute
   '/cursos': typeof ContaCursosRoute
@@ -179,6 +220,12 @@ export interface FileRoutesByTo {
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/admin/fontes': typeof ContaAdminFontesRoute
+  '/admin/importar': typeof ContaAdminImportarRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/admin': typeof ContaAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -191,7 +238,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
-  '/_conta/admin': typeof ContaAdminRoute
+  '/_conta/admin': typeof ContaAdminRouteWithChildren
   '/_conta/certificacoes': typeof ContaCertificacoesRoute
   '/_conta/conta': typeof ContaContaRoute
   '/_conta/cursos': typeof ContaCursosRoute
@@ -203,6 +250,12 @@ export interface FileRoutesById {
   '/_conta/progresso': typeof ContaProgressoRoute
   '/_conta/salarios': typeof ContaSalariosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
+  '/_conta/admin/fontes': typeof ContaAdminFontesRoute
+  '/_conta/admin/importar': typeof ContaAdminImportarRoute
+  '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
+  '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
+  '/_conta/admin/': typeof ContaAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -227,6 +280,12 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/salarios'
     | '/auth/callback'
+    | '/admin/descobrir-ats'
+    | '/admin/fontes'
+    | '/admin/importar'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -237,7 +296,6 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacidade'
     | '/recuperar-senha'
-    | '/admin'
     | '/certificacoes'
     | '/conta'
     | '/cursos'
@@ -249,6 +307,12 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/salarios'
     | '/auth/callback'
+    | '/admin/descobrir-ats'
+    | '/admin/fontes'
+    | '/admin/importar'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -272,6 +336,12 @@ export interface FileRouteTypes {
     | '/_conta/progresso'
     | '/_conta/salarios'
     | '/auth/callback'
+    | '/_conta/admin/descobrir-ats'
+    | '/_conta/admin/fontes'
+    | '/_conta/admin/importar'
+    | '/api/public/ingest-jobs'
+    | '/api/public/ingest-webhook'
+    | '/_conta/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -285,6 +355,8 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
+  ApiPublicIngestWebhookRoute: typeof ApiPublicIngestWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -436,11 +508,71 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_conta/admin/': {
+      id: '/_conta/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof ContaAdminIndexRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/_conta/admin/descobrir-ats': {
+      id: '/_conta/admin/descobrir-ats'
+      path: '/descobrir-ats'
+      fullPath: '/admin/descobrir-ats'
+      preLoaderRoute: typeof ContaAdminDescobrirAtsRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/_conta/admin/fontes': {
+      id: '/_conta/admin/fontes'
+      path: '/fontes'
+      fullPath: '/admin/fontes'
+      preLoaderRoute: typeof ContaAdminFontesRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/_conta/admin/importar': {
+      id: '/_conta/admin/importar'
+      path: '/importar'
+      fullPath: '/admin/importar'
+      preLoaderRoute: typeof ContaAdminImportarRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/api/public/ingest-jobs': {
+      id: '/api/public/ingest-jobs'
+      path: '/api/public/ingest-jobs'
+      fullPath: '/api/public/ingest-jobs'
+      preLoaderRoute: typeof ApiPublicIngestJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ingest-webhook': {
+      id: '/api/public/ingest-webhook'
+      path: '/api/public/ingest-webhook'
+      fullPath: '/api/public/ingest-webhook'
+      preLoaderRoute: typeof ApiPublicIngestWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface ContaAdminRouteChildren {
+  ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
+  ContaAdminFontesRoute: typeof ContaAdminFontesRoute
+  ContaAdminImportarRoute: typeof ContaAdminImportarRoute
+  ContaAdminIndexRoute: typeof ContaAdminIndexRoute
+}
+
+const ContaAdminRouteChildren: ContaAdminRouteChildren = {
+  ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
+  ContaAdminFontesRoute: ContaAdminFontesRoute,
+  ContaAdminImportarRoute: ContaAdminImportarRoute,
+  ContaAdminIndexRoute: ContaAdminIndexRoute,
+}
+
+const ContaAdminRouteWithChildren = ContaAdminRoute._addFileChildren(
+  ContaAdminRouteChildren,
+)
+
 interface ContaRouteChildren {
-  ContaAdminRoute: typeof ContaAdminRoute
+  ContaAdminRoute: typeof ContaAdminRouteWithChildren
   ContaCertificacoesRoute: typeof ContaCertificacoesRoute
   ContaContaRoute: typeof ContaContaRoute
   ContaCursosRoute: typeof ContaCursosRoute
@@ -454,7 +586,7 @@ interface ContaRouteChildren {
 }
 
 const ContaRouteChildren: ContaRouteChildren = {
-  ContaAdminRoute: ContaAdminRoute,
+  ContaAdminRoute: ContaAdminRouteWithChildren,
   ContaCertificacoesRoute: ContaCertificacoesRoute,
   ContaContaRoute: ContaContaRoute,
   ContaCursosRoute: ContaCursosRoute,
@@ -480,6 +612,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,
+  ApiPublicIngestWebhookRoute: ApiPublicIngestWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
