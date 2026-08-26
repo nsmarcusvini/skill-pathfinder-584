@@ -24,6 +24,26 @@ export const SEGMENT_CURRENCY: Record<MarketSegment, "BRL" | "USD"> = {
   remoto_global: "USD",
 };
 
+export const SENIORITIES = ["junior", "pleno", "senior", "especialista"] as const;
+export type Seniority = (typeof SENIORITIES)[number];
+
+export const SENIORITY_LABEL: Record<Seniority, string> = {
+  junior: "Júnior",
+  pleno: "Pleno",
+  senior: "Sênior",
+  especialista: "Especialista",
+};
+
+export const PERIOD_OPTIONS = [30, 90, 180, 365] as const;
+export const PERIOD_LABEL: Record<number, string> = {
+  30: "Últimos 30 dias",
+  90: "Últimos 90 dias",
+  180: "Últimos 180 dias",
+  365: "Últimos 12 meses",
+};
+
+const PERIOD_STORAGE_KEY = "rumvia:periodo";
+
 interface MarketValue {
   tracks: TrackOption[];
   tracksLoading: boolean;
@@ -33,6 +53,10 @@ interface MarketValue {
   currency: "BRL" | "USD";
   setTrackId: (trackId: string) => Promise<void>;
   setSegment: (segment: MarketSegment) => Promise<void>;
+  seniority: Seniority;
+  setSeniority: (seniority: Seniority) => Promise<void>;
+  periodDays: number;
+  setPeriodDays: (days: number) => void;
 }
 
 const MarketContext = React.createContext<MarketValue | null>(null);
@@ -62,14 +86,38 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   const trackId = profile?.current_track_id ?? tracks[0]?.id ?? null;
   const segment: MarketSegment =
     profile?.target_region === "remoto_global" ? "remoto_global" : "br";
+  const seniority = (SENIORITIES as readonly string[]).includes(profile?.seniority ?? "")
+    ? (profile!.seniority as Seniority)
+    : "pleno";
+
+  const [periodDays, setPeriodDaysState] = React.useState<number>(90);
+  React.useEffect(() => {
+    const stored = Number(window.localStorage.getItem(PERIOD_STORAGE_KEY));
+    if (PERIOD_OPTIONS.includes(stored as (typeof PERIOD_OPTIONS)[number])) {
+      setPeriodDaysState(stored);
+    }
+  }, []);
+  const setPeriodDays = React.useCallback(
+    (days: number) => {
+      window.localStorage.setItem(PERIOD_STORAGE_KEY, String(days));
+      setPeriodDaysState(days);
+      void queryClient.invalidateQueries();
+    },
+    [queryClient],
+  );
 
   const persist = React.useCallback(
-    async (patch: { current_track_id?: string; target_region?: MarketSegment }) => {
+    async (patch: {
+      current_track_id?: string;
+      target_region?: MarketSegment;
+      seniority?: Seniority;
+    }) => {
       if (!user) return;
 
       const profilePatch: {
         current_track_id?: string;
         target_region?: MarketSegment;
+        seniority?: Seniority;
         target_currency?: string;
       } = { ...patch };
       if (patch.target_region) {
@@ -82,7 +130,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         market_segment?: string;
         region?: string;
         currency?: string;
+        seniority_target?: string;
       } = {};
+      if (patch.seniority) prefPatch.seniority_target = patch.seniority;
       if (patch.current_track_id) prefPatch.track_id = patch.current_track_id;
       if (patch.target_region) {
         prefPatch.market_segment = patch.target_region;
@@ -113,8 +163,12 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       currency: SEGMENT_CURRENCY[segment],
       setTrackId: (id: string) => persist({ current_track_id: id }),
       setSegment: (s: MarketSegment) => persist({ target_region: s }),
+      seniority,
+      setSeniority: (s: Seniority) => persist({ seniority: s }),
+      periodDays,
+      setPeriodDays,
     }),
-    [tracks, tracksQuery.isLoading, trackId, segment, persist],
+    [tracks, tracksQuery.isLoading, trackId, segment, seniority, periodDays, setPeriodDays, persist],
   );
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
