@@ -72,7 +72,7 @@ export interface GapResult {
   items: GapItem[];
 }
 
-const SENIORITY_ORDER = ["junior", "pleno", "senior", "especialista"] as const;
+const SENIORITY_ORDER = ["junior", "pleno", "senior", "staff"] as const;
 
 function adjacentSeniorities(seniority: string): string[] {
   const i = SENIORITY_ORDER.indexOf(seniority as (typeof SENIORITY_ORDER)[number]);

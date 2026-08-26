@@ -24,14 +24,14 @@ export const SEGMENT_CURRENCY: Record<MarketSegment, "BRL" | "USD"> = {
   remoto_global: "USD",
 };
 
-export const SENIORITIES = ["junior", "pleno", "senior", "especialista"] as const;
+export const SENIORITIES = ["junior", "pleno", "senior", "staff"] as const;
 export type Seniority = (typeof SENIORITIES)[number];
 
 export const SENIORITY_LABEL: Record<Seniority, string> = {
   junior: "Júnior",
   pleno: "Pleno",
   senior: "Sênior",
-  especialista: "Especialista",
+  staff: "Staff",
 };
 
 export const PERIOD_OPTIONS = [30, 90, 180, 365] as const;
