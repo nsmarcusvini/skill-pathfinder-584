@@ -239,8 +239,14 @@ export function matchCatalogSegments<S extends string>(
           segments: new Set<S>([...prevSegments, ...segs]),
         };
       } else {
+        const current: SegmentMatch<S> = best;
         best = {
-          ...best,
+          skill_id: current.skill_id,
+          raw_term: current.raw_term,
+          matched_alias: current.matched_alias,
+          matched_by: current.matched_by,
+          confidence: current.confidence,
+          evidence: current.evidence ?? evidence,
           count: prevCount + count,
           segments: new Set<S>([...prevSegments, ...segs]),
         };
