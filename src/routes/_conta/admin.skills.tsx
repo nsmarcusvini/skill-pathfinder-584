@@ -187,7 +187,7 @@ function AdminSkills() {
   );
 }
 
-function Metric({ label, value, warning }: { label: string; value: string; warning?: boolean }) {
+function Metric({ label, value, warning }: { label: string; value: string; warning?: boolean | undefined }) {
   return (
     <div className="bg-bg p-4">
       <div className="font-mono text-[12px] uppercase tracking-wide text-text-muted">{label}</div>

@@ -23,6 +23,7 @@ export interface SourceResult {
 
 export async function runIngest(sourceKeys?: string[]): Promise<{
   sources: SourceResult[];
+  extraction?: Array<{ processed: number; skills_written: number; remaining: number }>;
   deactivated: number;
 }> {
   let query = supabaseAdmin.from("job_sources").select("id, key, adapter, config, is_active, source_type");

@@ -223,7 +223,8 @@ export function matchCatalogSegments<S extends string>(
       matchedTerms.add(normalize(candidate.term));
       if (candidate.alias) matchedTerms.add(normalize(candidate.alias));
 
-      if (!best || candidate.confidence > best.confidence || (candidate.confidence === best.confidence && count > best.count)) {
+      const previous: SegmentMatch<S> | null = best;
+      if (!previous || candidate.confidence > previous.confidence || (candidate.confidence === previous.confidence && count > previous.count)) {
         best = {
           skill_id: skill.id,
           raw_term: candidate.term,
@@ -231,12 +232,12 @@ export function matchCatalogSegments<S extends string>(
           matched_by: candidate.matchedBy,
           confidence: candidate.confidence,
           evidence,
-          count: (best?.count ?? 0) + count,
-          segments: new Set<S>([...(best?.segments ?? []), ...segs]),
+          count: (previous?.count ?? 0) + count,
+          segments: new Set<S>([...(previous?.segments ?? []), ...segs]),
         };
       } else {
-        best.count += count;
-        for (const s of segs) best.segments.add(s);
+        previous.count += count;
+        for (const s of segs) previous.segments.add(s);
       }
     }
 
