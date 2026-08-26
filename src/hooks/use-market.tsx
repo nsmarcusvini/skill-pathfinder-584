@@ -67,18 +67,27 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     async (patch: { current_track_id?: string; target_region?: MarketSegment }) => {
       if (!user) return;
 
-      const profilePatch: Record<string, string> = { ...patch };
+      const profilePatch: {
+        current_track_id?: string;
+        target_region?: MarketSegment;
+        target_currency?: string;
+      } = { ...patch };
       if (patch.target_region) {
-        profilePatch["target_currency"] = SEGMENT_CURRENCY[patch.target_region];
+        profilePatch.target_currency = SEGMENT_CURRENCY[patch.target_region];
       }
       await supabase.from("profiles").update(profilePatch).eq("id", user.id);
 
-      const prefPatch: Record<string, string> = {};
-      if (patch.current_track_id) prefPatch["track_id"] = patch.current_track_id;
+      const prefPatch: {
+        track_id?: string;
+        market_segment?: string;
+        region?: string;
+        currency?: string;
+      } = {};
+      if (patch.current_track_id) prefPatch.track_id = patch.current_track_id;
       if (patch.target_region) {
-        prefPatch["market_segment"] = patch.target_region;
-        prefPatch["region"] = patch.target_region;
-        prefPatch["currency"] = SEGMENT_CURRENCY[patch.target_region];
+        prefPatch.market_segment = patch.target_region;
+        prefPatch.region = patch.target_region;
+        prefPatch.currency = SEGMENT_CURRENCY[patch.target_region];
       }
       if (Object.keys(prefPatch).length > 0) {
         await supabase
