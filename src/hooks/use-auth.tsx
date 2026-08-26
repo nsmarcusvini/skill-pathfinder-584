@@ -212,14 +212,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) return { error: traduzErro(error.message) };
             return { error: null };
           }
-          const result = await lovable.auth.signInWithOAuth("google", {
+          const result = (await lovable.auth.signInWithOAuth("google", {
             redirect_uri: `${window.location.origin}/auth/callback`,
-          });
-          if (result?.error) {
+          })) as { error?: unknown } | undefined;
+          const oauthError = result?.error;
+          if (oauthError) {
             const message =
-              typeof result.error === "string"
-                ? result.error
-                : ((result.error as { message?: string }).message ?? "Falha no login com Google.");
+              typeof oauthError === "string"
+                ? oauthError
+                : ((oauthError as { message?: string }).message ?? "Falha no login com Google.");
             return { error: traduzErro(message) };
           }
           return { error: null };
