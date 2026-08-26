@@ -4,22 +4,27 @@
  * canônico + aliases + regex de siglas ambíguas + similaridade trigram.
  */
 
+import {
+  bestTrigram,
+  buildCatalogIndex,
+  escapeRegExp,
+  findOccurrences,
+  matchCatalogSegments,
+  normalize,
+  similarity,
+  stripLinks,
+  TRIGRAM_THRESHOLD,
+  type CatalogAlias,
+  type CatalogSkill,
+  type MatchedBy,
+} from "./skill-matcher";
+
+// Reexport para manter o contrato antigo: a implementação vive em skill-matcher.
+export { normalize, similarity, type CatalogAlias, type CatalogSkill, type MatchedBy };
+
 export const PARSER_VERSION = "cv-parser-v1";
 
 export type Section = "skills" | "experiencia" | "formacao" | "certificacoes" | "outro";
-export type MatchedBy = "exact" | "alias" | "regex" | "trigram" | "unmatched";
-
-export interface CatalogSkill {
-  id: string;
-  canonical_name: string;
-  is_ambiguous: boolean;
-  match_patterns: string[];
-}
-
-export interface CatalogAlias {
-  skill_id: string;
-  alias: string;
-}
 
 export interface ExtractedSkill {
   skill_id: string | null;
@@ -138,25 +143,6 @@ async function inflateToText(data: Uint8Array, method: number): Promise<string> 
 
 /* ------------------------------------------------------------ normalização */
 
-export function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-/** Remove URLs e e-mails para que não gerem falsos positivos. */
-function stripLinks(text: string): string {
-  return text
-    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, " ")
-    .replace(/\bhttps?:\/\/\S+/gi, " ")
-    .replace(/\b(?:www|github\.com|linkedin\.com)\/?\S*/gi, " ");
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /* ------------------------------------------------------------ seccionamento */
 
 const SECTION_PATTERNS: Array<{ section: Section; re: RegExp }> = [
@@ -218,24 +204,6 @@ export function sectionize(text: string): SectionedCv {
   };
 }
 
-/* --------------------------------------------------------------- trigram */
-
-function trigrams(value: string): Set<string> {
-  const padded = `  ${value.trim().replace(/\s+/g, " ")} `;
-  const set = new Set<string>();
-  for (let i = 0; i < padded.length - 2; i++) set.add(padded.slice(i, i + 3));
-  return set;
-}
-
-export function similarity(a: string, b: string): number {
-  const ta = trigrams(a);
-  const tb = trigrams(b);
-  if (ta.size === 0 || tb.size === 0) return 0;
-  let shared = 0;
-  for (const t of ta) if (tb.has(t)) shared += 1;
-  return shared / (ta.size + tb.size - shared);
-}
-
 /* ------------------------------------------------------------ experiência */
 
 const MONTHS: Record<string, number> = {
@@ -278,30 +246,6 @@ export function parseExperienceBlocks(sectionText: string): ExperienceBlock[] {
 }
 
 /* -------------------------------------------------------------- matching */
-
-interface Occurrence {
-  count: number;
-  sections: Set<Section>;
-  evidence: string;
-  rawTerm: string;
-}
-
-function findOccurrences(pattern: RegExp, sectionText: string): { count: number; evidence: string | null } {
-  let count = 0;
-  let evidence: string | null = null;
-  const re = new RegExp(pattern.source, "gi");
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(sectionText)) !== null) {
-    count += 1;
-    if (!evidence) {
-      const start = Math.max(0, m.index - 70);
-      const end = Math.min(sectionText.length, m.index + m[0].length + 70);
-      evidence = sectionText.slice(start, end).replace(/\s+/g, " ").trim();
-    }
-    if (m.index === re.lastIndex) re.lastIndex += 1;
-  }
-  return { count, evidence };
-}
 
 export interface MatchResult {
   extracted: ExtractedSkill[];
