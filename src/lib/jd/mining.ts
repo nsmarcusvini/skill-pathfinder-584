@@ -16,7 +16,7 @@ export interface MinedTerm {
 }
 
 const STOPWORDS_PT = new Set(
-  `a as o os um uma uns umas de do da dos das em no na nos nas por para com sem sob sobre entre ate apos e ou mas que quem qual quais quando onde como porque pois se ja nao sim muito mais menos todo toda todos todas outro outra outros outras mesmo mesma ser estar ter haver fazer poder dever vai vamos voce voces nos nosso nossa nossos nossas seu sua seus suas ele ela eles elas isso isto aquilo experiencia experiencias vaga vagas time times empresa empresas trabalho trabalhar area areas nivel niveis conhecimento conhecimentos ingles portugues espanhol anos ano dia dias mes meses hora horas home office remoto hibrido presencial clt pj beneficios beneficio salario plano saude vale refeicao alimentacao transporte oportunidade desafio desafios cultura pessoas pessoa profissional profissionais candidato candidatos processo seletivo etapa etapas entrevista entrevistas requisitos requisito desejavel diferenciais atividades atividade responsabilidades responsabilidade`.split(
+  `a as o os um uma uns umas de do da dos das em no na nos nas por para com sem sob sobre entre ate apos e ou mas que quem qual quais quando onde como porque pois se ja nao sim muito mais menos todo toda todos todas outro outra outros outras mesmo mesma ser estar ter haver fazer poder dever vai vamos voce voces nos nosso nossa nossos nossas seu sua seus suas ele ela eles elas isso isto aquilo experiencia experiencias vaga vagas time times empresa empresas trabalho trabalhar area areas nivel niveis conhecimento conhecimentos ingles portugues espanhol anos ano dia dias mes meses hora horas home office remoto hibrido presencial clt pj beneficios beneficio salario plano saude vale refeicao alimentacao transporte oportunidade desafio desafios cultura pessoas pessoa profissional profissionais candidato candidatos processo seletivo etapa etapas entrevista entrevistas requisitos requisito desejavel diferenciais atividades atividade responsabilidades responsabilidade vivencia vivencias certificacao certificacoes graduacao formacao dominio solida solido forte facilidade capacidade atuacao pratica praticas boas ferramentas ferramenta ambiente ambientes projeto projetos cliente clientes solucao solucoes negocio negocios dados producao desenvolvimento desenvolver gestao suporte melhoria continua`.split(
     /\s+/,
   ),
 );
@@ -72,6 +72,10 @@ function detectLang(text: string): "pt" | "en" | "other" {
 function addCandidate(map: Map<string, MinedTerm>, term: string, source: string, lang: MinedTerm["lang"]) {
   const clean = term.replace(/^[^\p{L}\d.#+]+|[^\p{L}\d#+]+$/gu, "").trim();
   if (clean.length < 2 || clean.length > 40) return;
+  if (/[@]|https?:/i.test(clean)) return;
+  // bigrama com palavra vazia em qualquer posição não vira candidato
+  const parts = clean.split(/\s+/);
+  if (parts.length > 1 && parts.some((w) => w.length < 3 || isStopword(w))) return;
   if (!/[\p{L}]/u.test(clean)) return;
   if (isStopword(clean) || isPlace(clean)) return;
   const key = normalize(clean);
