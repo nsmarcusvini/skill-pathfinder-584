@@ -382,7 +382,7 @@ function DesignSystemPage() {
               }
             />
             <LoadingState rows={5} />
-            <ErrorState onRetry={() => setLoading((l) => !l)} description={loading ? "Recarregando…" : undefined} />
+            <ErrorState onRetry={() => setLoading((l) => !l)} {...(loading ? { description: "Recarregando…" } : {})} />
           </div>
         </Section>
 
