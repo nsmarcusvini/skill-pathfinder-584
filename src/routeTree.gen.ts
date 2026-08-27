@@ -34,7 +34,9 @@ import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index
 import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
 import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
 import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
+import { Route as ContaAdminSaudeRouteImport } from './routes/_conta/admin.saude'
 import { Route as ContaAdminSkillsRouteImport } from './routes/_conta/admin.skills'
+import { Route as ContaAdminTrilhasRouteImport } from './routes/_conta/admin.trilhas'
 import { Route as ApiPublicExtractJdSkillsRouteImport } from './routes/api/public/extract-jd-skills'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
 import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
@@ -164,9 +166,19 @@ const ContaAdminImportarRoute = ContaAdminImportarRouteImport.update({
   path: '/importar',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminSaudeRoute = ContaAdminSaudeRouteImport.update({
+  id: '/saude',
+  path: '/saude',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
 const ContaAdminSkillsRoute = ContaAdminSkillsRouteImport.update({
   id: '/skills',
   path: '/skills',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
+const ContaAdminTrilhasRoute = ContaAdminTrilhasRouteImport.update({
+  id: '/trilhas',
+  path: '/trilhas',
   getParentRoute: () => ContaAdminRoute,
 } as any)
 const ApiPublicExtractJdSkillsRoute =
@@ -216,7 +228,9 @@ export interface FileRoutesByFullPath {
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/saude': typeof ContaAdminSaudeRoute
   '/admin/skills': typeof ContaAdminSkillsRoute
+  '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
@@ -246,7 +260,9 @@ export interface FileRoutesByTo {
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/saude': typeof ContaAdminSaudeRoute
   '/admin/skills': typeof ContaAdminSkillsRoute
+  '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
@@ -279,7 +295,9 @@ export interface FileRoutesById {
   '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/_conta/admin/fontes': typeof ContaAdminFontesRoute
   '/_conta/admin/importar': typeof ContaAdminImportarRoute
+  '/_conta/admin/saude': typeof ContaAdminSaudeRoute
   '/_conta/admin/skills': typeof ContaAdminSkillsRoute
+  '/_conta/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
@@ -312,7 +330,9 @@ export interface FileRouteTypes {
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/saude'
     | '/admin/skills'
+    | '/admin/trilhas'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
@@ -342,7 +362,9 @@ export interface FileRouteTypes {
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/saude'
     | '/admin/skills'
+    | '/admin/trilhas'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
@@ -374,7 +396,9 @@ export interface FileRouteTypes {
     | '/_conta/admin/descobrir-ats'
     | '/_conta/admin/fontes'
     | '/_conta/admin/importar'
+    | '/_conta/admin/saude'
     | '/_conta/admin/skills'
+    | '/_conta/admin/trilhas'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
@@ -576,11 +600,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminImportarRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/saude': {
+      id: '/_conta/admin/saude'
+      path: '/saude'
+      fullPath: '/admin/saude'
+      preLoaderRoute: typeof ContaAdminSaudeRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
     '/_conta/admin/skills': {
       id: '/_conta/admin/skills'
       path: '/skills'
       fullPath: '/admin/skills'
       preLoaderRoute: typeof ContaAdminSkillsRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
+    '/_conta/admin/trilhas': {
+      id: '/_conta/admin/trilhas'
+      path: '/trilhas'
+      fullPath: '/admin/trilhas'
+      preLoaderRoute: typeof ContaAdminTrilhasRouteImport
       parentRoute: typeof ContaAdminRoute
     }
     '/api/public/extract-jd-skills': {
@@ -618,7 +656,9 @@ interface ContaAdminRouteChildren {
   ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
   ContaAdminFontesRoute: typeof ContaAdminFontesRoute
   ContaAdminImportarRoute: typeof ContaAdminImportarRoute
+  ContaAdminSaudeRoute: typeof ContaAdminSaudeRoute
   ContaAdminSkillsRoute: typeof ContaAdminSkillsRoute
+  ContaAdminTrilhasRoute: typeof ContaAdminTrilhasRoute
   ContaAdminIndexRoute: typeof ContaAdminIndexRoute
 }
 
@@ -626,7 +666,9 @@ const ContaAdminRouteChildren: ContaAdminRouteChildren = {
   ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
   ContaAdminFontesRoute: ContaAdminFontesRoute,
   ContaAdminImportarRoute: ContaAdminImportarRoute,
+  ContaAdminSaudeRoute: ContaAdminSaudeRoute,
   ContaAdminSkillsRoute: ContaAdminSkillsRoute,
+  ContaAdminTrilhasRoute: ContaAdminTrilhasRoute,
   ContaAdminIndexRoute: ContaAdminIndexRoute,
 }
 

@@ -1,0 +1,198 @@
+# RUMVIA — Instruções permanentes do projeto
+
+> Este arquivo é lido pelo Claude Code no início de toda sessão. É a constituição do projeto.
+> Regras aqui **vencem** qualquer instrução casual do prompt.
+
+## O que é o RUMVIA
+
+Aplicação que compara o CV de um profissional de tecnologia com a demanda real do mercado
+de vagas e mostra, em porcentagem, o quanto ele está aderente à trilha de carreira que
+escolheu. Também mostra as ferramentas mais pedidas, empresas contratando, faixa salarial,
+e recomenda plano de estudos.
+
+Trilhas ativas: `devops` (variantes: DevOps Engineer, Platform Engineer, SRE),
+`data_engineer`, `fullstack`. `backend` e `frontend` virão depois via admin.
+
+## Stack real (não a que estava no system design original)
+
+O Lovable montou o projeto com **TanStack Start**, não com React + Vite + Deno Edge Functions.
+Você NÃO vai reverter isso. Adapte-se.
+
+| Camada | Realidade |
+|---|---|
+| Framework | TanStack Start 1.168 + Nitro + Vite 8 + React 19 |
+| Roteamento | file-based em `src/routes/` (TanStack Router) |
+| Server logic | `createServerFn` em `src/lib/*.functions.ts` e arquivos `*.server.ts` |
+| API endpoints | Route handlers em `src/routes/api/public/*.ts` (o que seria Edge Function) |
+| Auth | Supabase Auth (anônimo + permanente) + `@lovable.dev/cloud-auth-js` para OAuth Google |
+| Banco | Supabase Postgres (extensões: `pg_trgm`, `unaccent`, `citext`, `pg_cron`, `pg_net`, `pgcrypto` — **sem** `vector`) |
+| UI | shadcn/ui new-york + Tailwind 4 + Design System RUMVIA (base Industry) |
+| Dados | TanStack Query 5 + Supabase JS |
+| Package manager | Bun (`bun.lock`, `bunfig.toml`) — use `bun install`, `bun run dev` |
+
+Cron jobs do `pg_cron` chamam URLs do próprio app via `pg_net`
+(`https://<projeto>.lovable.app/api/public/...`).
+
+## Regras inegociáveis
+
+1. **Trilha é dado, não código.** Nenhum componente pode ter
+   `if (track === 'devops')` ou similar. Se você se pegar escrevendo isso, pare e leia
+   `career_tracks` + `track_role_variants` + `track_skill_baselines` do banco. Adicionar
+   trilha nova = inserir linhas no banco, zero mudança de código.
+
+2. **Sem LLM no MVP.** O parser de CV e o extrator de skills de vagas são
+   **determinísticos**: dicionário canônico + aliases bilíngues (pt/en) + regex para
+   `is_ambiguous` + similaridade trigram >= 0.86. Se pensar "aqui um LLM resolveria melhor",
+   a resposta é: sim, mas fora do escopo. Adicione o termo em `pending_skill_terms` para
+   curadoria.
+
+3. **Uma única fonte da fórmula de gap.** Está em `src/lib/gap.functions.ts`. Nenhuma tela
+   recalcula score. Se precisar de um subset, chame `compute-gap` com params diferentes.
+   Fórmula: `demanda = vagas_com_skill / total_vagas`; `peso = 0.7*demanda + 0.3*(baseline/100)`;
+   `cobertura = min(user_level/required_level, 1)`; `aderência = Σ(peso*cobertura) / Σ(peso) * 100`.
+
+4. **Um único skill matcher.** `src/lib/skill-matcher.ts` é compartilhado entre
+   `cv-parser.server.ts` e `jd/extract.server.ts`. Se divergir, o score fica inconsistente.
+   Nunca duplicar a lógica de matching em outro lugar.
+
+5. **`market_segment` sempre.** Toda vaga tem `br` ou `remoto_global`. Toda materialized
+   view agrega por segmento. Toda tela filtra por segmento ativo. Nunca somar os dois
+   no mesmo número. Salário: BR em BRL, remoto_global em USD, conversão só explícita
+   com data da taxa (`app_settings.usd_brl`).
+
+6. **RLS em toda tabela.** Dados de usuário: `auth.uid() = user_id`. Anônimo é
+   `authenticated` no JWT — em tabelas exclusivas de conta permanente (study_*,
+   user_certifications, user_courses, user_followed_companies, salary_observations com
+   `source='user'`), a policy tem:
+   ```sql
+   USING (auth.uid() = user_id AND (auth.jwt() ->> 'is_anonymous')::boolean IS NOT TRUE)
+   ```
+   Escrita em tabelas de mercado: só `service_role`.
+
+7. **Sessão anônima é sagrada.** `signInAnonymously` no primeiro acesso. Ao converter em
+   conta permanente, usar `updateUser` ou `linkIdentity` — **preservar `user.id`**. NUNCA
+   criar usuário novo e copiar dados. Está em `src/hooks/use-auth.tsx` — não mexer sem
+   entender.
+
+8. **Segredos só em variáveis de ambiente do servidor.** Nada no client. Nada em `.env`
+   commitado. Cron secret vive no Supabase Vault, lido via `vault.decrypted_secrets`.
+
+9. **Ingestão via adapter pattern.** Interface `JobAdapter` em `src/lib/ingest/adapters/`.
+   Adicionar fonte nova = 1 arquivo novo + linha em `job_sources`. **Proibido scraping
+   direto de LinkedIn, Indeed, Glassdoor** (ToS + antibot). Fontes pagas viram adapters
+   quando ativadas.
+
+10. **Interface em pt-BR.** Textos de vaga podem estar em inglês.
+
+11. **Design System (base Industry) é lei.** Cantos retos (`.blueprint`), hairlines,
+    Barlow / Barlow Condensed, paleta em `src/lib/design-tokens.ts`. Nunca hex solto
+    em componente. shadcn tem que respeitar radius 0. Escala de gap:
+    critical/low/mid/high — cor vem dos tokens.
+
+## Layout do projeto
+
+```
+src/
+  routes/                      # File-based routing do TanStack Router
+    index.tsx                  # Landing (visitante anônimo)
+    analise.tsx                # Teaser do parse do CV
+    login.tsx, cadastro.tsx    # Auth
+    onboarding.tsx
+    privacidade.tsx
+    _conta/                    # Segmento protegido (requer sessão)
+      dashboard.tsx            # ✅ pronto
+      cv.tsx                   # ✅ pronto (606 linhas)
+      minhas-skills.tsx        # ✅ pronto (682 linhas)
+      ferramentas.tsx          # ❌ esqueleto, precisa preencher (Prompt 9)
+      empresas.tsx             # ❌ esqueleto, precisa preencher (Prompt 9)
+      salarios.tsx             # ❌ esqueleto (Prompt 10)
+      progresso.tsx            # ❌ esqueleto (Prompt 11)
+      certificacoes.tsx        # ❌ esqueleto (Prompt 12)
+      cursos.tsx               # ❌ esqueleto (Prompt 12)
+      conta.tsx                # ✅ pronto
+      admin.*.tsx              # ⚠️ parcial (falta trilhas e saúde)
+    api/public/                # Endpoints de servidor (o que seria Edge Function)
+      ingest-jobs.ts
+      extract-jd-skills.ts
+      refresh-market-views.ts
+      ingest-webhook.ts
+  lib/
+    skill-matcher.ts           # ⚠️ MATCHER ÚNICO — não duplicar em outro lugar
+    gap.functions.ts           # ⚠️ FÓRMULA ÚNICA de aderência
+    cv-parser.server.ts        # Pipeline determinístico do CV
+    ingest/                    # Adapters + pipeline compartilhado
+      adapters/
+        ats.ts, aggregators.ts, csv-manual.ts   # ativos
+        adzuna.ts, jsearch.ts                    # esqueleto desativado
+      pipeline.server.ts       # Reutilizado por PULL e PUSH webhook
+    jd/                        # Extração de skills de vagas
+    design-tokens.ts
+  hooks/
+    use-auth.tsx               # ⚠️ anonymous sign-in + conversão — não regredir
+    use-market.tsx             # trilha + segmento globais
+    use-gap.tsx
+  components/
+    rumvia/                    # Design System RUMVIA
+    auth/
+    app/
+    ui/                        # shadcn/ui (não editar direto)
+  integrations/
+    supabase/
+      client.ts, client.server.ts, types.ts, auth-middleware.ts, ...
+supabase/
+  migrations/                  # 15 migrations rodadas; nomeadas por timestamp
+  seed/
+    0002_rumvia_seed.sql       # trilhas + skills + baselines
+    0004_rumvia_jobs_seed.sql  # 150 vagas fictícias
+```
+
+## Como trabalhar
+
+- Use **Bun**, não npm/pnpm. `bun install`, `bun run dev`, `bun run build`.
+- Antes de criar arquivo, procure se já existe algo parecido. Este projeto tem redundância
+  quase zero — o Lovable organizou bem, respeite.
+- Quando criar migration, use timestamp do dia atual e nomeie descritivamente. Não
+  reordene as existentes.
+- Toda nova server function em `src/lib/*.functions.ts` deve validar auth (existe
+  `requireSupabaseAuth` em `src/integrations/supabase/auth-middleware.ts`).
+- Toda nova rota `_conta/*` está automaticamente protegida por `src/routes/_conta.tsx`.
+- Não edite arquivos em `src/components/ui/` — são gerados pelo shadcn. Se precisar
+  customizar, envolva num componente próprio em `src/components/rumvia/`.
+- Não ligue código de front direto em materialized view. Passe por server function.
+- Ao terminar cada feature, atualize `docs/PROGRESS.md` marcando o item concluído (se
+  o arquivo não existir, crie).
+
+## Roadmap que sobrou (nesta ordem)
+
+- [ ] **Prompt 9** — Ferramentas + Empresas (rotas em `_conta/ferramentas.tsx` e
+      `_conta/empresas.tsx` + `src/lib/market.functions.ts`)
+- [ ] **Prompt 10** — Salários (`_conta/salarios.tsx` + adições ao `market.functions.ts`)
+- [ ] **Prompt 11** — Progresso (migration + `src/lib/study.functions.ts` +
+      `_conta/progresso.tsx`)
+- [ ] **Prompt 12** — Certificações + Cursos (migration + seed + `learning.functions.ts` +
+      duas rotas)
+- [ ] **Prompt 13** — Admin de trilhas + painel de saúde
+- [ ] **Prompt 14** — Expurgo de anônimos + notificações + LGPD (export/delete) +
+      responsividade + smoke test
+- [ ] **Prompt 8C** — Stripe (avulso R$7,99 + Pro R$30/mês) — só depois do funil validar
+
+Detalhes completos de cada um vivem em `docs/roadmap/`.
+
+## Coisas que já sei que quebram
+
+- **Cron aponta para URL de preview Lovable.** Antes de promover para produção,
+  atualizar a URL nas duas `cron.schedule` que estão em
+  `20260826170959_*.sql` e `20260826171043_*.sql`.
+- **`use-market.tsx` deriva segmento de `profile.target_region`.** Se o onboarding
+  não estiver gravando esse campo, tudo cai em `br` por default. Verificar em
+  `src/routes/onboarding.tsx` antes de mexer em Ferramentas.
+- **Anonymous sign-in precisa estar habilitado no painel do Supabase**
+  (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
+
+## O que fazer quando estiver em dúvida
+
+- Sobre arquitetura: releia este arquivo.
+- Sobre uma feature específica: `docs/roadmap/prompt-N.md`.
+- Sobre uma decisão que não está aqui: pergunte ao usuário antes de assumir.
+- Nunca invente dado. Se uma tela precisa mostrar número e o número não existe ainda,
+  use `<EmptyState>` — nunca placeholder com valor falso.

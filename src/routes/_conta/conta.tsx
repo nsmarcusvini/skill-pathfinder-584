@@ -86,15 +86,26 @@ function ContaPage() {
     if (!user) return;
     setExporting(true);
     try {
-      const [perfil, prefs] = await Promise.all([
+      const db = supabase as any;
+      const [perfil, prefs, gapAnalyses, userSkills, studyPlans, userCerts, userCourses] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
         supabase.from("user_track_preferences").select("*").eq("user_id", user.id),
+        supabase.from("gap_analyses").select("id, track_id, seniority, market_segment, adherence_score, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+        supabase.from("user_skills").select("skill_id, self_level, years_exp").eq("user_id", user.id),
+        db.from("study_plans").select("title, status, target_date, created_at").eq("user_id", user.id),
+        db.from("user_certifications").select("certification_id, custom_name, status, obtained_at, expires_at").eq("user_id", user.id),
+        db.from("user_courses").select("course_id, custom_title, status, progress_percent, completed_at").eq("user_id", user.id),
       ]);
       const payload = {
         exportado_em: new Date().toISOString(),
         conta: { id: user.id, email: user.email },
         perfil: perfil.data,
         preferencias_de_trilha: prefs.data ?? [],
+        analises_de_gap: gapAnalyses.data ?? [],
+        skills: userSkills.data ?? [],
+        planos_de_estudo: studyPlans.data ?? [],
+        certificacoes: userCerts.data ?? [],
+        cursos: userCourses.data ?? [],
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);

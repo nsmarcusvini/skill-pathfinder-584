@@ -132,8 +132,27 @@ export function AppShell({
           <div className="ml-auto flex shrink-0 items-center gap-2">{topbarExtra}</div>
         </header>
 
-        <main className="rumvia-container flex-1 py-6">{children}</main>
+        <main className="rumvia-container flex-1 py-6 pb-20 md:pb-6">{children}</main>
       </div>
+
+      {/* Mobile bottom nav — only first 6 items to fit the bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-stretch border-t border-divider bg-bg md:hidden"
+        aria-label="Navegação principal (mobile)"
+      >
+        {nav.slice(0, 5).map((item) => (
+          <Link
+            key={item.to}
+            to={item.to as never}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-neutral-600 hover:bg-surface"
+            activeProps={{ className: "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-accent-700 bg-surface font-semibold" }}
+            title={item.label}
+          >
+            <span aria-hidden>{item.icon}</span>
+            <span className="truncate px-0.5">{item.label}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }

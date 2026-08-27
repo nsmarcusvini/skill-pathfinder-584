@@ -321,3 +321,199 @@ export const searchSkillsAdmin = createServerFn({ method: "POST" })
       .limit(20);
     return skills ?? [];
   });
+
+// ─── Trilhas (career_tracks) ─────────────────────────────────────────────────
+
+export interface AdminTrack {
+  id: string;
+  key: string;
+  name: string;
+  is_active: boolean;
+  role_variants: string[];
+  skills_count: number;
+  jobs_br: number;
+  jobs_global: number;
+}
+
+export const listTracks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AdminTrack[]> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: tracks }, { data: variants }, { data: baselines }, { data: jobs }] = await Promise.all([
+      supabaseAdmin.from("career_tracks").select("id, key, name, is_active").order("name"),
+      supabaseAdmin.from("track_role_variants").select("track_id, role_title"),
+      supabaseAdmin.from("track_skill_baselines").select("track_id").select("track_id"),
+      supabaseAdmin.from("job_postings").select("track_id, market_segment").eq("is_active", true),
+    ]);
+
+    const variantMap = new Map<string, string[]>();
+    for (const v of variants ?? []) {
+      const arr = variantMap.get(v.track_id) ?? [];
+      arr.push(v.role_title);
+      variantMap.set(v.track_id, arr);
+    }
+
+    const skillsCount = new Map<string, number>();
+    for (const b of baselines ?? []) {
+      skillsCount.set(b.track_id, (skillsCount.get(b.track_id) ?? 0) + 1);
+    }
+
+    const jobsBr = new Map<string, number>();
+    const jobsGlobal = new Map<string, number>();
+    for (const j of jobs ?? []) {
+      if (!j.track_id) continue;
+      if (j.market_segment === "br") jobsBr.set(j.track_id, (jobsBr.get(j.track_id) ?? 0) + 1);
+      else if (j.market_segment === "remoto_global") jobsGlobal.set(j.track_id, (jobsGlobal.get(j.track_id) ?? 0) + 1);
+    }
+
+    return (tracks ?? []).map((t) => ({
+      id: t.id,
+      key: t.key,
+      name: t.name,
+      is_active: t.is_active ?? true,
+      role_variants: variantMap.get(t.id) ?? [],
+      skills_count: skillsCount.get(t.id) ?? 0,
+      jobs_br: jobsBr.get(t.id) ?? 0,
+      jobs_global: jobsGlobal.get(t.id) ?? 0,
+    }));
+  });
+
+export const toggleTrack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid(), is_active: z.boolean() }).parse(data))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("career_tracks").update({ is_active: data.is_active }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const upsertTrack = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().uuid().optional(),
+        key: z.string().min(2).max(40).regex(/^[a-z_]+$/),
+        name: z.string().min(2).max(120),
+        role_variants: z.array(z.string().min(2).max(120)).min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let trackId = data.id;
+    if (trackId) {
+      const { error } = await supabaseAdmin
+        .from("career_tracks")
+        .update({ key: data.key, name: data.name })
+        .eq("id", trackId);
+      if (error) throw new Error(error.message);
+    } else {
+      const { data: created, error } = await supabaseAdmin
+        .from("career_tracks")
+        .insert({ key: data.key, name: data.name, is_active: true })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      trackId = created.id;
+    }
+
+    // re-sync role_variants: delete old + insert new
+    await supabaseAdmin.from("track_role_variants").delete().eq("track_id", trackId);
+    const rows = data.role_variants.map((role_title, sort_order) => ({ track_id: trackId, role_title, sort_order }));
+    if (rows.length > 0) {
+      const { error } = await supabaseAdmin.from("track_role_variants").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+
+    return { id: trackId };
+  });
+
+// ─── Health dashboard ─────────────────────────────────────────────────────────
+
+export interface HealthStats {
+  users_total: number;
+  users_permanent: number;
+  users_anonymous: number;
+  users_last_7d: number;
+  jobs_total: number;
+  jobs_active: number;
+  jobs_br: number;
+  jobs_global: number;
+  gap_analyses_total: number;
+  gap_analyses_last_7d: number;
+  mv_salary_refreshed_at: string | null;
+  mv_tool_refreshed_at: string | null;
+  cron_last_run: string | null;
+  pending_terms: number;
+  study_plans_total: number;
+}
+
+export const getHealthStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<HealthStats> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const since7d = new Date(Date.now() - 7 * 86400_000).toISOString();
+
+    const [
+      { count: usersTotal },
+      { count: usersPermanent },
+      { count: usersLast7d },
+      { count: jobsTotal },
+      { count: jobsActive },
+      { count: jobsBr },
+      { count: jobsGlobal },
+      { count: gapTotal },
+      { count: gapLast7d },
+      { count: pendingTerms },
+      { data: appSettings },
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }).eq("is_anonymous", false),
+      supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", since7d),
+      supabaseAdmin.from("job_postings").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabaseAdmin.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true).eq("market_segment", "br"),
+      supabaseAdmin.from("job_postings").select("*", { count: "exact", head: true }).eq("is_active", true).eq("market_segment", "remoto_global"),
+      supabaseAdmin.from("gap_analyses").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("gap_analyses").select("*", { count: "exact", head: true }).gte("created_at", since7d),
+      supabaseAdmin.from("pending_skill_terms").select("*", { count: "exact", head: true }).eq("status", "novo"),
+      supabaseAdmin.from("app_settings").select("key, value").in("key", ["mv_salary_refreshed_at", "mv_tool_refreshed_at", "cron_last_run"]),
+    ]);
+
+    const settingsMap = new Map((appSettings ?? []).map((r) => [r.key, r.value as string]));
+
+    // study_plans is a new table — use raw query via rpc or count directly
+    let studyPlansTotal = 0;
+    try {
+      const { count } = await (supabaseAdmin as any).from("study_plans").select("*", { count: "exact", head: true });
+      studyPlansTotal = count ?? 0;
+    } catch {
+      studyPlansTotal = 0;
+    }
+
+    return {
+      users_total: usersTotal ?? 0,
+      users_permanent: usersPermanent ?? 0,
+      users_anonymous: (usersTotal ?? 0) - (usersPermanent ?? 0),
+      users_last_7d: usersLast7d ?? 0,
+      jobs_total: jobsTotal ?? 0,
+      jobs_active: jobsActive ?? 0,
+      jobs_br: jobsBr ?? 0,
+      jobs_global: jobsGlobal ?? 0,
+      gap_analyses_total: gapTotal ?? 0,
+      gap_analyses_last_7d: gapLast7d ?? 0,
+      mv_salary_refreshed_at: settingsMap.get("mv_salary_refreshed_at") ?? null,
+      mv_tool_refreshed_at: settingsMap.get("mv_tool_refreshed_at") ?? null,
+      cron_last_run: settingsMap.get("cron_last_run") ?? null,
+      pending_terms: pendingTerms ?? 0,
+      study_plans_total: studyPlansTotal,
+    };
+  });

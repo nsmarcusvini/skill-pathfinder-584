@@ -18,6 +18,21 @@ const CARDS = [
     text: "Cobre vagas brasileiras que nenhuma API gratuita entrega. Validação linha a linha e pré-visualização.",
   },
   {
+    to: "/admin/skills",
+    title: "Curadoria de skills",
+    text: "Fila de termos desconhecidos minerados das vagas. Aprove como alias ou crie skill nova.",
+  },
+  {
+    to: "/admin/trilhas",
+    title: "Trilhas de carreira",
+    text: "Gerencie trilhas ativas e variantes de cargo. Adicionar trilha = dados no banco, zero código.",
+  },
+  {
+    to: "/admin/saude",
+    title: "Saúde do sistema",
+    text: "Usuários, vagas, análises de gap, frescor das materialized views e último cron.",
+  },
+  {
     to: "/admin/descobrir-ats",
     title: "Descobrir ATS",
     text: "Cole a URL da página de carreiras e descubra o ATS e o board_token sugerido.",
