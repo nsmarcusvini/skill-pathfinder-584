@@ -209,7 +209,7 @@ function SalariosPage() {
               {/* BR column */}
               <div className="flex flex-col gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-accent-600, #416180)" }}>
-                  Brasil — BRL
+                  Brasil — BRL/mês
                 </div>
                 {brSen ? (
                   <>
@@ -233,7 +233,7 @@ function SalariosPage() {
               {/* Global column */}
               <div className="flex flex-col gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-accent-600, #416180)" }}>
-                  Remoto Global — USD
+                  Remoto Global — USD/mês
                 </div>
                 {globalSen ? (
                   <>
@@ -258,7 +258,7 @@ function SalariosPage() {
             {/* Conversion line */}
             {stats && brSen && globalSen && (
               <div className="mt-3 pt-3 border-t text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
-                Equivalência: mediana global = {formatCurrency(globalSen.p50 * stats.usdBrl, "BRL")} · 1 USD = R$ {stats.usdBrl.toFixed(2)} em {stats.rateDate}
+                Equivalência: mediana global = {formatCurrency(globalSen.p50 * stats.usdBrl, "BRL")}/mês · 1 USD = R$ {stats.usdBrl.toFixed(2)} em {stats.rateDate}
               </div>
             )}
           </>

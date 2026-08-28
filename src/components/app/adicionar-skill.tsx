@@ -37,6 +37,17 @@ export interface AdicionarSkillProps {
   variant?: "default" | "outline" | "ghost";
   size?: "sm" | "lg" | "default";
   align?: "start" | "end" | "center";
+  /**
+   * Modo direto: acrescenta ESTA skill, sem abrir a busca.
+   *
+   * Serve para onde a skill já está na tela e nomeá-la de novo numa busca seria
+   * trabalho à toa — o caso do "Top 10 lacunas" do dashboard, em que a pessoa
+   * lê "Kubernetes · faltante" e lembra que só esqueceu de preencher.
+   *
+   * A gravação é a MESMA do modo busca (mesmo nível, mesma invalidação, mesmo
+   * recálculo de gap). Só muda o que se mostra.
+   */
+  skill?: { id: string; name: string };
   /** Chamado depois de gravar, para a tela reagir se quiser. */
   onAdicionada?: (skillId: string, nome: string) => void;
 }
@@ -46,6 +57,7 @@ export function AdicionarSkill({
   variant = "outline",
   size = "sm",
   align = "end",
+  skill,
   onAdicionada,
 }: AdicionarSkillProps) {
   const { user } = useAuth();
@@ -53,8 +65,13 @@ export function AdicionarSkill({
   const recomputeGap = useRecomputeGap();
   const [open, setOpen] = React.useState(false);
 
+  const modoDireto = Boolean(skill);
+
   const catalogo = useQuery({
     queryKey: ["catalogo-skills"],
+    // No modo direto a skill já veio pronta: carregar as 200+ do catálogo e os
+    // aliases seria banda gasta por nada, ainda mais numa lista de 10 linhas.
+    enabled: !modoDireto,
     // Catálogo muda por curadoria, não por sessão: cache longo.
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
@@ -138,6 +155,25 @@ export function AdicionarSkill({
     const jaTenho = new Set(tenho);
     return todas.filter((s) => !jaTenho.has(s.id));
   }, [catalogo.data, minhas.data]);
+
+  // Já tem a skill? No modo direto o botão perde o sentido — some em vez de
+  // oferecer uma ação que não muda nada.
+  const jaPossui = Boolean(skill && (minhas.data ?? []).includes(skill.id));
+
+  if (skill) {
+    if (jaPossui) return null;
+    return (
+      <Button
+        variant={variant}
+        size={size}
+        disabled={!user || adicionar.isPending}
+        onClick={() => adicionar.mutate({ skillId: skill.id, nome: skill.name })}
+      >
+        <Plus className="mr-1 size-4" aria-hidden />
+        {label}
+      </Button>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

@@ -2,7 +2,7 @@ import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, Check, Pencil, RefreshCw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/rumvia/page-header";
@@ -21,6 +21,7 @@ import {
 import { useMarket, SENIORITY_LABEL, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
 import {
   listSalaryObservations,
+  createSalaryObservation,
   reviewSalaryObservation,
   updateSalaryObservation,
   deleteSalaryObservation,
@@ -34,6 +35,18 @@ export const Route = createFileRoute("/_conta/admin/salarios")({
 });
 
 type StatusFiltro = "pendente" | "aprovada" | "rejeitada" | "todos";
+
+/** Payload da entrada manual. Trilha e senioridade não são opcionais aqui: sem
+ *  elas a linha não entra em mv_salary_stats e o dado sumiria sem aviso. */
+interface NovoSalario {
+  trackId: string;
+  seniority: "junior" | "pleno" | "senior" | "staff";
+  marketSegment: "br" | "remoto_global";
+  currency: "BRL" | "USD" | "EUR";
+  period: "hour" | "month" | "year";
+  amountMin: number | null;
+  amountMax: number | null;
+}
 
 const STATUS: Array<{ key: StatusFiltro; label: string }> = [
   { key: "pendente", label: "Pendentes" },
@@ -65,6 +78,7 @@ function AdminSalariosPage() {
   const qc = useQueryClient();
   const market = useMarket();
   const carregar = useServerFn(listSalaryObservations);
+  const criar = useServerFn(createSalaryObservation);
   const revisar = useServerFn(reviewSalaryObservation);
   const corrigir = useServerFn(updateSalaryObservation);
   const excluir = useServerFn(deleteSalaryObservation);
@@ -73,6 +87,7 @@ function AdminSalariosPage() {
   const [status, setStatus] = React.useState<StatusFiltro>("pendente");
   const [soDiscrepantes, setSoDiscrepantes] = React.useState(false);
   const [editando, setEditando] = React.useState<AdminSalaryRow | null>(null);
+  const [criando, setCriando] = React.useState(false);
 
   const lista = useQuery({
     queryKey: ["admin", "salarios", status, soDiscrepantes],
@@ -111,6 +126,18 @@ function AdminSalariosPage() {
   const recalcularMut = useMutation({
     mutationFn: () => recalcular({ data: {} }),
     onSuccess: () => toast.success("Estatísticas recalculadas."),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // createSalaryObservation já recalcula a view no servidor — aqui não precisa
+  // pedir "Recalcular estatísticas" depois de salvar.
+  const criarMut = useMutation({
+    mutationFn: (v: NovoSalario) => criar({ data: v }),
+    onSuccess: () => {
+      toast.success("Salário adicionado e estatística recalculada.");
+      setCriando(false);
+      invalidar();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -173,10 +200,14 @@ function AdminSalariosPage() {
           Só discrepantes
         </button>
 
+        <Button size="sm" className="ml-auto" onClick={() => setCriando(true)}>
+          <Plus className="size-4" aria-hidden />
+          Adicionar salário
+        </Button>
+
         <Button
           variant="outline"
           size="sm"
-          className="ml-auto"
           loading={recalcularMut.isPending}
           onClick={() => recalcularMut.mutate()}
         >
@@ -211,10 +242,20 @@ function AdminSalariosPage() {
       )}
 
       <p className="text-caption text-neutral-600">
-        Observações vindas de vaga já entram aprovadas — têm origem rastreável. Só contribuição de
-        usuário passa por aqui. Aprovar não recalcula a mediana na hora: use{" "}
-        <strong>Recalcular estatísticas</strong> ao terminar a revisão.
+        A ingestão de vagas não gera mais salário: a estatística é curadoria manual, feita em{" "}
+        <strong>Adicionar salário</strong> — o que você digita ali já nasce aprovado e recalcula a
+        mediana na hora. Contribuição de usuário continua caindo aqui como pendente; aprovar{" "}
+        <em>não</em> recalcula sozinho, use <strong>Recalcular estatísticas</strong> ao terminar a
+        revisão. Trilha e senioridade são obrigatórias — sem elas a linha não entra na estatística.
       </p>
+
+      <DialogNovo
+        aberto={criando}
+        tracks={market.tracks}
+        salvando={criarMut.isPending}
+        onFechar={() => setCriando(false)}
+        onSalvar={(payload) => criarMut.mutate(payload)}
+      />
 
       <DialogEdicao
         row={editando}
@@ -331,6 +372,189 @@ function Linha({
         </Button>
       </div>
     </li>
+  );
+}
+
+/**
+ * Entrada manual — a única fonte que alimenta a estatística hoje.
+ *
+ * O segmento dita a moeda (regra 5 do CLAUDE.md: BR em BRL, remoto_global em
+ * USD, conversão só explícita), então mudar o segmento troca a moeda junto em
+ * vez de deixar o admin salvar "Brasil pagando em USD" — combinação que existiu
+ * em produção e ninguém pegou.
+ */
+function DialogNovo({
+  aberto,
+  tracks,
+  salvando,
+  onFechar,
+  onSalvar,
+}: {
+  aberto: boolean;
+  tracks: Array<{ id: string; name: string }>;
+  salvando: boolean;
+  onFechar: () => void;
+  onSalvar: (p: NovoSalario) => void;
+}) {
+  const [trilha, setTrilha] = React.useState("");
+  const [sen, setSen] = React.useState<"junior" | "pleno" | "senior" | "staff">("pleno");
+  const [seg, setSeg] = React.useState<"br" | "remoto_global">("br");
+  const [moeda, setMoeda] = React.useState<"BRL" | "USD" | "EUR">("BRL");
+  const [periodo, setPeriodo] = React.useState<"hour" | "month" | "year">("month");
+  const [min, setMin] = React.useState("");
+  const [max, setMax] = React.useState("");
+
+  // Reabrir o diálogo tem que dar um formulário limpo: sem isso o admin
+  // cadastraria a segunda faixa por cima dos valores da primeira.
+  React.useEffect(() => {
+    if (!aberto) return;
+    setTrilha(tracks[0]?.id ?? "");
+    setSen("pleno");
+    setSeg("br");
+    setMoeda("BRL");
+    setPeriodo("month");
+    setMin("");
+    setMax("");
+  }, [aberto, tracks]);
+
+  const trocarSegmento = (v: "br" | "remoto_global") => {
+    setSeg(v);
+    setMoeda(v === "br" ? "BRL" : "USD");
+  };
+
+  const nMin = min.trim() ? Number(min) : null;
+  const nMax = max.trim() ? Number(max) : null;
+  const numeroInvalido =
+    (min.trim() !== "" && !Number.isFinite(nMin)) || (max.trim() !== "" && !Number.isFinite(nMax));
+  const semValor = nMin === null && nMax === null;
+  const invertido = nMin !== null && nMax !== null && nMin > nMax;
+  const erro = numeroInvalido
+    ? "Use só números."
+    : semValor
+      ? "Informe ao menos um valor."
+      : invertido
+        ? "O mínimo não pode ser maior que o máximo."
+        : !trilha
+          ? "Selecione a trilha."
+          : null;
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => !o && onFechar()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Adicionar salário</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 sm:col-span-2">
+            <span className="label-h6 text-neutral-700">Trilha</span>
+            <select className="field" value={trilha} onChange={(e) => setTrilha(e.target.value)}>
+              {tracks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Senioridade</span>
+            <select
+              className="field"
+              value={sen}
+              onChange={(e) => setSen(e.target.value as typeof sen)}
+            >
+              <option value="junior">Júnior</option>
+              <option value="pleno">Pleno</option>
+              <option value="senior">Sênior</option>
+              <option value="staff">Staff</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Segmento</span>
+            <select
+              className="field"
+              value={seg}
+              onChange={(e) => trocarSegmento(e.target.value as typeof seg)}
+            >
+              <option value="br">Brasil</option>
+              <option value="remoto_global">Remoto global</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Mínimo</span>
+            <Input
+              value={min}
+              onChange={(e) => setMin(e.target.value)}
+              inputMode="numeric"
+              placeholder="12000"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Máximo</span>
+            <Input
+              value={max}
+              onChange={(e) => setMax(e.target.value)}
+              inputMode="numeric"
+              placeholder="18000"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Moeda</span>
+            <select
+              className="field"
+              value={moeda}
+              onChange={(e) => setMoeda(e.target.value as typeof moeda)}
+            >
+              <option value="BRL">BRL</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Período</span>
+            <select
+              className="field"
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value as typeof periodo)}
+            >
+              <option value="month">Mensal</option>
+              <option value="year">Anual</option>
+              <option value="hour">Por hora</option>
+            </select>
+          </label>
+        </div>
+
+        <p className="text-caption text-neutral-600">
+          A estatística é normalizada para <strong>mensal</strong>, então pode cadastrar em anual ou
+          por hora que a tela converte. Uma faixa já vira P25/P75; cadastre mais de uma linha no
+          mesmo balde para a mediana ganhar amostra.
+        </p>
+        {erro && <p className="text-caption text-danger">{erro}</p>}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button
+            loading={salvando}
+            disabled={Boolean(erro)}
+            onClick={() =>
+              onSalvar({
+                trackId: trilha,
+                seniority: sen,
+                marketSegment: seg,
+                currency: moeda,
+                period: periodo,
+                amountMin: nMin,
+                amountMax: nMax,
+              })
+            }
+          >
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

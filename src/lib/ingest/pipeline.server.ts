@@ -225,31 +225,19 @@ export async function ingestJobs(
         } as unknown as Json,
       });
 
-      if (row.salary_min || row.salary_max) {
-        // 'posting' — é o que o CHECK da tabela aceita ('posting' ou 'user').
-        // Já esteve como 'job_posting', que violava a regra: como o erro não era
-        // verificado, TODA observação salarial falhava calada e mv_salary_stats
-        // ficava vazia. O erro agora entra em counters.errors, mas não rejeita a
-        // vaga — salário é complemento, não requisito.
-        const { error: salaryError } = await supabaseAdmin.from("salary_observations").insert({
-          job_posting_id: upserted.id,
-          track_id,
-          seniority: row.seniority,
-          market_segment: row.market_segment,
-          country,
-          currency: currency ?? (row.market_segment === "br" ? "BRL" : "USD"),
-          amount_min: row.salary_min,
-          amount_max: row.salary_max,
-          period: row.salary_period ?? "year",
-          source: "posting",
-          // Nasce aprovada: veio de vaga real e o payload bruto fica em
-          // job_posting_raw. Só contribuição de usuário passa por moderação.
-          status: "aprovada",
-        });
-        if (salaryError) {
-          counters.errors.push(`${job.external_id} (salário): ${salaryError.message}`);
-        }
-      }
+      // A ingestão NÃO grava mais salary_observations.
+      //
+      // O track_id vinha de classifyTrack(), que devolve null quando o título da
+      // vaga não bate com nenhuma track_role_variants — 108 das 111 observações
+      // nasceram sem trilha. Como mv_salary_stats agrupa por track_id e descarta
+      // nulo, a tela /salarios ficava vazia em toda trilha que não fosse
+      // fullstack, e o que passava vinha inconsistente (segmento 'br' pagando em
+      // USD, faixa zerada). Salário virou curadoria manual do admin, em
+      // createSalaryObservation. Ver 20260828120000_salarios_manuais.sql.
+      //
+      // A faixa continua sendo gravada em job_postings (salary_min/salary_max),
+      // que é o que a tela de Vagas mostra — só a estatística agregada deixou de
+      // ser alimentada por aqui.
     } catch (error) {
       counters.rejected += 1;
       counters.errors.push(error instanceof Error ? error.message : String(error));

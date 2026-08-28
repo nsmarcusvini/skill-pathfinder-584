@@ -310,6 +310,16 @@ function DashboardPage() {
 }
 
 function GapRow({ item }: { item: GapItem }) {
+  // Nível 0 = a skill não está no perfil. Aí há duas leituras possíveis: ou a
+  // pessoa não sabe mesmo (e o caminho é estudar), ou ela sabe e só esqueceu de
+  // preencher — o parser de CV não pega tudo. Oferecer as duas saídas na mesma
+  // linha evita que ela mande para o plano de estudos algo que já domina, o que
+  // deixaria a aderência menor do que a realidade.
+  //
+  // Acima de 0 a skill já existe no perfil, só está abaixo do nível pedido:
+  // "já tenho" não faria sentido, o ajuste é em /minhas-skills.
+  const naoPossui = item.userLevel === 0;
+
   return (
     <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
       <div className="min-w-0">
@@ -322,18 +332,30 @@ function GapRow({ item }: { item: GapItem }) {
       <span className="num text-caption text-neutral-700">
         nível {item.userLevel}/{item.requiredLevel}
       </span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          const added = addToStudyPlan({ skillId: item.skillId, name: item.name });
-          toast[added ? "success" : "info"](
-            added ? `${item.name} adicionada ao plano de estudos` : `${item.name} já está no plano`,
-          );
-        }}
-      >
-        Adicionar ao plano de estudos
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {naoPossui ? (
+          <AdicionarSkill
+            skill={{ id: item.skillId, name: item.name }}
+            label="Já tenho essa"
+            variant="ghost"
+            size="sm"
+          />
+        ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const added = addToStudyPlan({ skillId: item.skillId, name: item.name });
+            toast[added ? "success" : "info"](
+              added
+                ? `${item.name} adicionada ao plano de estudos`
+                : `${item.name} já está no plano`,
+            );
+          }}
+        >
+          Adicionar ao plano de estudos
+        </Button>
+      </div>
     </li>
   );
 }

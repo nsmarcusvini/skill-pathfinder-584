@@ -903,6 +903,76 @@ export const listSalaryObservations = createServerFn({ method: "POST" })
     );
   });
 
+/**
+ * Entrada manual do admin — hoje a única fonte que alimenta a estatística.
+ *
+ * A ingestão de vagas parou de gravar salário (o track_id vinha nulo na maioria
+ * e mv_salary_stats descarta nulo, ver 20260828120000_salarios_manuais.sql), e
+ * contribuição de usuário nasce 'pendente'. O que o admin digita aqui nasce
+ * 'aprovada': ele é a curadoria, não faz sentido pedir que se auto-modere.
+ *
+ * trackId e seniority são OBRIGATÓRIOS aqui, ao contrário da coluna, que aceita
+ * nulo. Sem trilha a linha não entra na view, e sem senioridade ela cai no balde
+ * 'nao_informado', que a tela não sabe rotular — nos dois casos o admin digitaria
+ * um dado que some sem aviso.
+ */
+export const createSalaryObservation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        trackId: z.string().uuid(),
+        seniority: z.enum(["junior", "pleno", "senior", "staff"]),
+        marketSegment: z.enum(["br", "remoto_global"]),
+        currency: z.enum(["BRL", "USD", "EUR"]),
+        period: z.enum(["hour", "month", "year"]),
+        amountMin: z.number().nonnegative().nullable(),
+        amountMax: z.number().nonnegative().nullable(),
+        note: z.string().max(500).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.amountMin === null && data.amountMax === null) {
+      throw new Error("Informe ao menos um valor: mínimo ou máximo.");
+    }
+    if (data.amountMin !== null && data.amountMax !== null && data.amountMin > data.amountMax) {
+      throw new Error("O valor mínimo não pode ser maior que o máximo.");
+    }
+    // Zero passa no nonnegative() do zod e viraria uma faixa 0–0 no meio dos
+    // percentis. Já aconteceu: havia uma linha com p50 = 0,00 em produção.
+    if (data.amountMin === 0 && (data.amountMax === null || data.amountMax === 0)) {
+      throw new Error("O valor não pode ser zero.");
+    }
+
+    const { error } = await supabaseAdmin.from("salary_observations").insert({
+      track_id: data.trackId,
+      seniority: data.seniority,
+      market_segment: data.marketSegment,
+      country: data.marketSegment === "br" ? "BR" : null,
+      currency: data.currency,
+      period: data.period,
+      amount_min: data.amountMin,
+      amount_max: data.amountMax,
+      source: "admin",
+      status: "aprovada",
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: context.userId,
+      ...(data.note ? { review_note: data.note } : {}),
+    });
+    if (error) throw new Error(error.message);
+
+    // A tela lê a materialized view, não a tabela: sem refresh o admin salva e
+    // não vê nada mudar, que é exatamente o sintoma que trouxe a gente até aqui.
+    const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
+    if (refreshError) throw new Error(`Salvo, mas a estatística não recalculou: ${refreshError.message}`);
+
+    return { ok: true };
+  });
+
 export const reviewSalaryObservation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>

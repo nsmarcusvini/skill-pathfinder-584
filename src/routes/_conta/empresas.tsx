@@ -53,6 +53,8 @@ import {
   getCompanyMonthly,
   type CompanyRankingItem,
 } from "@/lib/market.functions";
+import { listJobLocations } from "@/lib/jobs.functions";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_conta/empresas")({
   head: () => ({
@@ -94,10 +96,36 @@ function EmpresasPage() {
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<string | null>(null);
   const [selectedCompanyName, setSelectedCompanyName] = React.useState<string>("");
   const [sortBy, setSortBy] = React.useState<"jobs" | "recent">("jobs");
+  /** Chaves de cidade selecionadas (sem acento) — ver listJobLocations. */
+  const [cidades, setCidades] = React.useState<string[]>([]);
 
   const runRanking = useServerFn(getCompanyRanking);
   const runDetail = useServerFn(getCompanyDetail);
   const runMonthly = useServerFn(getCompanyMonthly);
+  const runLocations = useServerFn(listJobLocations);
+
+  // Localidades disponíveis para a trilha/segmento atuais — mesma RPC que
+  // /vagas usa, já agrupada por chave sem acento.
+  const locaisQuery = useQuery({
+    queryKey: ["empresas_localidades", trackId, segment],
+    enabled: Boolean(trackId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => runLocations({ data: { trackId: trackId as string, segment } }),
+  });
+  const locais = React.useMemo(() => locaisQuery.data ?? [], [locaisQuery.data]);
+
+  // O ranking filtra por grafia, não por chave: a coluna city guarda o texto
+  // como veio da fonte.
+  const grafiasSelecionadas = React.useMemo(
+    () => locais.filter((l) => cidades.includes(l.key)).flatMap((l) => l.spellings),
+    [locais, cidades],
+  );
+
+  // Trocar de trilha ou segmento muda a lista de cidades; manter a seleção
+  // antiga deixaria o filtro preso numa cidade que não existe mais no recorte.
+  React.useEffect(() => {
+    setCidades([]);
+  }, [trackId, segment]);
 
   // ── Gap status map ────────────────────────────────────────────────────────
   const gapStatusBySkill = React.useMemo(() => {
@@ -110,7 +138,7 @@ function EmpresasPage() {
 
   // ── Company ranking ───────────────────────────────────────────────────────
   const rankingQuery = useQuery({
-    queryKey: ["companies", trackId, segment, seniority, periodDays],
+    queryKey: ["companies", trackId, segment, seniority, periodDays, grafiasSelecionadas],
     enabled: Boolean(trackId),
     staleTime: 5 * 60 * 1000,
     queryFn: () =>
@@ -120,6 +148,7 @@ function EmpresasPage() {
           segments: [segment],
           seniorities: [seniority],
           periodDays,
+          ...(grafiasSelecionadas.length > 0 ? { cities: grafiasSelecionadas } : {}),
         },
       }),
   });
@@ -179,7 +208,14 @@ function EmpresasPage() {
 
   // ── Company detail ────────────────────────────────────────────────────────
   const detailQuery = useQuery({
-    queryKey: ["company-detail", selectedCompanyId, trackId, segment, periodDays],
+    queryKey: [
+      "company-detail",
+      selectedCompanyId,
+      trackId,
+      segment,
+      periodDays,
+      grafiasSelecionadas,
+    ],
     enabled: Boolean(selectedCompanyId) && Boolean(trackId),
     queryFn: () =>
       runDetail({
@@ -188,6 +224,7 @@ function EmpresasPage() {
           companyId: selectedCompanyId!,
           segments: [segment],
           periodDays,
+          ...(grafiasSelecionadas.length > 0 ? { cities: grafiasSelecionadas } : {}),
         },
       }),
   });
@@ -269,6 +306,56 @@ function EmpresasPage() {
         </Select>
       </Blueprint>
 
+      {/* Localidades. Só aparece quando há cidade no recorte — num segmento
+          totalmente remoto a coluna city é nula e a régua ficaria vazia. */}
+      {locais.length > 0 ? (
+        <Blueprint className="flex flex-col gap-2 p-4">
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-neutral-700" aria-hidden />
+            <span className="label-h6 text-neutral-700">Localidades</span>
+            {cidades.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCidades([])}
+                className="cursor-pointer text-caption text-accent-800 underline underline-offset-2"
+              >
+                limpar {cidades.length}
+              </button>
+            ) : null}
+          </div>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Filtrar empresas por localidade"
+          >
+            {locais.map((l) => {
+              const on = cidades.includes(l.key);
+              return (
+                <button
+                  key={l.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setCidades((prev) =>
+                      prev.includes(l.key) ? prev.filter((k) => k !== l.key) : [...prev, l.key],
+                    )
+                  }
+                  className={cn(
+                    "cursor-pointer border px-3 py-1.5 text-caption transition-colors",
+                    on
+                      ? "border-accent-700 bg-accent-100 text-accent-800"
+                      : "border-divider text-neutral-700 hover:bg-surface",
+                  )}
+                >
+                  {l.label}
+                  <span className="ml-1.5 font-mono text-neutral-600 tabular-nums">{l.jobs}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Blueprint>
+      ) : null}
+
       {/* States */}
       {!trackId ? (
         <EmptyState
@@ -282,7 +369,11 @@ function EmpresasPage() {
       ) : sortedCompanies.length === 0 ? (
         <EmptyState
           title="Sem empresas neste recorte"
-          description="Tente ampliar o período ou mudar o segmento de mercado."
+          description={
+            cidades.length > 0
+              ? "Nenhuma empresa contratando nessas localidades. Tente ampliar o período ou limpar o filtro de localidade."
+              : "Tente ampliar o período ou mudar o segmento de mercado."
+          }
         />
       ) : (
         <Blueprint className="flex flex-col">

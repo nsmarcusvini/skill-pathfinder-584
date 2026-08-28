@@ -217,6 +217,8 @@ interface CompanyRankingInput {
   segments: string[];
   seniorities: string[];
   periodDays: number;
+  /** Grafias de cidade, como vêm de `job_locations().grafias` (ver jobs.functions.ts). */
+  cities?: string[];
 }
 
 export const getCompanyRanking = createServerFn({ method: "POST" })
@@ -229,6 +231,7 @@ export const getCompanyRanking = createServerFn({ method: "POST" })
       _segments: data.segments,
       _seniorities: data.seniorities,
       _since: sinceDaysAgo(data.periodDays),
+      ...(data.cities?.length ? { _cities: data.cities } : {}),
     });
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => ({
@@ -258,6 +261,9 @@ interface CompanyDetailInput {
   companyId: string;
   segments: string[];
   periodDays: number;
+  /** Mesmo recorte de localidade aplicado no ranking, para o detalhe não mostrar
+   *  vaga/skill fora do filtro que o usuário escolheu na tela. */
+  cities?: string[];
 }
 
 export const getCompanyDetail = createServerFn({ method: "POST" })
@@ -266,22 +272,24 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<CompanyDetail> => {
     const { supabase, userId } = context;
 
+    let openJobsQuery = supabase
+      .from("job_postings")
+      .select("id, title, seniority, apply_url, posted_at, market_segment")
+      .eq("company_id", data.companyId)
+      .eq("track_id", data.trackId)
+      .eq("is_active", true)
+      .in("market_segment", data.segments);
+    if (data.cities?.length) openJobsQuery = openJobsQuery.in("city", data.cities);
+
     const [{ data: demandRows }, { data: openJobRows }] = await Promise.all([
       supabase.rpc("company_skill_demand", {
         _track_id: data.trackId,
         _company_id: data.companyId,
         _segments: data.segments,
         _since: sinceDaysAgo(data.periodDays),
+        ...(data.cities?.length ? { _cities: data.cities } : {}),
       }),
-      supabase
-        .from("job_postings")
-        .select("id, title, seniority, apply_url, posted_at, market_segment")
-        .eq("company_id", data.companyId)
-        .eq("track_id", data.trackId)
-        .eq("is_active", true)
-        .in("market_segment", data.segments)
-        .order("posted_at", { ascending: false })
-        .limit(20),
+      openJobsQuery.order("posted_at", { ascending: false }).limit(20),
     ]);
 
     const skillIds = (demandRows ?? []).map((r) => r.skill_id);
