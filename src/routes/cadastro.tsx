@@ -7,12 +7,18 @@ import { AlertTriangle } from "lucide-react";
 
 import { AuthLayout, FieldError } from "@/components/auth/auth-layout";
 import { GoogleButton } from "@/components/auth/google-button";
+import { LoadingState } from "@/components/rumvia/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentCv, hasExtractedCv } from "@/hooks/use-current-cv";
 import { signUpSchema, type SignUpValues } from "@/lib/auth-schemas";
 
 export const Route = createFileRoute("/cadastro")({
+  // Depende de sessão (useAuth) e de uma leitura no banco (useCurrentCv) para
+  // decidir se deixa renderizar o formulário — precisa rodar no cliente,
+  // mesmo padrão de /analise.
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Criar conta — RUMVIA" },
@@ -31,11 +37,33 @@ function CadastroPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const [conflictEmail, setConflictEmail] = React.useState<string | null>(null);
+  const cvQuery = useCurrentCv();
+
+  // Só cria conta quem já extraiu o currículo. Sem isso a conta nasce vazia e
+  // a primeira coisa que a pessoa vê no dashboard é um EmptyState — o CV é o
+  // que dá substância à análise, então ele vem antes, nunca depois.
+  //
+  // O bloqueio é AQUI, na rota de destino, e não só nos botões que levam até
+  // ela: um link direto, o botão Voltar do navegador ou uma aba salva não
+  // passam pelos CTAs que já mandam para /analise primeiro, e sem o guard
+  // aqui todos esses caminhos abririam o formulário sem CV nenhum.
+  const carregando = auth.loading || (Boolean(auth.user) && cvQuery.isLoading);
+  const semCv = !carregando && !hasExtractedCv(cvQuery.data);
+
+  React.useEffect(() => {
+    if (semCv) {
+      void navigate({ to: "/analise", search: { cv: undefined }, replace: true });
+    }
+  }, [semCv, navigate]);
 
   const form = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: { fullName: "", email: "", password: "", passwordConfirm: "" },
   });
+
+  if (carregando || semCv) {
+    return <LoadingState label="Verificando sua análise…" />;
+  }
 
   async function onSubmit(values: SignUpValues) {
     // Visitante anônimo: convertemos a MESMA conta, preservando o user.id

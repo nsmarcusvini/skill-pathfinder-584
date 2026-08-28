@@ -51,7 +51,8 @@ function LoginPage() {
       footer={
         <p className="text-caption text-neutral-700">
           Ainda não tem conta?{" "}
-          <Link to="/cadastro" className="text-accent-700 underline">
+          {/* /analise primeiro: conta só se cria depois de extrair o currículo. */}
+          <Link to="/analise" search={{ cv: undefined }} className="text-accent-700 underline">
             Criar conta
           </Link>
         </p>

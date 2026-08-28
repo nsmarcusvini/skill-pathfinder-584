@@ -96,8 +96,11 @@ function LandingPage() {
             <Link to="/login" className="text-caption text-neutral-600 hover:text-accent-700">
               Entrar
             </Link>
+            {/* /analise primeiro: conta só se cria depois de extrair o currículo. */}
             <Button asChild size="sm">
-              <Link to="/cadastro">Criar conta grátis</Link>
+              <Link to="/analise" search={{ cv: undefined }}>
+                Criar conta grátis
+              </Link>
             </Button>
           </nav>
         </div>
@@ -129,8 +132,13 @@ function LandingPage() {
                 <strong className="text-bg">o que está te custando oportunidades</strong>.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
+                {/* Rotulado "Analisar meu CV" — tem de abrir o envio, não o
+                    cadastro. Ia direto para /cadastro, contradizendo a frase
+                    "Sem cadastro para a prévia" duas linhas abaixo. */}
                 <Button asChild size="lg">
-                  <Link to="/cadastro">Analisar meu CV — grátis</Link>
+                  <Link to="/analise" search={{ cv: undefined }}>
+                    Analisar meu CV — grátis
+                  </Link>
                 </Button>
               </div>
               <p className="mt-4 font-mono text-caption" style={{ color: "rgba(242,242,243,0.4)" }}>
@@ -508,7 +516,9 @@ function LandingPage() {
               size="lg"
               style={{ background: "var(--rumvia-bg)", color: "var(--accent-700)" }}
             >
-              <Link to="/cadastro">Analisar meu CV agora — grátis</Link>
+              <Link to="/analise" search={{ cv: undefined }}>
+                Analisar meu CV agora — grátis
+              </Link>
             </Button>
             <Button
               asChild

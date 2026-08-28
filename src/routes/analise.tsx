@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import { CvDropzone } from "@/components/app/cv-dropzone";
 import { AdicionarSkill } from "@/components/app/adicionar-skill";
 import { PublicHeader } from "@/components/app/public-header";
-import { AuthDialog } from "@/components/auth/auth-dialog";
 import { RequireAccount } from "@/components/auth/require-account";
 import { Blueprint } from "@/components/rumvia/blueprint";
 import { ChartCard } from "@/components/rumvia/chart-card";
@@ -36,6 +35,7 @@ import { SkillBadge } from "@/components/rumvia/skill-badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentCv, hasExtractedCv } from "@/hooks/use-current-cv";
 import {
   SEGMENT_LABEL,
   SENIORITIES,
@@ -108,24 +108,10 @@ function AnalisePage() {
   const [seniority, setSeniority] = React.useState<Seniority>("pleno");
   const [segment, setSegment] = React.useState<MarketSegment>("br");
   const [recognized, setRecognized] = React.useState<number>(0);
-  const [authOpen, setAuthOpen] = React.useState(false);
   const started = React.useRef<string | null>(null);
 
   /** CV anterior desta sessão anônima: quem fecha a aba reencontra a análise. */
-  const currentCvQuery = useQuery({
-    queryKey: ["analise-cv", user?.id],
-    enabled: Boolean(user) && !search.cv,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("cvs")
-        .select("id, status, created_at")
-        .eq("is_current", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data ?? null;
-    },
-  });
+  const currentCvQuery = useCurrentCv();
 
   const tracksQuery = useQuery({
     queryKey: ["tracks-publicas"],
@@ -189,7 +175,7 @@ function AnalisePage() {
   React.useEffect(() => {
     const existing = currentCvQuery.data;
     if (!existing || cvId || stage !== "aguardando") return;
-    if (existing.status === "parsed") {
+    if (hasExtractedCv(existing)) {
       started.current = existing.id;
       setCvId(existing.id);
       void (async () => {
@@ -254,8 +240,8 @@ function AnalisePage() {
               Salve sua análise criando uma conta — o CV e as skills desta sessão continuam sendo
               seus, nada é reprocessado.
             </p>
-            <Button size="sm" onClick={() => setAuthOpen(true)}>
-              Criar conta grátis
+            <Button size="sm" asChild>
+              <Link to="/cadastro">Criar conta grátis</Link>
             </Button>
           </Blueprint>
         ) : null}
@@ -544,8 +530,8 @@ function AnalisePage() {
                       A análise completa — todas as lacunas, salários e plano de estudos — fica na
                       sua conta. É grátis e mantém tudo que você já enviou.
                     </p>
-                    <Button size="lg" onClick={() => setAuthOpen(true)}>
-                      Criar conta grátis para ver a análise completa
+                    <Button size="lg" asChild>
+                      <Link to="/cadastro">Criar conta grátis para ver a análise completa</Link>
                     </Button>
                   </Blueprint>
                 ) : (
@@ -561,17 +547,6 @@ function AnalisePage() {
           </div>
         ) : null}
       </main>
-
-      <AuthDialog
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        defaultMode="criar"
-        title="Criar conta grátis"
-        description="Sua análise atual é preservada: o mesmo perfil vira conta permanente."
-        onSuccess={() => {
-          void navigate({ to: "/onboarding" });
-        }}
-      />
     </div>
   );
 }

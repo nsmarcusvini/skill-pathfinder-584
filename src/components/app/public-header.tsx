@@ -23,8 +23,13 @@ export function PublicHeader() {
             <Button asChild variant="outline" size="sm">
               <Link to="/login">Entrar</Link>
             </Button>
+            {/* Manda para /analise, não /cadastro: conta só se cria depois de
+                extrair o currículo. /cadastro tem o mesmo bloqueio como
+                rede de segurança, mas o CTA já parte pelo caminho certo. */}
             <Button asChild size="sm">
-              <Link to="/cadastro">Criar conta</Link>
+              <Link to="/analise" search={{ cv: undefined }}>
+                Criar conta
+              </Link>
             </Button>
           </>
         )}
