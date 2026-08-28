@@ -59,6 +59,25 @@ function bool(r: Record<string, unknown>, ...chaves: string[]): boolean | null {
   return null;
 }
 
+/**
+ * Sub-objeto, quando a fonte agrupa valores relacionados em vez de achatar.
+ *
+ * O LinkedIn faz isso com salário:
+ *   base_salary: { currency: "R$", min_amount: 10001, max_amount: 15000,
+ *                  payment_period: "mo" }
+ *
+ * Confirmado com dados reais da conta em 2026-08-28 — não é suposição. Antes
+ * disso o mapeamento só procurava chaves achatadas (`salary_min`, `pay_min`) e
+ * TODO salário do LinkedIn caía como null, calado.
+ */
+function obj(r: Record<string, unknown>, ...chaves: string[]): Record<string, unknown> {
+  for (const k of chaves) {
+    const v = r[k];
+    if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+  }
+  return {};
+}
+
 /** Data em ISO, aceitando epoch em segundos ou milissegundos. */
 function data(r: Record<string, unknown>, ...chaves: string[]): string | null {
   for (const k of chaves) {
@@ -114,8 +133,14 @@ function paraNormalizedJob(
     "description_html",
     "job_description",
     "description",
+    // Glassdoor chama a descrição de job_overview. Sem esta chave o texto vinha
+    // null e NENHUMA skill era extraída — a vaga entrava vazia, somando no
+    // denominador da demanda sem contribuir com nada.
+    "job_overview",
   );
   const texto = txt(r, "job_description_plain", "description_text") ?? semHtml(html);
+
+  const salario = obj(r, "base_salary", "salary", "pay", "compensation");
 
   const remotoDeclarado = bool(r, "is_remote", "remote", "remote_work");
   const modalidadeTxt = (
@@ -145,10 +170,19 @@ function paraNormalizedJob(
     country: txt(r, "country_code", "country", "job_country"),
     description_html: html,
     description_text: texto,
-    salary_min: num(r, "salary_min", "min_salary", "base_salary_min", "pay_min"),
-    salary_max: num(r, "salary_max", "max_salary", "base_salary_max", "pay_max"),
-    salary_currency: txt(r, "salary_currency", "currency", "pay_currency"),
-    salary_period: txt(r, "salary_period", "pay_period", "salary_type"),
+    // Achatado primeiro, aninhado como segunda tentativa: fontes diferentes
+    // escolhem formas diferentes e as duas precisam funcionar.
+    salary_min:
+      num(r, "salary_min", "min_salary", "base_salary_min", "pay_min") ??
+      num(salario, "min_amount", "min", "minimum"),
+    salary_max:
+      num(r, "salary_max", "max_salary", "base_salary_max", "pay_max") ??
+      num(salario, "max_amount", "max", "maximum"),
+    salary_currency:
+      txt(r, "salary_currency", "currency", "pay_currency") ?? txt(salario, "currency"),
+    salary_period:
+      txt(r, "salary_period", "pay_period", "salary_type") ??
+      txt(salario, "payment_period", "period"),
     employment_type: txt(r, "job_employment_type", "employment_type", "job_type", "contract_type"),
     seniority_hint: txt(
       r,
@@ -165,7 +199,14 @@ function paraNormalizedJob(
       "posted_time",
       "job_posted_time",
     ),
-    apply_url: txt(r, "apply_link", "application_url", "apply_url", ...extras.urlKeys),
+    apply_url: txt(
+      r,
+      "apply_link",
+      "application_url",
+      "apply_url",
+      "job_application_link",
+      ...extras.urlKeys,
+    ),
     // Registro cru completo: auditoria, e permite refinar o mapeamento depois
     // sem precisar recoletar nada.
     raw: r,
@@ -286,7 +327,11 @@ export const brightDataIndeedAdapter = criarAdapter({
 export const brightDataGlassdoorAdapter = criarAdapter({
   key: "bd_glassdoor",
   nome: "Bright Data — Glassdoor Jobs",
-  idKeys: ["job_listing_id", "glassdoor_job_id"],
+  // job_posting_id PRIMEIRO: é o que a conta devolve de fato (verificado no
+  // snapshot sd_mtd7h0i92onkz8frcg, 2026-08-28). Sem ele o mapeamento não
+  // achava id nenhum e descartava os 177 registros do lote inteiro — em
+  // silêncio, porque descartar registro incompleto é comportamento normal.
+  idKeys: ["job_posting_id", "job_listing_id", "glassdoor_job_id"],
   urlKeys: ["url", "job_url", "link"],
   discoverBy: "keyword",
 });

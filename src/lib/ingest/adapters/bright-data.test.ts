@@ -199,3 +199,98 @@ describe("JobGether", () => {
     await expect(jobgetherAdapter.trigger({})).rejects.toThrow(/indisponível/i);
   });
 });
+
+describe("salário aninhado (forma real do LinkedIn)", () => {
+  // Esta é a forma que a conta do cliente devolveu de fato em 2026-08-28.
+  // Diferente das outras fixtures, ela NÃO é inventada — foi copiada de
+  // job_posting_raw depois da primeira coleta real.
+  it("lê base_salary aninhado em vez de deixar o salário como null", () => {
+    const [vaga] = brightDataLinkedinJobsAdapter.collect(
+      [
+        {
+          job_posting_id: "sal1",
+          job_title: "DevOps",
+          company_name: "Acme",
+          base_salary: {
+            currency: "R$",
+            min_amount: 10001,
+            max_amount: 15000,
+            payment_period: "mo",
+          },
+        },
+      ],
+      cfg,
+    );
+
+    expect(vaga!.salary_min).toBe(10001);
+    expect(vaga!.salary_max).toBe(15000);
+    expect(vaga!.salary_currency).toBe("R$");
+    // "mo" tem de sobreviver até normalize.toAnnual, que converte para ano.
+    expect(vaga!.salary_period).toBe("mo");
+  });
+
+  it("prefere o campo achatado quando as duas formas existem", () => {
+    const [vaga] = brightDataLinkedinJobsAdapter.collect(
+      [
+        {
+          job_posting_id: "sal2",
+          job_title: "A",
+          company_name: "B",
+          salary_min: 999,
+          base_salary: { min_amount: 111 },
+        },
+      ],
+      cfg,
+    );
+    expect(vaga!.salary_min).toBe(999);
+  });
+
+  it("não quebra quando base_salary vem nulo ou vazio", () => {
+    const [semNada] = brightDataLinkedinJobsAdapter.collect(
+      [{ job_posting_id: "sal3", job_title: "A", company_name: "B", base_salary: null }],
+      cfg,
+    );
+    expect(semNada!.salary_min).toBeNull();
+    expect(semNada!.salary_currency).toBeNull();
+  });
+});
+
+describe("Glassdoor — forma real da conta (regressão)", () => {
+  // Copiado de um registro real do snapshot sd_mtd7h0i92onkz8frcg (2026-08-28),
+  // com os campos reduzidos ao que o mapeamento usa.
+  //
+  // Esse lote trouxe 177 registros e o mapeamento converteu ZERO, porque
+  // procurava o id em `job_listing_id` e o Glassdoor manda `job_posting_id`.
+  // Registro sem id é descartado por regra, então a falha não gerou erro:
+  // o lote inteiro sumiu em silêncio, com ingestion_runs marcado "success".
+  const real = {
+    job_posting_id: 1010219372153,
+    job_title: "JR Fullstack Engineer - Indaiatuba/SP",
+    company_name: "John Deere",
+    job_location: "Indaiatuba",
+    job_overview: "Trabalhamos para que a vida possa avançar. Buscamos experiência com Java e AWS.",
+    job_application_link: "https://www.glassdoor.com.br/job-listing/jr-fullstack-engineer",
+    url: "https://www.glassdoor.com.br/job-listing/jr-fullstack-engineer",
+    pay_range_currency: "BRL",
+  };
+
+  it("converte o registro em vez de descartá-lo", () => {
+    const [vaga] = brightDataGlassdoorAdapter.collect([real], cfg);
+    expect(vaga).toBeDefined();
+    // O id vem como número no JSON; tem de virar texto sem virar null.
+    expect(vaga!.external_id).toBe("1010219372153");
+    expect(vaga!.title).toBe("JR Fullstack Engineer - Indaiatuba/SP");
+    expect(vaga!.company_name).toBe("John Deere");
+  });
+
+  it("lê job_overview como descrição — sem ela nenhuma skill é extraída", () => {
+    const [vaga] = brightDataGlassdoorAdapter.collect([real], cfg);
+    expect(vaga!.description_text).toContain("Java");
+    expect(vaga!.description_text).toContain("AWS");
+  });
+
+  it("lê job_application_link como link de candidatura", () => {
+    const [vaga] = brightDataGlassdoorAdapter.collect([real], cfg);
+    expect(vaga!.apply_url).toContain("glassdoor");
+  });
+});

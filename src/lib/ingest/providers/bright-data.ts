@@ -99,8 +99,13 @@ async function requisitar(
 
       const corpo = await res.text().catch(() => "");
       const repetivel = res.status === 429 || res.status >= 500;
+      // 300 caracteres cortavam a parte útil. Num validation_error a Bright
+      // Data ecoa o payload inteiro ANTES de dizer o que está errado, então o
+      // array `errors` — o único pedaço que explica a falha — caía fora. Custou
+      // uma investigação manual para descobrir que o Indeed usa `keyword_search`
+      // e não `keyword`. 2000 cobre o eco mais o diagnóstico.
       ultimoErro = erro(
-        `Bright Data HTTP ${res.status} em ${url}: ${corpo.slice(0, 300)}`,
+        `Bright Data HTTP ${res.status} em ${url}: ${corpo.slice(0, 2000)}`,
         res.status,
         repetivel,
       );

@@ -13,6 +13,7 @@ import {
   inferSeniority,
   normalizeCountry,
   normalizeCurrency,
+  parseLocation,
   normalizeTitle,
   toAnnual,
 } from "./normalize";
@@ -139,6 +140,9 @@ export async function ingestJobs(
       const salary = toAnnual(job.salary_min, job.salary_max, job.salary_period);
       const currency = normalizeCurrency(job.salary_currency, country);
       const companyId = await resolveCompany(job.company_name);
+      // city/state nunca eram preenchidos: as colunas existiam vazias na base
+      // inteira, e por isso não dava para filtrar vaga por localidade.
+      const local = parseLocation(job.location_raw);
 
       const row = {
         source_id: options.sourceId,
@@ -151,6 +155,8 @@ export async function ingestJobs(
         role_variant_id,
         seniority: inferSeniority(job.title, job.seniority_hint),
         location_raw: job.location_raw,
+        city: local.city,
+        state: local.state,
         country,
         is_remote: job.is_remote,
         remote_restriction: segment.remote_restriction,

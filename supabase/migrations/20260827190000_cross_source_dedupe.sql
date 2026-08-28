@@ -162,7 +162,8 @@ comment on function public.dedupe_job_postings(integer, integer) is
   'Elege o registro canônico de cada vaga sindicalizada entre fontes. Idempotente.';
 
 -- Escrita em dado de mercado é só do service_role (regra 6).
-revoke all on function public.dedupe_job_postings(integer, integer) from public;
+revoke all on function public.dedupe_job_postings(integer, integer)
+  from public, anon, authenticated;
 grant execute on function public.dedupe_job_postings(integer, integer) to service_role;
 
 -- ────────────────────────────────────────── agregações passam a ler o canônico

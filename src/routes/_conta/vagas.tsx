@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useMarket, SENIORITY_LABEL, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
-import { listJobs, getJobDetail, type JobListItem } from "@/lib/jobs.functions";
+import { listJobs, getJobDetail, listJobLocations, type JobListItem } from "@/lib/jobs.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_conta/vagas")({
@@ -95,25 +95,51 @@ function VagasPage() {
   const market = useMarket();
   const runList = useServerFn(listJobs);
   const runDetail = useServerFn(getJobDetail);
+  const runLocations = useServerFn(listJobLocations);
 
   const [busca, setBusca] = React.useState("");
   const [buscaAtiva, setBuscaAtiva] = React.useState("");
   const [soRemoto, setSoRemoto] = React.useState(false);
-  const [comSalario, setComSalario] = React.useState(false);
   const [quaseLa, setQuaseLa] = React.useState(false);
+  /** Chaves de cidade selecionadas (sem acento) — ver listJobLocations. */
+  const [cidades, setCidades] = React.useState<string[]>([]);
   const [pagina, setPagina] = React.useState(0);
   const [aberta, setAberta] = React.useState<string | null>(null);
 
   const trackId = market.trackId;
   const segment = market.segment;
 
+  // Localidades disponíveis para a trilha/segmento atuais. Vem do servidor já
+  // agrupado por chave sem acento, então "Florianopolis" e "Florianópolis" são
+  // uma opção só.
+  const locaisQuery = useQuery({
+    queryKey: ["vagas_localidades", trackId, segment],
+    enabled: Boolean(trackId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => runLocations({ data: { trackId: trackId as string, segment } }),
+  });
+  const locais = React.useMemo(() => locaisQuery.data ?? [], [locaisQuery.data]);
+
+  // A listagem filtra por grafia, não por chave: a coluna city guarda o texto
+  // como veio da fonte.
+  const grafiasSelecionadas = React.useMemo(
+    () => locais.filter((l) => cidades.includes(l.key)).flatMap((l) => l.spellings),
+    [locais, cidades],
+  );
+
+  // Trocar de trilha ou segmento muda a lista de cidades; manter a seleção
+  // antiga deixaria o filtro preso numa cidade que não existe mais no recorte.
+  React.useEffect(() => {
+    setCidades([]);
+  }, [trackId, segment]);
+
   // Filtros novos recomeçam da primeira página.
   React.useEffect(() => {
     setPagina(0);
-  }, [trackId, segment, buscaAtiva, soRemoto, comSalario, quaseLa]);
+  }, [trackId, segment, buscaAtiva, soRemoto, quaseLa, cidades]);
 
   const listaQuery = useQuery({
-    queryKey: ["vagas", trackId, segment, buscaAtiva, soRemoto, comSalario, quaseLa, pagina],
+    queryKey: ["vagas", trackId, segment, buscaAtiva, soRemoto, quaseLa, cidades, pagina],
     enabled: Boolean(trackId),
     queryFn: () =>
       runList({
@@ -122,8 +148,8 @@ function VagasPage() {
           segment,
           ...(buscaAtiva ? { search: buscaAtiva } : {}),
           ...(soRemoto ? { onlyRemote: true } : {}),
-          ...(comSalario ? { withSalary: true } : {}),
           ...(quaseLa ? { maxMissing: 2 } : {}),
+          ...(grafiasSelecionadas.length > 0 ? { cities: grafiasSelecionadas } : {}),
           limit: PAGE_SIZE,
           offset: pagina * PAGE_SIZE,
         },
@@ -137,7 +163,7 @@ function VagasPage() {
   });
 
   const page = listaQuery.data;
-  const temFiltro = Boolean(buscaAtiva || soRemoto || comSalario || quaseLa);
+  const temFiltro = Boolean(buscaAtiva || soRemoto || quaseLa || cidades.length > 0);
   const detalhe = detalheQuery.data;
 
   return (
@@ -172,9 +198,10 @@ function VagasPage() {
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* "Com salário" saiu daqui: hoje quase nenhuma vaga tem faixa
+              salarial, então o filtro zerava a lista e parecia defeito. */}
           {[
             { on: soRemoto, set: setSoRemoto, label: "Só remoto" },
-            { on: comSalario, set: setComSalario, label: "Com salário" },
             { on: quaseLa, set: setQuaseLa, label: "Falta ≤ 2 skills" },
           ].map((f) => (
             <button
@@ -200,8 +227,8 @@ function VagasPage() {
                 setBusca("");
                 setBuscaAtiva("");
                 setSoRemoto(false);
-                setComSalario(false);
                 setQuaseLa(false);
+                setCidades([]);
               }}
             >
               Limpar
@@ -209,6 +236,56 @@ function VagasPage() {
           ) : null}
         </div>
       </Blueprint>
+
+      {/* Localidades. Só aparece quando há cidade no recorte — num segmento
+          totalmente remoto a coluna city é nula e a régua ficaria vazia. */}
+      {locais.length > 0 ? (
+        <Blueprint className="flex flex-col gap-2 p-4">
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-neutral-700" aria-hidden />
+            <span className="label-h6 text-neutral-700">Localidades</span>
+            {cidades.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCidades([])}
+                className="cursor-pointer text-caption text-accent-800 underline underline-offset-2"
+              >
+                limpar {cidades.length}
+              </button>
+            ) : null}
+          </div>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Filtrar vagas por localidade"
+          >
+            {locais.map((l) => {
+              const on = cidades.includes(l.key);
+              return (
+                <button
+                  key={l.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setCidades((prev) =>
+                      prev.includes(l.key) ? prev.filter((k) => k !== l.key) : [...prev, l.key],
+                    )
+                  }
+                  className={cn(
+                    "cursor-pointer border px-3 py-1.5 text-caption transition-colors",
+                    on
+                      ? "border-accent-700 bg-accent-100 text-accent-800"
+                      : "border-divider text-neutral-700 hover:bg-surface",
+                  )}
+                >
+                  {l.label}
+                  <span className="ml-1.5 font-mono text-neutral-600 tabular-nums">{l.jobs}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Blueprint>
+      ) : null}
 
       {listaQuery.isPending ? <LoadingState /> : null}
       {listaQuery.isError ? (

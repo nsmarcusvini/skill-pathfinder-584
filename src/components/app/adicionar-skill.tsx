@@ -72,15 +72,33 @@ export function AdicionarSkill({
     },
   });
 
+  // A chave TEM de ser diferente da usada por /minhas-skills, que é
+  // ["user_skills", userId]. O React Query indexa só pela chave: duas queries
+  // com a mesma chave dividem a MESMA entrada de cache, e quem resolver
+  // primeiro define o valor que as duas enxergam.
+  //
+  // Esta aqui devolvia um Set e a de /minhas-skills espera um array. Quando
+  // este componente populava o cache primeiro, /minhas-skills lia um Set e
+  // quebrava com "I.map is not a function" — o `?? []` de lá não protege,
+  // porque um Set é truthy. Além disso os SELECTs diferem (aqui só skill_id,
+  // lá seis colunas), então compartilhar a entrada entregaria linhas
+  // incompletas mesmo com o formato certo.
+  //
+  // O sufixo "ids" separa as duas entradas mantendo o prefixo ["user_skills"],
+  // então invalidateQueries({queryKey:["user_skills"]}) continua alcançando as
+  // duas — o React Query casa chave por prefixo de array.
   const minhas = useQuery({
-    queryKey: ["user_skills", user?.id],
+    queryKey: ["user_skills", user?.id, "ids"],
     enabled: Boolean(user),
     queryFn: async () => {
       const { data } = await supabase
         .from("user_skills")
         .select("skill_id")
         .eq("user_id", user!.id);
-      return new Set((data ?? []).map((r) => r.skill_id));
+      // Array, não Set: um valor serializável e do mesmo formato do que a outra
+      // query devolve. Se as chaves voltarem a colidir um dia, o resultado é
+      // dado errado — não uma tela branca.
+      return (data ?? []).map((r) => r.skill_id);
     },
   });
 
@@ -114,7 +132,11 @@ export function AdicionarSkill({
     const todas = catalogo.data?.skills ?? [];
     const tenho = minhas.data;
     if (!tenho) return todas;
-    return todas.filter((s) => !tenho.has(s.id));
+    // O Set é montado aqui, a partir do array do cache. Antes ele vinha pronto
+    // da queryFn, e era esse Set que vazava para /minhas-skills pela chave
+    // compartilhada.
+    const jaTenho = new Set(tenho);
+    return todas.filter((s) => !jaTenho.has(s.id));
   }, [catalogo.data, minhas.data]);
 
   return (

@@ -35,3 +35,6 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Config local do Claude Code (launch.json, settings.local.json)
+.claude/

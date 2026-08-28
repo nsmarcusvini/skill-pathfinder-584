@@ -43,7 +43,9 @@ export const Route = createFileRoute("/api/public/ingest-async")({
             await import("@/lib/ingest/bright-data.server");
 
           const lote =
-            fase === "disparar" ? { snapshots: [], dedupe: null } : await colherSnapshots();
+            fase === "disparar"
+              ? { snapshots: [], dedupe: null, extracao: null }
+              : await colherSnapshots();
           const colheita = lote.snapshots;
           const disparos = fase === "colher" ? [] : await dispararColetas();
 
@@ -52,6 +54,7 @@ export const Route = createFileRoute("/api/public/ingest-async")({
               colheita,
               disparos,
               dedupe: lote.dedupe,
+              extracao: lote.extracao,
               resumo: {
                 snapshots_processados: colheita.length,
                 snapshots_ingeridos: colheita.filter((c) => c.status === "ingested").length,
@@ -60,6 +63,7 @@ export const Route = createFileRoute("/api/public/ingest-async")({
                 coletas_disparadas: disparos.filter((d) => d.status === "disparado").length,
                 // Quantas cópias da mesma vaga foram tiradas da contagem agora.
                 duplicatas_entre_fontes: lote.dedupe?.duplicatas ?? 0,
+                skills_extraidas: lote.extracao?.skills ?? 0,
               },
             }),
             {

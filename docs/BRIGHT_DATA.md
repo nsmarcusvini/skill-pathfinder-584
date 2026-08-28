@@ -140,6 +140,54 @@ conta, dá para refinar o mapeamento olhando o que veio, **sem recoletar nada**.
 
 Preferir `null` a inventar um campo que talvez não exista é regra aqui.
 
+### Schemas reais observados (2026-08-28)
+
+Depois da primeira coleta de verdade, o que a conta devolveu:
+
+**LinkedIn (`gd_lpfll7v5hcqtkxl6l`)** — campos presentes em 100% dos registros:
+`job_posting_id`, `job_title`, `company_name`, `company_id`, `company_logo`,
+`company_url`, `job_location`, `country_code`, `job_seniority_level`,
+`job_employment_type`, `job_posted_date`, `job_posted_time`,
+`job_description_formatted`, `job_summary`, `job_function`, `job_industries`,
+`job_num_applicants`, `apply_link`, `url`, `base_salary`, `salary_standards`.
+
+Duas descobertas que exigiram correção:
+
+1. **Salário é aninhado**, não achatado:
+   ```json
+   "base_salary": { "currency": "R$", "min_amount": 10001,
+                    "max_amount": 15000, "payment_period": "mo" }
+   ```
+   O mapeamento só procurava `salary_min`/`pay_min` e devolvia null para todos.
+   Presente em ~2,5% das vagas (5 de 200).
+
+2. **`payment_period` vem abreviado** (`mo`, `yr`). Não estavam em
+   `PERIOD_FACTOR` no `normalize.ts`, então `toAnnual` não achava o fator e
+   devolvia o valor mensal como se fosse anual — R$10 mil/mês entraria na
+   mediana como R$10 mil/ano. Falha calada, e das piores.
+
+**Não existe campo de modalidade** (remoto/híbrido/presencial) no dataset do
+LinkedIn. `work_modality` fica null de propósito; a informação, quando existe,
+está no texto de `job_location` ou da descrição.
+
+### Cada dataset tem o SEU schema de entrada
+
+O `discover_inputs` não é o mesmo entre fontes. O Indeed recusou o payload do
+LinkedIn com `validation_error`:
+
+| Fonte | Campos de entrada |
+|---|---|
+| LinkedIn, Glassdoor | `keyword`, `location` |
+| **Indeed** | `keyword_search` (**não** `keyword`), `location`, `country`, `domain` — os três últimos obrigatórios |
+
+A própria API diz qual é o schema quando você erra: o corpo do 400 traz
+`errors: [["keyword", "This input should not contain a keyword field"], ...]`.
+É a fonte autoritativa — não adivinhe, provoque o erro e leia.
+
+> O truncamento do erro em `providers/bright-data.ts` era de 300 caracteres e
+> cortava exatamente o array `errors`, porque a Bright Data ecoa o payload
+> inteiro antes de explicar a falha. Hoje são 2000.
+
 ### Taxonomia de tecnologias
 
 Linguagens, cloud, frameworks, bancos e ferramentas DevOps **não viraram colunas**.

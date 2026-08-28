@@ -164,6 +164,70 @@ export function normalizeCountry(location: string | null, explicit?: string | nu
   return null;
 }
 
+/**
+ * Palavras que ocupam o lugar da cidade sem serem uma. Aparecem sozinhas
+ * ("Anywhere", "Remoto") ou como sufixo ("Brazil (Remote)").
+ */
+const NAO_E_CIDADE =
+  /^(remote|remoto|anywhere|worldwide|global|home\s*office|hybrid|h[íi]brido|on-?site|presencial|distributed|latam|latin america|am[ée]rica latina|europe|emea|apac|americas|multiple locations|various|n\/a|-)$/;
+
+/** Último segmento costuma ser país; não é cidade nem estado. */
+const PAISES =
+  /^(brazil|brasil|br|united states|usa|us|canada|ca|mexico|m[ée]xico|argentina|chile|colombia|per[uú]|uruguai|uruguay|portugal|pt|spain|espa[ñn]a|es|united kingdom|uk|gb|england|germany|deutschland|de|france|fr|italy|it|netherlands|nl|poland|pl|ireland|india|australia)$/;
+
+export interface ParsedLocation {
+  city: string | null;
+  state: string | null;
+}
+
+/**
+ * Extrai cidade e estado de `location_raw`.
+ *
+ * As fontes escrevem a mesma cidade de formas diferentes — "São Paulo, São
+ * Paulo, Brazil", "São Paulo, Brazil", "Brasil", "Remoto". Sem normalizar, um
+ * filtro por localidade viraria uma lista de dezenas de variações da mesma
+ * cidade, cada uma com uma contagem parcial.
+ *
+ * Deliberadamente conservador: quando não dá para afirmar que um segmento é
+ * cidade, devolve null. Preencher errado é pior do que não preencher — a tela
+ * sabe mostrar "não informado", mas não sabe desconfiar de um dado plausível.
+ *
+ * ESTA É A ÚNICA fonte dessa regra. O pipeline e o backfill importam daqui.
+ */
+export function parseLocation(locationRaw: string | null | undefined): ParsedLocation {
+  if (!locationRaw) return { city: null, state: null };
+
+  // "Brazil (Remote)" -> "Brazil"; o parêntese nunca carrega a cidade.
+  const limpo = locationRaw.replace(/\([^)]*\)/g, " ").trim();
+  if (!limpo) return { city: null, state: null };
+
+  const partes = limpo
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (partes.length === 0) return { city: null, state: null };
+
+  const ehDescartavel = (v: string) => {
+    const n = deaccent(v).toLowerCase();
+    return NAO_E_CIDADE.test(n) || PAISES.test(n);
+  };
+
+  // Tira país e palavras de modalidade de qualquer posição.
+  const uteis = partes.filter((p) => !ehDescartavel(p));
+  if (uteis.length === 0) return { city: null, state: null };
+
+  const city = uteis[0] ?? null;
+  // "São Paulo, São Paulo" repete cidade no estado; guardar as duas iguais não
+  // agrega e ainda faz a UI mostrar "São Paulo — São Paulo".
+  const segundo = uteis[1];
+  const state =
+    segundo && deaccent(segundo).toLowerCase() !== deaccent(city ?? "").toLowerCase()
+      ? segundo
+      : null;
+
+  return { city, state };
+}
+
 export function normalizeCurrency(
   currency: string | null | undefined,
   country: string | null,
@@ -179,18 +243,32 @@ export function normalizeCurrency(
   return null;
 }
 
+/**
+ * Fatores para anualizar. As abreviações (`hr`, `mo`, `yr`...) não são enfeite:
+ * é assim que o LinkedIn manda em `base_salary.payment_period`, verificado com
+ * dados reais em 2026-08-28. Sem elas, `toAnnual` não encontrava o fator e
+ * devolvia o valor MENSAL como se fosse anual — um salário de R$10 mil/mês
+ * entraria na mediana como R$10 mil/ano, deformando a estatística para baixo.
+ * Falhar calado aqui é pior do que não ler o salário.
+ */
 const PERIOD_FACTOR: Record<string, number> = {
   hour: 2080,
   hourly: 2080,
+  hr: 2080,
   day: 252,
   daily: 252,
   week: 52,
   weekly: 52,
+  wk: 52,
   month: 12,
   monthly: 12,
+  mo: 12,
+  mth: 12,
   year: 1,
   yearly: 1,
+  yr: 1,
   annual: 1,
+  annually: 1,
 };
 
 /** Converte para período anual quando o fator é conhecido. */

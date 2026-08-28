@@ -68,7 +68,14 @@ interface ListJobsInput {
   /** Busca textual em título e empresa. */
   search?: string;
   onlyRemote?: boolean;
-  withSalary?: boolean;
+  /**
+   * Grafias de cidade, como vêm de `job_locations().grafias`.
+   *
+   * São as grafias e não a chave sem acento de propósito: assim o filtro é um
+   * `IN` direto sobre a coluna `city`, sem precisar de unaccent no caminho da
+   * consulta que pagina a lista.
+   */
+  cities?: string[];
   /** Só vagas em que falta no máximo N skills. */
   maxMissing?: number;
   limit?: number;
@@ -115,7 +122,7 @@ export const listJobs = createServerFn({ method: "POST" })
 
     if (data.seniorities?.length) q = q.in("seniority", data.seniorities);
     if (data.onlyRemote) q = q.eq("is_remote", true);
-    if (data.withSalary) q = q.not("salary_min", "is", null);
+    if (data.cities?.length) q = q.in("city", data.cities);
     if (data.search?.trim()) {
       const term = `%${data.search.trim()}%`;
       q = q.or(`title.ilike.${term},company_name_raw.ilike.${term}`);
@@ -286,4 +293,41 @@ export const getJobDetail = createServerFn({ method: "POST" })
         .map((s) => ({ skillId: s.skillId, name: s.name })),
       skills,
     };
+  });
+
+// ─── Localidades ─────────────────────────────────────────────────────────────
+
+export interface JobLocation {
+  /** Chave sem acento, em minúsculas — identidade estável do grupo. */
+  key: string;
+  /** Grafia mais frequente, para mostrar na tela. */
+  label: string;
+  jobs: number;
+  /** Todas as grafias do grupo; é o que a listagem usa para filtrar. */
+  spellings: string[];
+}
+
+/**
+ * Cidades com vaga na trilha e segmento atuais.
+ *
+ * Vem do banco já agrupado por chave sem acento (RPC `job_locations`), senão
+ * "Florianopolis" e "Florianópolis" apareceriam como dois filtros diferentes,
+ * cada um com parte das vagas.
+ */
+export const listJobLocations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { trackId: string; segment: string }) => input)
+  .handler(async ({ data, context }): Promise<JobLocation[]> => {
+    const { data: rows, error } = await context.supabase.rpc("job_locations", {
+      _track_id: data.trackId,
+      _segments: [data.segment],
+    });
+    if (error) throw new Error(error.message);
+
+    return (rows ?? []).map((r) => ({
+      key: r.chave,
+      label: r.rotulo,
+      jobs: Number(r.vagas),
+      spellings: r.grafias ?? [],
+    }));
   });

@@ -125,6 +125,7 @@ export interface ResultadoColheita {
 export interface ResultadoColheitaLote {
   snapshots: ResultadoColheita[];
   dedupe: DedupeResult | null;
+  extracao: { processadas: number; skills: number; restantes: number } | null;
 }
 
 export async function colherSnapshots(): Promise<ResultadoColheitaLote> {
@@ -280,6 +281,8 @@ export async function colherSnapshots(): Promise<ResultadoColheitaLote> {
   // as três cópias juntas. Fazendo por snapshot, a primeira a chegar viraria
   // canônica sozinha e a ordem de colheita decidiria o resultado.
   let dedupe: DedupeResult | null = null;
+  let extracao: ResultadoColheitaLote["extracao"] = null;
+
   if (ingeriuAlgo) {
     try {
       dedupe = await dedupeJobPostings();
@@ -289,7 +292,33 @@ export async function colherSnapshots(): Promise<ResultadoColheitaLote> {
       // é a duplicata contar até a próxima execução.
       log("dedupe_falhou", { erro: e instanceof Error ? e.message : String(e) });
     }
+
+    // Extração de skills, como o fluxo pull já fazia no fim do runIngest.
+    //
+    // Sem isto, a vaga entrava sem skill nenhuma e só era processada quando o
+    // cron de PULL rodasse — outro fluxo, de 6 em 6 horas. Não é só atraso: a
+    // demanda é `vagas_com_skill / total_vagas`, então uma vaga sem skills soma
+    // no denominador e em nenhum numerador. Duzentas vagas nesse estado
+    // deprimem TODOS os percentuais de demanda ao mesmo tempo, sem erro nenhum
+    // aparecer. Depender do outro cron para isso era acoplamento acidental.
+    try {
+      const { extractJdSkills } = await import("@/lib/jd/extract.server");
+      let processadas = 0;
+      let skills = 0;
+      let restantes = 0;
+      for (let lote = 0; lote < 10; lote++) {
+        const r = await extractJdSkills({});
+        processadas += r.processed;
+        skills += r.skills_written;
+        restantes = r.remaining;
+        if (r.processed === 0 || r.remaining === 0) break;
+      }
+      extracao = { processadas, skills, restantes };
+      log("extracao_concluida", { ...extracao });
+    } catch (e) {
+      log("extracao_falhou", { erro: e instanceof Error ? e.message : String(e) });
+    }
   }
 
-  return { snapshots: saida, dedupe };
+  return { snapshots: saida, dedupe, extracao };
 }
