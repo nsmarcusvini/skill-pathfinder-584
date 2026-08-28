@@ -45,7 +45,7 @@ import {
 } from "@/hooks/use-market";
 import { applyCvAnalysis } from "@/lib/analysis.functions";
 import { computeGap } from "@/lib/gap.functions";
-import { parseCv } from "@/lib/cv.functions";
+import { parseCv, resetVisitorCvs } from "@/lib/cv.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/analise")({
@@ -100,6 +100,7 @@ function AnalisePage() {
   const runParse = useServerFn(parseCv);
   const runApply = useServerFn(applyCvAnalysis);
   const runGap = useServerFn(computeGap);
+  const runReset = useServerFn(resetVisitorCvs);
 
   const [stage, setStage] = React.useState<Stage>("aguardando");
   const [erro, setErro] = React.useState<string | null>(null);
@@ -108,7 +109,34 @@ function AnalisePage() {
   const [seniority, setSeniority] = React.useState<Seniority>("pleno");
   const [segment, setSegment] = React.useState<MarketSegment>("br");
   const [recognized, setRecognized] = React.useState<number>(0);
+  const [resetando, setResetando] = React.useState(false);
   const started = React.useRef<string | null>(null);
+
+  /**
+   * Escape hatch de "visitante só pode ter 1 currículo": apaga tudo desta
+   * sessão anônima e limpa o estado local, liberando a dropzone de novo.
+   *
+   * Existe porque o limite conta toda linha de `cvs`, não só a atual — uma
+   * leitura que falha (arquivo corrompido, PDF sem texto…) já ocupa a única
+   * vaga, e sem isto a pessoa ficava travada sem conseguir tentar de novo,
+   * mesmo a página prometendo "sem cadastro para a prévia".
+   */
+  async function excluirEEnviarOutro() {
+    setResetando(true);
+    try {
+      await runReset();
+      started.current = null;
+      setCvId(null);
+      setErro(null);
+      setStage("aguardando");
+      await queryClient.invalidateQueries({ queryKey: ["analise-cv", user?.id] });
+      void navigate({ to: "/analise", search: { cv: undefined }, replace: true });
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setResetando(false);
+    }
+  }
 
   /** CV anterior desta sessão anônima: quem fecha a aba reencontra a análise. */
   const currentCvQuery = useCurrentCv();
@@ -247,8 +275,18 @@ function AnalisePage() {
         ) : null}
 
         {erro ? (
-          <Blueprint className="mt-6 border-danger p-4">
-            <p className="text-body text-danger">{erro}</p>
+          <Blueprint className="mt-6 flex flex-wrap items-center gap-3 border-danger p-4">
+            <p className="flex-1 text-body text-danger">{erro}</p>
+            {isAnonymous ? (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={resetando}
+                onClick={() => void excluirEEnviarOutro()}
+              >
+                Excluir currículo e enviar outro
+              </Button>
+            ) : null}
           </Blueprint>
         ) : null}
 

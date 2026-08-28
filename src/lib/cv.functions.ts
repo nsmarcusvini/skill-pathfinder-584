@@ -166,3 +166,50 @@ export const parseCv = createServerFn({ method: "POST" })
       return fail((err as Error).message.slice(0, 500));
     }
   });
+
+/**
+ * Apaga TODOS os currículos desta sessão anônima (arquivo + linha) para
+ * destravar um novo envio.
+ *
+ * Existe porque o limite de "1 currículo" para visitante conta toda linha em
+ * `cvs`, não só a `is_current`. Duas situações enchem essa contagem sem o
+ * visitante ter feito nada de errado: trocar de arquivo (a linha antiga vira
+ * `is_current=false`, mas continua existindo) e uma leitura que falha (fica
+ * como `status=failed`, ocupando a única vaga). Nos dois casos a pessoa ficava
+ * travada sem conseguir tentar de novo, mesmo a página prometendo "sem
+ * cadastro para a prévia". Isso é o botão de escape: zera a sessão e libera
+ * o próximo envio.
+ *
+ * Só atua em sessão anônima — conta permanente pode acumular currículos de
+ * propósito (é o histórico que a regra vende como diferencial), então nunca
+ * apaga em massa por engano.
+ */
+export const resetVisitorCvs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const userId = context.userId;
+    const isAnonymous = Boolean((context.claims as { is_anonymous?: boolean }).is_anonymous);
+
+    if (!isAnonymous) {
+      throw new Error("Conta permanente mantém histórico de currículos — nada foi apagado.");
+    }
+
+    const { data: cvs, error: listError } = await supabase
+      .from("cvs")
+      .select("id, storage_path")
+      .eq("user_id", userId);
+    if (listError) throw listError;
+    if (!cvs || cvs.length === 0) return { ok: true as const, deleted: 0 };
+
+    const paths = cvs.map((c) => c.storage_path);
+    // O arquivo some primeiro: se a linha saísse antes e o storage falhasse,
+    // sobraria um arquivo órfão sem dono capaz de apagá-lo depois.
+    const { error: storageError } = await supabase.storage.from("cvs").remove(paths);
+    if (storageError) throw storageError;
+
+    const { error: deleteError } = await supabase.from("cvs").delete().eq("user_id", userId);
+    if (deleteError) throw deleteError;
+
+    return { ok: true as const, deleted: cvs.length };
+  });

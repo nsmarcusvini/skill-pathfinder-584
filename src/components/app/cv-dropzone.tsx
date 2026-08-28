@@ -23,7 +23,7 @@ export interface CvDropzoneProps {
  * explícito, e o aceite é gravado em cvs.consent_at.
  */
 export function CvDropzone({ onUploaded, className }: CvDropzoneProps) {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, isAnonymous, loading } = useAuth();
   const [consent, setConsent] = React.useState(false);
   const [dragging, setDragging] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
@@ -61,11 +61,28 @@ export function CvDropzone({ onUploaded, className }: CvDropzoneProps) {
         .upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) throw uploadError;
 
-      await supabase
-        .from("cvs")
-        .update({ is_current: false })
-        .eq("user_id", user.id)
-        .eq("is_current", true);
+      if (isAnonymous) {
+        // Visitante só pode ter 1 currículo (regra do servidor em
+        // parseCv), e essa regra conta TODA linha, não só a is_current.
+        // Sem apagar a anterior, o segundo envio de qualquer visitante
+        // esbarraria nesse limite — mesmo trocando de arquivo pela
+        // primeira vez, o que é uso normal, não abuso.
+        const { data: antigos } = await supabase
+          .from("cvs")
+          .select("storage_path")
+          .eq("user_id", user.id);
+        if (antigos && antigos.length > 0) {
+          await supabase.storage.from("cvs").remove(antigos.map((c) => c.storage_path));
+          await supabase.from("cvs").delete().eq("user_id", user.id);
+        }
+      } else {
+        // Conta permanente mantém histórico: só desativa a antiga.
+        await supabase
+          .from("cvs")
+          .update({ is_current: false })
+          .eq("user_id", user.id)
+          .eq("is_current", true);
+      }
 
       const { error: insertError } = await supabase.from("cvs").insert({
         id: cvId,
