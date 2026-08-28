@@ -279,7 +279,7 @@ function LandingPage() {
             {/* Ferramentas mais pedidas — usa dados reais ou EmptyState */}
             <div className="flex flex-col gap-3 bg-bg p-8">
               <span className="label-h6 text-neutral-500">Mercado de vagas</span>
-              <h3 className="font-heading text-h3 uppercase">Ferramentas mais pedidas</h3>
+              <h3 className="font-heading text-h3 uppercase">Stacks em Alta</h3>
               <p className="text-body text-neutral-600" style={{ lineHeight: 1.65 }}>
                 Ranking atualizado das tecnologias mais frequentes nas vagas da sua trilha — com
                 base em dados reais dos últimos 90 dias.

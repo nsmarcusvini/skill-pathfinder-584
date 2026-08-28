@@ -50,19 +50,40 @@ export function AppShell({
     <div className="flex min-h-screen bg-bg">
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-divider bg-surface transition-[width] duration-150 md:flex",
+          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-divider bg-surface transition-[width] duration-300 ease-in-out md:flex",
           collapsed ? "w-12" : "w-52",
         )}
       >
-        <div className="flex h-12 items-center gap-2 border-b border-divider px-3">
-          {!collapsed ? (
-            <span className="label-h6 truncate text-accent-700">RUMVIA</span>
-          ) : (
-            <span className="label-h6 text-accent-700">R</span>
-          )}
+        <div className="flex h-12 items-center gap-2 overflow-hidden border-b border-divider px-3">
+          {/* As duas grafias ficam montadas o tempo todo, uma sobre a outra, e só
+              a opacidade troca. Um unmount condicional (como antes) some e
+              aparece no instante exato do clique — sem transição nenhuma — e é
+              isso que faz o recolher parecer brusco mesmo com a largura já
+              suave. Crossfade: nenhuma das duas pisca, uma se apaga enquanto a
+              outra surge. */}
+          <span className="label-h6 relative shrink-0 text-accent-700">
+            <span
+              aria-hidden={collapsed}
+              className={cn(
+                "block truncate transition-opacity duration-300 ease-in-out",
+                collapsed ? "opacity-0" : "opacity-100",
+              )}
+            >
+              RUMVIA
+            </span>
+            <span
+              aria-hidden={!collapsed}
+              className={cn(
+                "absolute inset-0 transition-opacity duration-300 ease-in-out",
+                collapsed ? "opacity-100" : "opacity-0",
+              )}
+            >
+              R
+            </span>
+          </span>
         </div>
 
-        <nav className="nav flex-1 py-2" aria-label="Navegação principal">
+        <nav className="nav flex-1 overflow-hidden py-2" aria-label="Navegação principal">
           {nav.map((item) => (
             <Link
               key={item.to}
@@ -71,7 +92,17 @@ export function AppShell({
               title={item.label}
             >
               <span className="shrink-0">{item.icon}</span>
-              {!collapsed ? <span className="truncate">{item.label}</span> : null}
+              {/* Sempre montado; encolhe e apaga junto, no mesmo ritmo da
+                  largura do aside, em vez de sumir de golpe. */}
+              <span
+                aria-hidden={collapsed}
+                className={cn(
+                  "truncate transition-[opacity,max-width] duration-300 ease-in-out",
+                  collapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100",
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           ))}
         </nav>
@@ -79,17 +110,34 @@ export function AppShell({
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          className="flex h-10 cursor-pointer items-center gap-2 border-t border-divider px-3 text-caption text-neutral-700 hover:bg-neutral-200"
+          className="flex h-10 cursor-pointer items-center gap-2 overflow-hidden border-t border-divider px-3 text-caption text-neutral-700 hover:bg-neutral-200"
           aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
         >
-          {collapsed ? (
-            <PanelLeftOpen className="size-4" aria-hidden />
-          ) : (
-            <>
-              <PanelLeftClose className="size-4" aria-hidden />
-              <span>Recolher</span>
-            </>
-          )}
+          <span className="relative flex size-4 shrink-0 items-center justify-center">
+            <PanelLeftClose
+              aria-hidden
+              className={cn(
+                "absolute size-4 transition-opacity duration-300 ease-in-out",
+                collapsed ? "opacity-0" : "opacity-100",
+              )}
+            />
+            <PanelLeftOpen
+              aria-hidden
+              className={cn(
+                "absolute size-4 transition-opacity duration-300 ease-in-out",
+                collapsed ? "opacity-100" : "opacity-0",
+              )}
+            />
+          </span>
+          <span
+            aria-hidden={collapsed}
+            className={cn(
+              "truncate transition-[opacity,max-width] duration-300 ease-in-out",
+              collapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100",
+            )}
+          >
+            Recolher
+          </span>
         </button>
       </aside>
 

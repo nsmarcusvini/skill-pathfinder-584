@@ -59,12 +59,12 @@ import { addToStudyPlan } from "@/lib/study-plan";
 export const Route = createFileRoute("/_conta/ferramentas")({
   head: () => ({
     meta: [
-      { title: "Ferramentas — RUMVIA" },
+      { title: "Stacks em Alta — RUMVIA" },
       {
         name: "description",
         content: "Ferramentas e clouds mais exigidas na sua trilha e segmento.",
       },
-      { property: "og:title", content: "Ferramentas — RUMVIA" },
+      { property: "og:title", content: "Stacks em Alta — RUMVIA" },
       { property: "og:description", content: "Demanda de ferramentas por trilha e segmento." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -273,7 +273,7 @@ function FerramentasPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Mercado"
-        title="Ferramentas"
+        title="Stacks em Alta"
         subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]} · ${SENIORITY_LABEL[seniority]}`}
       />
 
@@ -367,7 +367,7 @@ function FerramentasPage() {
         <>
           {/* Gráfico de barras: top 15 */}
           <ChartCard
-            title="Top 15 ferramentas por demanda"
+            title="Stacks em Alta"
             description="Porcentagem de vagas da trilha que pedem cada ferramenta. Cor = seu status."
           >
             <div className="h-[360px]">

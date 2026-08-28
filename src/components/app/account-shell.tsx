@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
     icon: <ListChecks className="size-4" aria-hidden />,
   },
   { label: "Vagas", to: "/vagas", icon: <Briefcase className="size-4" aria-hidden /> },
-  { label: "Ferramentas", to: "/ferramentas", icon: <Wrench className="size-4" aria-hidden /> },
+  { label: "Stacks em Alta", to: "/ferramentas", icon: <Wrench className="size-4" aria-hidden /> },
   { label: "Empresas", to: "/empresas", icon: <Building2 className="size-4" aria-hidden /> },
   { label: "Salários", to: "/salarios", icon: <Wallet className="size-4" aria-hidden /> },
   { label: "Progresso", to: "/progresso", icon: <Gauge className="size-4" aria-hidden /> },

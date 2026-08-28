@@ -617,7 +617,10 @@ function SkillRow({
           type="number"
           min={1980}
           max={new Date().getFullYear()}
-          defaultValue={row.last_used_year ?? ""}
+          // Sem valor salvo, assume o ano atual: é o caso mais comum (a pessoa
+          // ainda usa a skill) e poupa um clique. Só um valor de exibição — nada
+          // é gravado enquanto o campo não for tocado (onBlur abaixo).
+          defaultValue={row.last_used_year ?? new Date().getFullYear()}
           className="num w-24"
           onBlur={(e) => {
             const v = e.target.value === "" ? null : Number(e.target.value);

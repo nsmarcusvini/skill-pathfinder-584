@@ -346,3 +346,74 @@ export const generatePlanFromGap = createServerFn({ method: "POST" })
       createdAt: plan.created_at,
     };
   });
+
+// ─── Adicionar skill ao plano (atalho de 1 clique) ────────────────────────────
+
+interface AddSkillToPlanInput {
+  trackId: string;
+  skillId: string;
+  skillName: string;
+}
+
+/**
+ * Usado pelos botões "Adicionar ao plano de estudos" do dashboard e de
+ * ferramentas — não abrem diálogo escolhendo o plano, então esta função acha
+ * o plano ativo da trilha ou cria um. O item entra em `study_items`, a mesma
+ * tabela que a aba Progresso lê; sem isso o clique não aparecia em lugar
+ * nenhum que o usuário revisitasse.
+ */
+export const addSkillToStudyPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: AddSkillToPlanInput) => input)
+  .handler(async ({ data, context }): Promise<{ added: boolean; planId: string }> => {
+    const db = context.supabase;
+    const userId = context.userId;
+
+    const { data: existingPlan, error: planQueryError } = await db
+      .from("study_plans")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("track_id", data.trackId)
+      .eq("status", "ativo")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (planQueryError) throw new Error(planQueryError.message);
+
+    let planId = existingPlan?.id as string | undefined;
+    if (!planId) {
+      const { data: createdPlan, error: createPlanError } = await db
+        .from("study_plans")
+        .insert({
+          user_id: userId,
+          track_id: data.trackId,
+          title: "Meu plano de estudos",
+          status: "ativo",
+        })
+        .select("id")
+        .single();
+      if (createPlanError) throw new Error(createPlanError.message);
+      planId = createdPlan.id;
+    }
+
+    const { data: existingItem, error: itemQueryError } = await db
+      .from("study_items")
+      .select("id")
+      .eq("plan_id", planId)
+      .eq("skill_id", data.skillId)
+      .maybeSingle();
+    if (itemQueryError) throw new Error(itemQueryError.message);
+    if (existingItem) return { added: false, planId };
+
+    const { error: insertError } = await db.from("study_items").insert({
+      plan_id: planId,
+      user_id: userId,
+      skill_id: data.skillId,
+      title: `Aprender: ${data.skillName}`,
+      type: "outro",
+      status: "backlog",
+    });
+    if (insertError) throw new Error(insertError.message);
+
+    return { added: true, planId };
+  });

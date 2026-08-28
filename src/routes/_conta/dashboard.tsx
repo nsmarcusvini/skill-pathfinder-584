@@ -1,5 +1,7 @@
 import * as React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   PolarAngleAxis,
@@ -46,7 +48,7 @@ import {
 } from "@/hooks/use-market";
 import { useGap } from "@/hooks/use-gap";
 import { WIDENING_LABEL, type GapItem } from "@/lib/gap.functions";
-import { addToStudyPlan } from "@/lib/study-plan";
+import { addSkillToStudyPlan } from "@/lib/study.functions";
 
 export const Route = createFileRoute("/_conta/dashboard")({
   head: () => ({
@@ -319,6 +321,25 @@ function GapRow({ item }: { item: GapItem }) {
   // Acima de 0 a skill já existe no perfil, só está abaixo do nível pedido:
   // "já tenho" não faria sentido, o ajuste é em /minhas-skills.
   const naoPossui = item.userLevel === 0;
+  const { trackId } = useMarket();
+  const queryClient = useQueryClient();
+  const runAddToPlan = useServerFn(addSkillToStudyPlan);
+
+  const addToPlan = useMutation({
+    mutationFn: () =>
+      runAddToPlan({
+        data: { trackId: trackId as string, skillId: item.skillId, skillName: item.name },
+      }),
+    onSuccess: ({ added }) => {
+      void queryClient.invalidateQueries({ queryKey: ["study_plans"] });
+      void queryClient.invalidateQueries({ queryKey: ["study_items"] });
+      toast[added ? "success" : "info"](
+        added ? `${item.name} adicionada ao plano de estudos` : `${item.name} já está no plano`,
+        { description: "Confira e organize os itens na aba Progresso." },
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
@@ -344,14 +365,8 @@ function GapRow({ item }: { item: GapItem }) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => {
-            const added = addToStudyPlan({ skillId: item.skillId, name: item.name });
-            toast[added ? "success" : "info"](
-              added
-                ? `${item.name} adicionada ao plano de estudos`
-                : `${item.name} já está no plano`,
-            );
-          }}
+          disabled={!trackId || addToPlan.isPending}
+          onClick={() => addToPlan.mutate()}
         >
           Adicionar ao plano de estudos
         </Button>
