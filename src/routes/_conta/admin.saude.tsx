@@ -27,8 +27,8 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  sub?: string;
-  warning?: boolean;
+  sub?: string | undefined;
+  warning?: boolean | undefined;
 }) {
   return (
     <div className="border p-4 flex flex-col gap-1">
@@ -55,7 +55,10 @@ function StatCard({
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="border-b pb-1 font-mono text-xs uppercase tracking-wide" style={{ color: "var(--color-muted-foreground, #888)" }}>
+    <div
+      className="border-b pb-1 font-mono text-xs uppercase tracking-wide"
+      style={{ color: "var(--color-muted-foreground, #888)" }}
+    >
       {title}
     </div>
   );
@@ -89,7 +92,11 @@ function AdminSaudePage() {
       <SectionHeader title="Usuários" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
         <StatCard label="Total" value={fmt(s.users_total)} />
-        <StatCard label="Permanentes" value={fmt(s.users_permanent)} sub={`${100 - pctAnon}% do total`} />
+        <StatCard
+          label="Permanentes"
+          value={fmt(s.users_permanent)}
+          sub={`${100 - pctAnon}% do total`}
+        />
         <StatCard label="Anônimos" value={fmt(s.users_anonymous)} sub={`${pctAnon}% do total`} />
         <StatCard label="Novos (7d)" value={fmt(s.users_last_7d)} />
       </div>
@@ -99,7 +106,11 @@ function AdminSaudePage() {
         <StatCard label="Total no banco" value={fmt(s.jobs_total)} />
         <StatCard label="Ativas" value={fmt(s.jobs_active)} />
         <StatCard label="BR (ativas)" value={fmt(s.jobs_br)} sub={`${pctBr}%`} />
-        <StatCard label="Remoto global (ativas)" value={fmt(s.jobs_global)} sub={`${100 - pctBr}%`} />
+        <StatCard
+          label="Remoto global (ativas)"
+          value={fmt(s.jobs_global)}
+          sub={`${100 - pctBr}%`}
+        />
       </div>
 
       <SectionHeader title="Análises de gap" />
@@ -123,7 +134,8 @@ function AdminSaudePage() {
       </div>
 
       <p className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
-        Se as views estiverem desatualizadas, acesse Admin → Fontes → "Rodar ingestão" ou espere o próximo ciclo do pg_cron.
+        Se as views estiverem desatualizadas, acesse Admin → Fontes → "Rodar ingestão" ou espere o
+        próximo ciclo do pg_cron.
       </p>
     </div>
   );

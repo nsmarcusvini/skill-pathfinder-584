@@ -36,7 +36,8 @@ interface TrackRef {
 let classifierCache: { loadedAt: number; variants: TrackRef[] } | null = null;
 
 async function loadClassifier(): Promise<TrackRef[]> {
-  if (classifierCache && Date.now() - classifierCache.loadedAt < 5 * 60_000) return classifierCache.variants;
+  if (classifierCache && Date.now() - classifierCache.loadedAt < 5 * 60_000)
+    return classifierCache.variants;
   const { data } = await supabaseAdmin
     .from("track_role_variants")
     .select("id, track_id, search_terms")
@@ -50,7 +51,10 @@ async function loadClassifier(): Promise<TrackRef[]> {
   return variants;
 }
 
-function classifyTrack(titleNormalized: string, variants: TrackRef[]): { track_id: string | null; role_variant_id: string | null } {
+function classifyTrack(
+  titleNormalized: string,
+  variants: TrackRef[],
+): { track_id: string | null; role_variant_id: string | null } {
   let best: { ref: TrackRef; score: number } | null = null;
   for (const variant of variants) {
     for (const term of variant.terms) {
@@ -99,8 +103,17 @@ export interface PipelineOptions {
 }
 
 /** Normaliza, classifica e faz upsert por (source_id, external_id). */
-export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions): Promise<IngestCounters> {
-  const counters: IngestCounters = { received: jobs.length, created: 0, updated: 0, rejected: 0, errors: [] };
+export async function ingestJobs(
+  jobs: NormalizedJob[],
+  options: PipelineOptions,
+): Promise<IngestCounters> {
+  const counters: IngestCounters = {
+    received: jobs.length,
+    created: 0,
+    updated: 0,
+    rejected: 0,
+    errors: [],
+  };
   const variants = await loadClassifier();
 
   for (const job of jobs) {
@@ -111,7 +124,10 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
       }
 
       const text = job.description_text ?? null;
-      const country = normalizeCountry(job.location_raw, job.country ?? options.defaultCountry ?? null);
+      const country = normalizeCountry(
+        job.location_raw,
+        job.country ?? options.defaultCountry ?? null,
+      );
       const segment = classifyMarketSegment({
         country,
         location_raw: job.location_raw,
@@ -151,6 +167,22 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
         ingested_at: new Date().toISOString(),
         dedupe_hash: dedupeHash(job.company_name, job.title, job.location_raw),
         is_active: true,
+
+        // Campos opcionais do NormalizedJob. Fontes ricas (Bright Data)
+        // preenchem; as demais deixam null e nada quebra.
+        work_modality: job.work_modality ?? (job.is_remote ? "remoto" : null),
+        requirements_text: job.requirements_text ?? null,
+        qualifications_text: job.qualifications_text ?? null,
+        benefits_text: job.benefits_text ?? null,
+        source_url: job.source_url ?? null,
+        source_job_id: job.source_job_id ?? job.external_id,
+        source_updated_at: job.source_updated_at ?? null,
+
+        // Marca que a vaga foi VISTA agora. É o que sustenta a expiração:
+        // vaga que para de aparecer na coleta tem last_seen_at parado, e
+        // deactivateStaleJobs a desativa depois de 45 dias.
+        last_seen_at: new Date().toISOString(),
+        lifecycle_status: "ativa",
       };
 
       const { data: existing } = await supabaseAdmin
@@ -188,7 +220,12 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
       });
 
       if (row.salary_min || row.salary_max) {
-        await supabaseAdmin.from("salary_observations").insert({
+        // 'posting' — é o que o CHECK da tabela aceita ('posting' ou 'user').
+        // Já esteve como 'job_posting', que violava a regra: como o erro não era
+        // verificado, TODA observação salarial falhava calada e mv_salary_stats
+        // ficava vazia. O erro agora entra em counters.errors, mas não rejeita a
+        // vaga — salário é complemento, não requisito.
+        const { error: salaryError } = await supabaseAdmin.from("salary_observations").insert({
           job_posting_id: upserted.id,
           track_id,
           seniority: row.seniority,
@@ -198,8 +235,14 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
           amount_min: row.salary_min,
           amount_max: row.salary_max,
           period: row.salary_period ?? "year",
-          source: "job_posting",
+          source: "posting",
+          // Nasce aprovada: veio de vaga real e o payload bruto fica em
+          // job_posting_raw. Só contribuição de usuário passa por moderação.
+          status: "aprovada",
         });
+        if (salaryError) {
+          counters.errors.push(`${job.external_id} (salário): ${salaryError.message}`);
+        }
       }
     } catch (error) {
       counters.rejected += 1;
@@ -210,16 +253,51 @@ export async function ingestJobs(jobs: NormalizedJob[], options: PipelineOptions
   return counters;
 }
 
-/** Desativa vagas não vistas há 45 dias. */
+/**
+ * Desativa vagas não VISTAS há 45 dias.
+ *
+ * Passou a olhar last_seen_at em vez de ingested_at. A diferença importa: uma
+ * vaga ingerida há 60 dias mas que continua aparecendo em toda coleta segue
+ * aberta, e antes era desativada por idade. Já uma que sumiu da fonte tem
+ * last_seen_at parado — e é essa que deve expirar.
+ *
+ * COALESCE com ingested_at cobre as vagas anteriores à coluna existir.
+ */
 export async function deactivateStaleJobs(): Promise<number> {
   const cutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await supabaseAdmin
     .from("job_postings")
-    .update({ is_active: false })
-    .lt("ingested_at", cutoff)
+    .update({ is_active: false, lifecycle_status: "expirada" })
+    .lt("last_seen_at", cutoff)
     .eq("is_active", true)
     .select("id");
   return data?.length ?? 0;
+}
+
+export interface DedupeResult {
+  grupos: number;
+  duplicatas: number;
+  alteradas: number;
+}
+
+/**
+ * Reelege o registro canônico de cada vaga sindicalizada entre fontes.
+ *
+ * A lógica inteira vive na função SQL `dedupe_job_postings` — aqui é só a
+ * chamada. É deliberado: as RPCs de mercado (market_demand, tool_ranking...)
+ * leem a tabela AO VIVO, não a matview, então a eleição precisa acontecer no
+ * fim de cada ingestão, e não só na hora de recalcular as views.
+ *
+ * Idempotente: rodar de novo sem dado novo devolve alteradas = 0.
+ */
+export async function dedupeJobPostings(): Promise<DedupeResult> {
+  const { data, error } = await supabaseAdmin.rpc("dedupe_job_postings").maybeSingle();
+  if (error) throw new Error(`dedupe_job_postings: ${error.message}`);
+  return {
+    grupos: data?.grupos ?? 0,
+    duplicatas: data?.duplicatas ?? 0,
+    alteradas: data?.alteradas ?? 0,
+  };
 }
 
 export async function startRun(sourceId: string): Promise<string | null> {
@@ -247,7 +325,11 @@ export async function finishRun(
         jobs_found: counters.received,
         jobs_new: counters.created,
         jobs_updated: counters.updated,
-        error: error ?? (counters.errors.length > 0 ? counters.errors.slice(0, 5).join(" | ").slice(0, 1000) : null),
+        error:
+          error ??
+          (counters.errors.length > 0
+            ? counters.errors.slice(0, 5).join(" | ").slice(0, 1000)
+            : null),
       })
       .eq("id", runId);
   }

@@ -4,8 +4,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Plus, List, Columns, Clock, Trash2, ChevronDown, ChevronRight,
-  Zap, CalendarDays, CheckCircle2, Circle, PlayCircle,
+  Plus,
+  List,
+  Columns,
+  Clock,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  PlayCircle,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/rumvia/page-header";
@@ -15,26 +25,46 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useMarket, SENIORITY_LABEL } from "@/hooks/use-market";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getStudyPlans, createStudyPlan, getStudyItems, createStudyItem,
-  updateStudyItem, deleteStudyItem, addStudyLog, getStudyHeatmap,
+  getStudyPlans,
+  createStudyPlan,
+  getStudyItems,
+  createStudyItem,
+  updateStudyItem,
+  deleteStudyItem,
+  addStudyLog,
+  getStudyHeatmap,
   generatePlanFromGap,
-  type StudyPlan, type StudyItem, type ItemStatus, type ItemType,
+  type StudyPlan,
+  type StudyItem,
+  type ItemStatus,
+  type ItemType,
 } from "@/lib/study.functions";
 
 export const Route = createFileRoute("/_conta/progresso")({
   head: () => ({
     meta: [
       { title: "Progresso — RUMVIA" },
-      { name: "description", content: "Kanban de estudo, registro de horas e plano gerado das suas lacunas." },
+      {
+        name: "description",
+        content: "Kanban de estudo, registro de horas e plano gerado das suas lacunas.",
+      },
     ],
   }),
   component: ProgressoPage,
@@ -95,7 +125,10 @@ function Heatmap({ rows }: { rows: { date: string; hours: number }[] }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3 text-xs mb-1" style={{ color: "var(--color-muted-foreground, #888)" }}>
+      <div
+        className="flex items-center gap-3 text-xs mb-1"
+        style={{ color: "var(--color-muted-foreground, #888)" }}
+      >
         <span>Últimos 6 meses</span>
         {streak > 0 && (
           <span className="font-semibold" style={{ color: "var(--color-success)" }}>
@@ -123,10 +156,10 @@ function Heatmap({ rows }: { rows: { date: string; hours: number }[] }) {
                 c.hours === 0
                   ? "var(--color-border, #e5e7eb)"
                   : c.hours < 1
-                  ? "#7e9cb8"
-                  : c.hours < 3
-                  ? "#416180"
-                  : "#1e3a52",
+                    ? "#7e9cb8"
+                    : c.hours < 3
+                      ? "#416180"
+                      : "#1e3a52",
             }}
           />
         ))}
@@ -182,13 +215,19 @@ function ItemCard({
           {ITEM_TYPE_LABEL[item.type]}
         </span>
         {item.dueDate && (
-          <span className="text-xs flex items-center gap-1" style={{ color: "var(--color-muted-foreground, #888)" }}>
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: "var(--color-muted-foreground, #888)" }}
+          >
             <CalendarDays size={10} />
             {item.dueDate}
           </span>
         )}
         {item.estimatedHours && (
-          <span className="text-xs flex items-center gap-1" style={{ color: "var(--color-muted-foreground, #888)" }}>
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: "var(--color-muted-foreground, #888)" }}
+          >
             <Clock size={10} />
             {item.spentHours}/{item.estimatedHours}h
           </span>
@@ -206,10 +245,7 @@ function ItemCard({
         </div>
       )}
       <div className="flex items-center gap-2 mt-1">
-        <Select
-          value={item.status}
-          onValueChange={(v) => onStatusChange(item.id, v as ItemStatus)}
-        >
+        <Select value={item.status} onValueChange={(v) => onStatusChange(item.id, v as ItemStatus)}>
           <SelectTrigger className="h-6 text-xs w-36">
             <SelectValue />
           </SelectTrigger>
@@ -287,10 +323,7 @@ function KanbanColumn({
         <span className="text-xs font-semibold uppercase tracking-wider">
           {STATUS_LABEL[status]}
         </span>
-        <span
-          className="ml-auto text-xs"
-          style={{ color: "var(--color-muted-foreground, #888)" }}
-        >
+        <span className="ml-auto text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
           {items.length}
         </span>
       </div>
@@ -346,7 +379,8 @@ function ProgressoPage() {
   });
 
   const plans = plansQuery.data ?? [];
-  const activePlanId = selectedPlanId ?? plans.find((p) => p.status === "ativo")?.id ?? plans[0]?.id ?? null;
+  const activePlanId =
+    selectedPlanId ?? plans.find((p) => p.status === "ativo")?.id ?? plans[0]?.id ?? null;
 
   const itemsQuery = useQuery({
     queryKey: ["study_items", activePlanId],
@@ -502,11 +536,15 @@ function ProgressoPage() {
           </div>
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-col">
-              <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>Itens concluídos</span>
+              <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
+                Itens concluídos
+              </span>
               <span className="text-2xl font-semibold">{concludedCount}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>Horas estudadas</span>
+              <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
+                Horas estudadas
+              </span>
               <span className="text-2xl font-semibold">{totalHours.toFixed(1)}h</span>
             </div>
           </div>
@@ -516,10 +554,7 @@ function ProgressoPage() {
       {/* Plan selector + actions */}
       <div className="flex flex-wrap items-center gap-3">
         {plans.length > 0 && (
-          <Select
-            value={activePlanId ?? ""}
-            onValueChange={(v) => setSelectedPlanId(v)}
-          >
+          <Select value={activePlanId ?? ""} onValueChange={(v) => setSelectedPlanId(v)}>
             <SelectTrigger className="w-64 h-8 text-sm">
               <SelectValue placeholder="Selecionar plano" />
             </SelectTrigger>
@@ -550,7 +585,11 @@ function ProgressoPage() {
           <button
             onClick={() => setViewMode("kanban")}
             className="p-1.5 border"
-            style={{ background: viewMode === "kanban" ? "var(--color-accent-600, #416180)" : "transparent", color: viewMode === "kanban" ? "#fff" : "inherit" }}
+            style={{
+              background:
+                viewMode === "kanban" ? "var(--color-accent-600, #416180)" : "transparent",
+              color: viewMode === "kanban" ? "#fff" : "inherit",
+            }}
             title="Kanban"
           >
             <Columns size={14} />
@@ -558,7 +597,10 @@ function ProgressoPage() {
           <button
             onClick={() => setViewMode("lista")}
             className="p-1.5 border"
-            style={{ background: viewMode === "lista" ? "var(--color-accent-600, #416180)" : "transparent", color: viewMode === "lista" ? "#fff" : "inherit" }}
+            style={{
+              background: viewMode === "lista" ? "var(--color-accent-600, #416180)" : "transparent",
+              color: viewMode === "lista" ? "#fff" : "inherit",
+            }}
             title="Lista"
           >
             <List size={14} />
@@ -579,31 +621,50 @@ function ProgressoPage() {
         <>
           {/* Filter bar */}
           <div className="flex flex-wrap items-center gap-3">
-            <Select value={filterType} onValueChange={(v) => setFilterType(v as ItemType | "todos")}>
+            <Select
+              value={filterType}
+              onValueChange={(v) => setFilterType(v as ItemType | "todos")}
+            >
               <SelectTrigger className="w-32 h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos" className="text-xs">Todos os tipos</SelectItem>
+                <SelectItem value="todos" className="text-xs">
+                  Todos os tipos
+                </SelectItem>
                 {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-                  <SelectItem key={t} value={t} className="text-xs">{ITEM_TYPE_LABEL[t]}</SelectItem>
+                  <SelectItem key={t} value={t} className="text-xs">
+                    {ITEM_TYPE_LABEL[t]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {viewMode === "lista" && (
-              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as ItemStatus | "todos")}>
+              <Select
+                value={filterStatus}
+                onValueChange={(v) => setFilterStatus(v as ItemStatus | "todos")}
+              >
                 <SelectTrigger className="w-36 h-7 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos" className="text-xs">Todos os status</SelectItem>
+                  <SelectItem value="todos" className="text-xs">
+                    Todos os status
+                  </SelectItem>
                   {COLUMNS.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">{STATUS_LABEL[s]}</SelectItem>
+                    <SelectItem key={s} value={s} className="text-xs">
+                      {STATUS_LABEL[s]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
-            <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={() => setShowNewItem(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs ml-auto"
+              onClick={() => setShowNewItem(true)}
+            >
               <Plus size={12} className="mr-1" /> Adicionar item
             </Button>
           </div>
@@ -618,7 +679,9 @@ function ProgressoPage() {
                   key={status}
                   status={status}
                   items={itemsByStatus(status)}
-                  onDrop={(id, newStatus) => moveItemMutation.mutate({ itemId: id, status: newStatus })}
+                  onDrop={(id, newStatus) =>
+                    moveItemMutation.mutate({ itemId: id, status: newStatus })
+                  }
                   onStatusChange={(id, s) => moveItemMutation.mutate({ itemId: id, status: s })}
                   onDelete={(id) => deleteItemMutation.mutate(id)}
                   onLogHours={(item) => setLogTarget(item)}
@@ -639,7 +702,10 @@ function ProgressoPage() {
                       <div className="shrink-0">{STATUS_ICON[item.status]}</div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">{item.title}</div>
-                        <div className="text-xs flex gap-2 mt-0.5" style={{ color: "var(--color-muted-foreground, #888)" }}>
+                        <div
+                          className="text-xs flex gap-2 mt-0.5"
+                          style={{ color: "var(--color-muted-foreground, #888)" }}
+                        >
                           <span>{ITEM_TYPE_LABEL[item.type]}</span>
                           {item.dueDate && <span>{item.dueDate}</span>}
                           <span>{item.spentHours}h</span>
@@ -647,21 +713,31 @@ function ProgressoPage() {
                       </div>
                       <Select
                         value={item.status}
-                        onValueChange={(v) => moveItemMutation.mutate({ itemId: item.id, status: v as ItemStatus })}
+                        onValueChange={(v) =>
+                          moveItemMutation.mutate({ itemId: item.id, status: v as ItemStatus })
+                        }
                       >
                         <SelectTrigger className="w-32 h-6 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {COLUMNS.map((s) => (
-                            <SelectItem key={s} value={s} className="text-xs">{STATUS_LABEL[s]}</SelectItem>
+                            <SelectItem key={s} value={s} className="text-xs">
+                              {STATUS_LABEL[s]}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <button onClick={() => setLogTarget(item)} className="opacity-60 hover:opacity-100">
+                      <button
+                        onClick={() => setLogTarget(item)}
+                        className="opacity-60 hover:opacity-100"
+                      >
                         <Clock size={13} />
                       </button>
-                      <button onClick={() => deleteItemMutation.mutate(item.id)} className="opacity-40 hover:opacity-100">
+                      <button
+                        onClick={() => deleteItemMutation.mutate(item.id)}
+                        className="opacity-40 hover:opacity-100"
+                      >
                         <Trash2 size={13} />
                       </button>
                     </div>
@@ -690,7 +766,9 @@ function ProgressoPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowNewPlan(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setShowNewPlan(false)}>
+              Cancelar
+            </Button>
             <Button
               onClick={() => createPlanMutation.mutate()}
               disabled={!newPlanTitle.trim() || createPlanMutation.isPending}
@@ -710,16 +788,24 @@ function ProgressoPage() {
           <div className="flex flex-col gap-3 py-2">
             <div className="flex flex-col gap-1">
               <Label className="text-xs">Título</Label>
-              <Input value={newItemTitle} onChange={(e) => setNewItemTitle(e.target.value)} placeholder="ex: Curso Docker Avançado" />
+              <Input
+                value={newItemTitle}
+                onChange={(e) => setNewItemTitle(e.target.value)}
+                placeholder="ex: Curso Docker Avançado"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">Tipo</Label>
                 <Select value={newItemType} onValueChange={(v) => setNewItemType(v as ItemType)}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {(Object.keys(ITEM_TYPE_LABEL) as ItemType[]).map((t) => (
-                      <SelectItem key={t} value={t} className="text-sm">{ITEM_TYPE_LABEL[t]}</SelectItem>
+                      <SelectItem key={t} value={t} className="text-sm">
+                        {ITEM_TYPE_LABEL[t]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -747,7 +833,9 @@ function ProgressoPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowNewItem(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setShowNewItem(false)}>
+              Cancelar
+            </Button>
             <Button
               onClick={() => createItemMutation.mutate()}
               disabled={!newItemTitle.trim() || createItemMutation.isPending}
@@ -759,7 +847,12 @@ function ProgressoPage() {
       </Dialog>
 
       {/* Log hours dialog */}
-      <Dialog open={!!logTarget} onOpenChange={(open) => { if (!open) setLogTarget(null); }}>
+      <Dialog
+        open={!!logTarget}
+        onOpenChange={(open) => {
+          if (!open) setLogTarget(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar horas — {logTarget?.title}</DialogTitle>
@@ -776,7 +869,9 @@ function ProgressoPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setLogTarget(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setLogTarget(null)}>
+              Cancelar
+            </Button>
             <Button
               onClick={() => logMutation.mutate()}
               disabled={!Number(logHours) || logMutation.isPending}

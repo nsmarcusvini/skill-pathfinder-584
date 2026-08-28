@@ -95,7 +95,11 @@ export function buildCatalogIndex(skills: CatalogSkill[], aliases: CatalogAlias[
     aliasBySkill.set(a.skill_id, list);
   }
   const normTerms = [
-    ...skills.map((s) => ({ skillId: s.id, norm: normalize(s.canonical_name), alias: null as string | null })),
+    ...skills.map((s) => ({
+      skillId: s.id,
+      norm: normalize(s.canonical_name),
+      alias: null as string | null,
+    })),
     ...aliases.map((a) => ({ skillId: a.skill_id, norm: normalize(a.alias), alias: a.alias })),
   ];
   return { skills, aliasBySkill, normTerms };
@@ -125,7 +129,14 @@ export function findOccurrences(
 ): { count: number; evidence: string | null } {
   let count = 0;
   let evidence: string | null = null;
-  const re = new RegExp(pattern.source, "gi");
+  // As flags do padrão original TÊM de sobreviver — em especial `u`.
+  // wordBoundaryRegex monta `(?<![\p{L}\d])termo(?![\p{L}\d])`, e sem `u` o
+  // \p{L} deixa de ser "letra Unicode" e vira a classe literal [pL{}\d]: a
+  // fronteira some e o alias casa no meio das palavras. Era assim que "ge"
+  // casava em "gerir"/"German", "orm" em "platform"/"transformação" e "tf" em
+  // "platform" — 98% das vagas ganhavam skills que não estavam lá.
+  const flags = Array.from(new Set([...pattern.flags, "g", "i"])).join("");
+  const re = new RegExp(pattern.source, flags);
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     count += 1;
@@ -168,17 +179,31 @@ export function matchCatalogSegments<S extends string>(
       matchedBy: Exclude<MatchedBy, "unmatched">;
       confidence: number;
       re: RegExp;
-    }> = [
-      {
+    }> = [];
+
+    // Skill ambígua com match_patterns: os padrões SUBSTITUEM o nome puro, não
+    // se somam a ele. Antes eram apenas acrescentados — e como o nome puro tem
+    // confiança 1,0 contra 0,9 do padrão, ele sempre vencia e a desambiguação
+    // nunca era aplicada. "Go" casava em "go live" e "go-to-market" (189 vagas),
+    // e nenhum match por regex jamais foi registrado na base.
+    const patterns = skill.is_ambiguous ? (skill.match_patterns ?? []) : [];
+    const desambiguada = patterns.length > 0;
+    const nomeNorm = normalize(skill.canonical_name);
+
+    if (!desambiguada) {
+      candidates.push({
         term: skill.canonical_name,
         alias: null,
         matchedBy: "exact",
         confidence: 1,
         re: wordBoundaryRegex(skill.canonical_name),
-      },
-    ];
+      });
+    }
 
     for (const alias of index.aliasBySkill.get(skill.id) ?? []) {
+      // Alias igual ao nome canônico reintroduziria a ambiguidade pela porta dos
+      // fundos (o seed tem, p.ex., o alias "Go" para a skill "Go").
+      if (desambiguada && normalize(alias) === nomeNorm) continue;
       candidates.push({
         term: alias,
         alias,
@@ -188,8 +213,8 @@ export function matchCatalogSegments<S extends string>(
       });
     }
 
-    if (skill.is_ambiguous) {
-      for (const pattern of skill.match_patterns ?? []) {
+    {
+      for (const pattern of patterns) {
         try {
           candidates.push({
             term: skill.canonical_name,

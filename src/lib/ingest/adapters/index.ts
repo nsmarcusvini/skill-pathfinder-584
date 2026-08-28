@@ -13,9 +13,15 @@ import {
   smartrecruitersAdapter,
   workableAdapter,
 } from "./ats";
+import {
+  brightDataGlassdoorAdapter,
+  brightDataIndeedAdapter,
+  brightDataLinkedinJobsAdapter,
+  jobgetherAdapter,
+} from "./bright-data";
 import { csvManualAdapter } from "./csv-manual";
 import { jsearchAdapter } from "./jsearch";
-import type { JobAdapter } from "../types";
+import type { AsyncJobAdapter, JobAdapter } from "../types";
 
 /** Registro de adapters por `job_sources.adapter`. */
 export const ADAPTERS: Record<string, JobAdapter> = {
@@ -34,6 +40,27 @@ export const ADAPTERS: Record<string, JobAdapter> = {
   jsearch: jsearchAdapter,
 };
 
+/**
+ * Adapters de coleta assíncrona (duas fases). Ficam num registro separado
+ * porque o orquestrador é outro: dispara agora, colhe depois. Ver
+ * `bright-data.server.ts`.
+ */
+export const ASYNC_ADAPTERS: Record<string, AsyncJobAdapter> = {
+  bd_linkedin_jobs: brightDataLinkedinJobsAdapter,
+  bd_indeed: brightDataIndeedAdapter,
+  bd_glassdoor: brightDataGlassdoorAdapter,
+  bd_jobgether: jobgetherAdapter,
+};
+
 export function getAdapter(key: string): JobAdapter | null {
   return ADAPTERS[key] ?? null;
+}
+
+export function getAsyncAdapter(key: string): AsyncJobAdapter | null {
+  return ASYNC_ADAPTERS[key] ?? null;
+}
+
+/** Uma chave de adapter é assíncrona? Usado por run.server para escolher o fluxo. */
+export function isAsyncAdapterKey(key: string): boolean {
+  return key in ASYNC_ADAPTERS;
 }

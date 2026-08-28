@@ -29,15 +29,19 @@ import { Route as ContaFerramentasRouteImport } from './routes/_conta/ferramenta
 import { Route as ContaMinhasSkillsRouteImport } from './routes/_conta/minhas-skills'
 import { Route as ContaProgressoRouteImport } from './routes/_conta/progresso'
 import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
+import { Route as ContaVagasRouteImport } from './routes/_conta/vagas'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index'
 import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
 import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
 import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
+import { Route as ContaAdminSalariosRouteImport } from './routes/_conta/admin.salarios'
 import { Route as ContaAdminSaudeRouteImport } from './routes/_conta/admin.saude'
 import { Route as ContaAdminSkillsRouteImport } from './routes/_conta/admin.skills'
 import { Route as ContaAdminTrilhasRouteImport } from './routes/_conta/admin.trilhas'
+import { Route as ContaAdminUsuariosRouteImport } from './routes/_conta/admin.usuarios'
 import { Route as ApiPublicExtractJdSkillsRouteImport } from './routes/api/public/extract-jd-skills'
+import { Route as ApiPublicIngestAsyncRouteImport } from './routes/api/public/ingest-async'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
 import { Route as ApiPublicIngestWebhookRouteImport } from './routes/api/public/ingest-webhook'
 import { Route as ApiPublicRefreshMarketViewsRouteImport } from './routes/api/public/refresh-market-views'
@@ -141,6 +145,11 @@ const ContaSalariosRoute = ContaSalariosRouteImport.update({
   path: '/salarios',
   getParentRoute: () => ContaRoute,
 } as any)
+const ContaVagasRoute = ContaVagasRouteImport.update({
+  id: '/vagas',
+  path: '/vagas',
+  getParentRoute: () => ContaRoute,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -166,6 +175,11 @@ const ContaAdminImportarRoute = ContaAdminImportarRouteImport.update({
   path: '/importar',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminSalariosRoute = ContaAdminSalariosRouteImport.update({
+  id: '/salarios',
+  path: '/salarios',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
 const ContaAdminSaudeRoute = ContaAdminSaudeRouteImport.update({
   id: '/saude',
   path: '/saude',
@@ -181,12 +195,22 @@ const ContaAdminTrilhasRoute = ContaAdminTrilhasRouteImport.update({
   path: '/trilhas',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminUsuariosRoute = ContaAdminUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
 const ApiPublicExtractJdSkillsRoute =
   ApiPublicExtractJdSkillsRouteImport.update({
     id: '/api/public/extract-jd-skills',
     path: '/api/public/extract-jd-skills',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicIngestAsyncRoute = ApiPublicIngestAsyncRouteImport.update({
+  id: '/api/public/ingest-async',
+  path: '/api/public/ingest-async',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicIngestJobsRoute = ApiPublicIngestJobsRouteImport.update({
   id: '/api/public/ingest-jobs',
   path: '/api/public/ingest-jobs',
@@ -224,14 +248,18 @@ export interface FileRoutesByFullPath {
   '/minhas-skills': typeof ContaMinhasSkillsRoute
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
+  '/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/salarios': typeof ContaAdminSalariosRoute
   '/admin/saude': typeof ContaAdminSaudeRoute
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
+  '/admin/usuarios': typeof ContaAdminUsuariosRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
+  '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
@@ -256,14 +284,18 @@ export interface FileRoutesByTo {
   '/minhas-skills': typeof ContaMinhasSkillsRoute
   '/progresso': typeof ContaProgressoRoute
   '/salarios': typeof ContaSalariosRoute
+  '/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
+  '/admin/salarios': typeof ContaAdminSalariosRoute
   '/admin/saude': typeof ContaAdminSaudeRoute
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
+  '/admin/usuarios': typeof ContaAdminUsuariosRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
+  '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
@@ -291,14 +323,18 @@ export interface FileRoutesById {
   '/_conta/minhas-skills': typeof ContaMinhasSkillsRoute
   '/_conta/progresso': typeof ContaProgressoRoute
   '/_conta/salarios': typeof ContaSalariosRoute
+  '/_conta/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/_conta/admin/fontes': typeof ContaAdminFontesRoute
   '/_conta/admin/importar': typeof ContaAdminImportarRoute
+  '/_conta/admin/salarios': typeof ContaAdminSalariosRoute
   '/_conta/admin/saude': typeof ContaAdminSaudeRoute
   '/_conta/admin/skills': typeof ContaAdminSkillsRoute
   '/_conta/admin/trilhas': typeof ContaAdminTrilhasRoute
+  '/_conta/admin/usuarios': typeof ContaAdminUsuariosRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
+  '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
   '/api/public/ingest-webhook': typeof ApiPublicIngestWebhookRoute
   '/api/public/refresh-market-views': typeof ApiPublicRefreshMarketViewsRoute
@@ -326,14 +362,18 @@ export interface FileRouteTypes {
     | '/minhas-skills'
     | '/progresso'
     | '/salarios'
+    | '/vagas'
     | '/auth/callback'
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/salarios'
     | '/admin/saude'
     | '/admin/skills'
     | '/admin/trilhas'
+    | '/admin/usuarios'
     | '/api/public/extract-jd-skills'
+    | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/api/public/refresh-market-views'
@@ -358,14 +398,18 @@ export interface FileRouteTypes {
     | '/minhas-skills'
     | '/progresso'
     | '/salarios'
+    | '/vagas'
     | '/auth/callback'
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
+    | '/admin/salarios'
     | '/admin/saude'
     | '/admin/skills'
     | '/admin/trilhas'
+    | '/admin/usuarios'
     | '/api/public/extract-jd-skills'
+    | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/api/public/refresh-market-views'
@@ -392,14 +436,18 @@ export interface FileRouteTypes {
     | '/_conta/minhas-skills'
     | '/_conta/progresso'
     | '/_conta/salarios'
+    | '/_conta/vagas'
     | '/auth/callback'
     | '/_conta/admin/descobrir-ats'
     | '/_conta/admin/fontes'
     | '/_conta/admin/importar'
+    | '/_conta/admin/salarios'
     | '/_conta/admin/saude'
     | '/_conta/admin/skills'
     | '/_conta/admin/trilhas'
+    | '/_conta/admin/usuarios'
     | '/api/public/extract-jd-skills'
+    | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
     | '/api/public/ingest-webhook'
     | '/api/public/refresh-market-views'
@@ -418,6 +466,7 @@ export interface RootRouteChildren {
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   ApiPublicExtractJdSkillsRoute: typeof ApiPublicExtractJdSkillsRoute
+  ApiPublicIngestAsyncRoute: typeof ApiPublicIngestAsyncRoute
   ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
   ApiPublicIngestWebhookRoute: typeof ApiPublicIngestWebhookRoute
   ApiPublicRefreshMarketViewsRoute: typeof ApiPublicRefreshMarketViewsRoute
@@ -565,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaSalariosRouteImport
       parentRoute: typeof ContaRoute
     }
+    '/_conta/vagas': {
+      id: '/_conta/vagas'
+      path: '/vagas'
+      fullPath: '/vagas'
+      preLoaderRoute: typeof ContaVagasRouteImport
+      parentRoute: typeof ContaRoute
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -600,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminImportarRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/salarios': {
+      id: '/_conta/admin/salarios'
+      path: '/salarios'
+      fullPath: '/admin/salarios'
+      preLoaderRoute: typeof ContaAdminSalariosRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
     '/_conta/admin/saude': {
       id: '/_conta/admin/saude'
       path: '/saude'
@@ -621,11 +684,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminTrilhasRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/usuarios': {
+      id: '/_conta/admin/usuarios'
+      path: '/usuarios'
+      fullPath: '/admin/usuarios'
+      preLoaderRoute: typeof ContaAdminUsuariosRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
     '/api/public/extract-jd-skills': {
       id: '/api/public/extract-jd-skills'
       path: '/api/public/extract-jd-skills'
       fullPath: '/api/public/extract-jd-skills'
       preLoaderRoute: typeof ApiPublicExtractJdSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ingest-async': {
+      id: '/api/public/ingest-async'
+      path: '/api/public/ingest-async'
+      fullPath: '/api/public/ingest-async'
+      preLoaderRoute: typeof ApiPublicIngestAsyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/ingest-jobs': {
@@ -656,9 +733,11 @@ interface ContaAdminRouteChildren {
   ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
   ContaAdminFontesRoute: typeof ContaAdminFontesRoute
   ContaAdminImportarRoute: typeof ContaAdminImportarRoute
+  ContaAdminSalariosRoute: typeof ContaAdminSalariosRoute
   ContaAdminSaudeRoute: typeof ContaAdminSaudeRoute
   ContaAdminSkillsRoute: typeof ContaAdminSkillsRoute
   ContaAdminTrilhasRoute: typeof ContaAdminTrilhasRoute
+  ContaAdminUsuariosRoute: typeof ContaAdminUsuariosRoute
   ContaAdminIndexRoute: typeof ContaAdminIndexRoute
 }
 
@@ -666,9 +745,11 @@ const ContaAdminRouteChildren: ContaAdminRouteChildren = {
   ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
   ContaAdminFontesRoute: ContaAdminFontesRoute,
   ContaAdminImportarRoute: ContaAdminImportarRoute,
+  ContaAdminSalariosRoute: ContaAdminSalariosRoute,
   ContaAdminSaudeRoute: ContaAdminSaudeRoute,
   ContaAdminSkillsRoute: ContaAdminSkillsRoute,
   ContaAdminTrilhasRoute: ContaAdminTrilhasRoute,
+  ContaAdminUsuariosRoute: ContaAdminUsuariosRoute,
   ContaAdminIndexRoute: ContaAdminIndexRoute,
 }
 
@@ -688,6 +769,7 @@ interface ContaRouteChildren {
   ContaMinhasSkillsRoute: typeof ContaMinhasSkillsRoute
   ContaProgressoRoute: typeof ContaProgressoRoute
   ContaSalariosRoute: typeof ContaSalariosRoute
+  ContaVagasRoute: typeof ContaVagasRoute
 }
 
 const ContaRouteChildren: ContaRouteChildren = {
@@ -702,6 +784,7 @@ const ContaRouteChildren: ContaRouteChildren = {
   ContaMinhasSkillsRoute: ContaMinhasSkillsRoute,
   ContaProgressoRoute: ContaProgressoRoute,
   ContaSalariosRoute: ContaSalariosRoute,
+  ContaVagasRoute: ContaVagasRoute,
 }
 
 const ContaRouteWithChildren = ContaRoute._addFileChildren(ContaRouteChildren)
@@ -718,6 +801,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   ApiPublicExtractJdSkillsRoute: ApiPublicExtractJdSkillsRoute,
+  ApiPublicIngestAsyncRoute: ApiPublicIngestAsyncRoute,
   ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,
   ApiPublicIngestWebhookRoute: ApiPublicIngestWebhookRoute,
   ApiPublicRefreshMarketViewsRoute: ApiPublicRefreshMarketViewsRoute,

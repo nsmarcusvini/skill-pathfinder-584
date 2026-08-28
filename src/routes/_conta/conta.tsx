@@ -23,7 +23,10 @@ export const Route = createFileRoute("/_conta/conta")({
   head: () => ({
     meta: [
       { title: "Minha conta — RUMVIA" },
-      { name: "description", content: "Edite seu perfil, troque a senha, exporte ou exclua seus dados." },
+      {
+        name: "description",
+        content: "Edite seu perfil, troque a senha, exporte ou exclua seus dados.",
+      },
       { property: "og:title", content: "Minha conta — RUMVIA" },
       { property: "og:description", content: "Gerencie sua conta RUMVIA." },
     ],
@@ -86,16 +89,34 @@ function ContaPage() {
     if (!user) return;
     setExporting(true);
     try {
-      const db = supabase as any;
-      const [perfil, prefs, gapAnalyses, userSkills, studyPlans, userCerts, userCourses] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-        supabase.from("user_track_preferences").select("*").eq("user_id", user.id),
-        supabase.from("gap_analyses").select("id, track_id, seniority, market_segment, adherence_score, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
-        supabase.from("user_skills").select("skill_id, self_level, years_exp").eq("user_id", user.id),
-        db.from("study_plans").select("title, status, target_date, created_at").eq("user_id", user.id),
-        db.from("user_certifications").select("certification_id, custom_name, status, obtained_at, expires_at").eq("user_id", user.id),
-        db.from("user_courses").select("course_id, custom_title, status, progress_percent, completed_at").eq("user_id", user.id),
-      ]);
+      const db = supabase;
+      const [perfil, prefs, gapAnalyses, userSkills, studyPlans, userCerts, userCourses] =
+        await Promise.all([
+          supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+          supabase.from("user_track_preferences").select("*").eq("user_id", user.id),
+          supabase
+            .from("gap_analyses")
+            .select("id, track_id, seniority, market_segment, adherence_score, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("user_skills")
+            .select("skill_id, self_level, years_exp")
+            .eq("user_id", user.id),
+          db
+            .from("study_plans")
+            .select("title, status, target_date, created_at")
+            .eq("user_id", user.id),
+          db
+            .from("user_certifications")
+            .select("certification_id, custom_name, status, obtained_at, expires_at")
+            .eq("user_id", user.id),
+          db
+            .from("user_courses")
+            .select("course_id, custom_title, status, progress_percent, completed_at")
+            .eq("user_id", user.id),
+        ]);
       const payload = {
         exportado_em: new Date().toISOString(),
         conta: { id: user.id, email: user.email },
@@ -130,9 +151,7 @@ function ContaPage() {
       toast.success("Conta excluída.");
       void navigate({ to: "/", replace: true });
     } catch (err) {
-      toast.error(
-        "Não foi possível excluir a conta agora: " + (err as Error).message,
-      );
+      toast.error("Não foi possível excluir a conta agora: " + (err as Error).message);
     } finally {
       setDeleting(false);
     }
@@ -192,7 +211,12 @@ function ContaPage() {
             <label className="label-h6 text-neutral-700" htmlFor="nova">
               Nova senha
             </label>
-            <Input id="nova" type="password" autoComplete="new-password" {...senhaForm.register("password")} />
+            <Input
+              id="nova"
+              type="password"
+              autoComplete="new-password"
+              {...senhaForm.register("password")}
+            />
             <FieldError message={senhaForm.formState.errors.password?.message} />
           </div>
           <div>

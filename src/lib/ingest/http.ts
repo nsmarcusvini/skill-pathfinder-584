@@ -21,11 +21,7 @@ function release(): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function fetchJson<T>(
-  url: string,
-  init: RequestInit = {},
-  attempts = 4,
-): Promise<T> {
+export async function fetchJson<T>(url: string, init: RequestInit = {}, attempts = 4): Promise<T> {
   await acquire();
   try {
     let lastError: unknown = null;
@@ -33,11 +29,16 @@ export async function fetchJson<T>(
       try {
         const res = await fetch(url, {
           ...init,
-          headers: { accept: "application/json", "user-agent": "RUMVIA-ingest/1.0", ...(init.headers ?? {}) },
+          headers: {
+            accept: "application/json",
+            "user-agent": "RUMVIA-ingest/1.0",
+            ...(init.headers ?? {}),
+          },
         });
         if (res.status === 429 || res.status >= 500) {
           const retryAfter = Number(res.headers.get("retry-after"));
-          const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 750;
+          const wait =
+            Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 750;
           lastError = new Error(`HTTP ${res.status} em ${url}`);
           await sleep(wait);
           continue;
@@ -59,7 +60,10 @@ export async function fetchJson<T>(
 }
 
 /** Executa tarefas com o mesmo teto de concorrência do fetch. */
-export async function mapPool<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<Array<PromiseSettledResult<R>>> {
+export async function mapPool<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+): Promise<Array<PromiseSettledResult<R>>> {
   const results: Array<PromiseSettledResult<R>> = [];
   let index = 0;
   const workers = Array.from({ length: Math.min(MAX_CONCURRENCY, items.length || 1) }, async () => {

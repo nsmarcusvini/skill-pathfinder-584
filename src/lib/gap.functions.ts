@@ -87,21 +87,37 @@ function hashParams(parts: Array<string | number | null>): string {
   return `${h.toString(36)}-${raw.length.toString(36)}`;
 }
 
+/**
+ * `unranked`: aceita vagas sem senioridade declarada. Só no último degrau —
+ * ali a amostra já está escassa e o resultado sai marcado como low_confidence,
+ * então incluir nível desconhecido ajuda mais do que atrapalha. Nos degraus
+ * iniciais, misturar isso pioraria a precisão sem necessidade.
+ */
 function stepConfig(
   step: WideningStep,
   periodDays: number,
   seniority: string,
   marketSegment: string,
-): { days: number; sen: string[]; seg: string[] } {
+): { days: number; sen: string[]; seg: string[]; unranked: boolean } {
   switch (step) {
     case "janela_180":
-      return { days: 180, sen: [seniority], seg: [marketSegment] };
+      return { days: 180, sen: [seniority], seg: [marketSegment], unranked: false };
     case "senioridades_adjacentes":
-      return { days: 180, sen: adjacentSeniorities(seniority), seg: [marketSegment] };
+      return {
+        days: 180,
+        sen: adjacentSeniorities(seniority),
+        seg: [marketSegment],
+        unranked: false,
+      };
     case "ambos_segmentos":
-      return { days: 180, sen: adjacentSeniorities(seniority), seg: ["br", "remoto_global"] };
+      return {
+        days: 180,
+        sen: adjacentSeniorities(seniority),
+        seg: ["br", "remoto_global"],
+        unranked: true,
+      };
     default:
-      return { days: periodDays, sen: [seniority], seg: [marketSegment] };
+      return { days: periodDays, sen: [seniority], seg: [marketSegment], unranked: false };
   }
 }
 
@@ -190,16 +206,27 @@ export const computeGap = createServerFn({ method: "POST" })
       const skillsUnchanged =
         !lastSkill?.updated_at ||
         new Date(latest.computed_at).getTime() >= new Date(lastSkill.updated_at).getTime();
-      if (fresh && skillsUnchanged) {
-        const cachedStep = ((latest.widening_step as WideningStep) ?? "base");
-        const cfg = stepConfig(cachedStep, periodDays, seniority, marketSegment);
-        const { data: cachedStats } = await supabase.rpc("market_scope_stats", {
-          _track_id: trackId,
-          _seniorities: cfg.sen,
-          _segments: cfg.seg,
-          _since: new Date(Date.now() - cfg.days * 24 * 60 * 60 * 1000).toISOString(),
-        });
-        const cs = cachedStats?.[0];
+      const cachedStep = (latest.widening_step as WideningStep) ?? "base";
+      const cfg = stepConfig(cachedStep, periodDays, seniority, marketSegment);
+      const { data: cachedStats } = await supabase.rpc("market_scope_stats", {
+        _track_id: trackId,
+        _seniorities: cfg.sen,
+        _segments: cfg.seg,
+        _since: new Date(Date.now() - cfg.days * 24 * 60 * 60 * 1000).toISOString(),
+        _include_unranked: cfg.unranked,
+      });
+      const cs = cachedStats?.[0];
+
+      // O cache também tem de morrer quando o MERCADO muda, não só as skills do
+      // usuário. Sem isto, uma análise feita com a base vazia sobrevivia 24h:
+      // o painel mostrava score congelado e "0 vagas analisadas" mesmo depois de
+      // milhares de vagas entrarem — e ainda misturava, na mesma tela, empresas e
+      // mediana recém-consultadas com um score velho.
+      // postings_sample guarda o total_jobs do recorte, então basta compará-lo
+      // com a estatística fresca que já buscamos acima: nenhuma consulta a mais.
+      const mercadoIgual = Number(cs?.total_jobs ?? 0) === Number(latest.postings_sample ?? 0);
+
+      if (fresh && skillsUnchanged && mercadoIgual) {
         const { data: items } = await supabase
           .from("gap_analysis_items")
           .select("*, skills(canonical_name, skill_categories(key, name))")
@@ -249,9 +276,9 @@ export const computeGap = createServerFn({ method: "POST" })
     }
 
     // ---- recorte de mercado, com degraus de ampliação ----
-    const steps = (["base", "janela_180", "senioridades_adjacentes", "ambos_segmentos"] as const).map(
-      (step) => ({ step, ...stepConfig(step, periodDays, seniority, marketSegment) }),
-    );
+    const steps = (
+      ["base", "janela_180", "senioridades_adjacentes", "ambos_segmentos"] as const
+    ).map((step) => ({ step, ...stepConfig(step, periodDays, seniority, marketSegment) }));
 
     let usedStep: WideningStep = "base";
     let totalJobs = 0;
@@ -265,12 +292,14 @@ export const computeGap = createServerFn({ method: "POST" })
         _seniorities: s.sen,
         _segments: s.seg,
         _since: since,
+        _include_unranked: s.unranked,
       });
       const { data: statRows } = await supabase.rpc("market_scope_stats", {
         _track_id: trackId,
         _seniorities: s.sen,
         _segments: s.seg,
         _since: since,
+        _include_unranked: s.unranked,
       });
       const st = statRows?.[0];
       usedStep = s.step;
@@ -279,7 +308,10 @@ export const computeGap = createServerFn({ method: "POST" })
       stats = {
         total_jobs: totalJobs,
         companies_30d: Number(st?.companies_30d ?? 0),
-        salary_median: st?.salary_median === null || st?.salary_median === undefined ? null : Number(st.salary_median),
+        salary_median:
+          st?.salary_median === null || st?.salary_median === undefined
+            ? null
+            : Number(st.salary_median),
       };
       if (totalJobs >= MIN_SAMPLE) break;
     }

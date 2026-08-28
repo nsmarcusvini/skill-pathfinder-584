@@ -11,7 +11,9 @@ escolheu. Também mostra as ferramentas mais pedidas, empresas contratando, faix
 e recomenda plano de estudos.
 
 Trilhas ativas: `devops` (variantes: DevOps Engineer, Platform Engineer, SRE),
-`data_engineer`, `fullstack`. `backend` e `frontend` virão depois via admin.
+`data_engineer`, `fullstack`, `frontend`, `backend` e `qa`. As três últimas entraram
+em 2026-08-27 pela migration `20260827200000_tracks_frontend_backend_qa.sql` — só
+dados, nenhuma linha de código (regra 1). Trilha nova segue `docs/ADICIONAR_TRILHA.md`.
 
 ## Stack real (não a que estava no system design original)
 

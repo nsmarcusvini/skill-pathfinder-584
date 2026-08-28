@@ -42,23 +42,20 @@ export interface StudyLogHeatmapRow {
   hours: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyDb = any;
-
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
 export const getStudyPlans = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<StudyPlan[]> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { data, error } = await db
       .from("study_plans")
       .select("id, track_id, title, description, target_date, status, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r: AnyDb) => ({
+    return (data ?? []).map((r) => ({
       id: r.id,
       trackId: r.track_id ?? null,
       title: r.title,
@@ -76,15 +73,15 @@ export const createStudyPlan = createServerFn({ method: "POST" })
       input,
   )
   .handler(async ({ data, context }): Promise<StudyPlan> => {
-    const db = context.supabase as AnyDb;
-    const insert: Record<string, unknown> = {
+    const db = context.supabase;
+    const insert = {
       user_id: context.userId,
       title: data.title,
       status: "ativo",
+      ...(data.trackId ? { track_id: data.trackId } : {}),
+      ...(data.description ? { description: data.description } : {}),
+      ...(data.targetDate ? { target_date: data.targetDate } : {}),
     };
-    if (data.trackId) insert["track_id"] = data.trackId;
-    if (data.description) insert["description"] = data.description;
-    if (data.targetDate) insert["target_date"] = data.targetDate;
     const { data: row, error } = await db.from("study_plans").insert(insert).select().single();
     if (error) throw new Error(error.message);
     return {
@@ -102,7 +99,7 @@ export const updatePlanStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { planId: string; status: PlanStatus }) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { error } = await db
       .from("study_plans")
       .update({ status: data.status })
@@ -139,7 +136,7 @@ export const getStudyItems = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { planId: string }) => input)
   .handler(async ({ data, context }): Promise<StudyItem[]> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { data: rows, error } = await db
       .from("study_items")
       .select("*")
@@ -167,25 +164,21 @@ export const createStudyItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: CreateItemInput) => input)
   .handler(async ({ data, context }): Promise<StudyItem> => {
-    const db = context.supabase as AnyDb;
-    const insert: Record<string, unknown> = {
+    const db = context.supabase;
+    const insert = {
       plan_id: data.planId,
       user_id: context.userId,
       title: data.title,
       type: data.type ?? "outro",
       status: "backlog",
+      ...(data.skillId ? { skill_id: data.skillId } : {}),
+      ...(data.resourceUrl ? { resource_url: data.resourceUrl } : {}),
+      ...(data.estimatedHours !== undefined ? { estimated_hours: data.estimatedHours } : {}),
+      ...(data.dueDate ? { due_date: data.dueDate } : {}),
+      ...(data.priority !== undefined ? { priority: data.priority } : {}),
+      ...(data.sourceGapItemId ? { source_gap_item_id: data.sourceGapItemId } : {}),
     };
-    if (data.skillId) insert["skill_id"] = data.skillId;
-    if (data.resourceUrl) insert["resource_url"] = data.resourceUrl;
-    if (data.estimatedHours !== undefined) insert["estimated_hours"] = data.estimatedHours;
-    if (data.dueDate) insert["due_date"] = data.dueDate;
-    if (data.priority !== undefined) insert["priority"] = data.priority;
-    if (data.sourceGapItemId) insert["source_gap_item_id"] = data.sourceGapItemId;
-    const { data: row, error } = await db
-      .from("study_items")
-      .insert(insert)
-      .select()
-      .single();
+    const { data: row, error } = await db.from("study_items").insert(insert).select().single();
     if (error) throw new Error(error.message);
     return mapItem(row as Record<string, unknown>);
   });
@@ -204,14 +197,15 @@ export const updateStudyItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpdateItemInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
-    const patch: Record<string, unknown> = {};
-    if (data.status !== undefined) patch["status"] = data.status;
-    if (data.progressPercent !== undefined) patch["progress_percent"] = data.progressPercent;
-    if (data.spentHours !== undefined) patch["spent_hours"] = data.spentHours;
-    if (data.notes !== undefined) patch["notes"] = data.notes;
-    if (data.priority !== undefined) patch["priority"] = data.priority;
-    if ("completedAt" in data) patch["completed_at"] = data.completedAt ?? null;
+    const db = context.supabase;
+    const patch = {
+      ...(data.status !== undefined ? { status: data.status } : {}),
+      ...(data.progressPercent !== undefined ? { progress_percent: data.progressPercent } : {}),
+      ...(data.spentHours !== undefined ? { spent_hours: data.spentHours } : {}),
+      ...(data.notes !== undefined ? { notes: data.notes } : {}),
+      ...(data.priority !== undefined ? { priority: data.priority } : {}),
+      ...("completedAt" in data ? { completed_at: data.completedAt ?? null } : {}),
+    };
     if (Object.keys(patch).length === 0) return;
     const { error } = await db
       .from("study_items")
@@ -225,7 +219,7 @@ export const deleteStudyItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { itemId: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { error } = await db
       .from("study_items")
       .delete()
@@ -242,14 +236,14 @@ export const addStudyLog = createServerFn({ method: "POST" })
     (input: { itemId: string; hours: number; note?: string; loggedAt?: string }) => input,
   )
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
-    const insert: Record<string, unknown> = {
+    const db = context.supabase;
+    const insert = {
       item_id: data.itemId,
       user_id: context.userId,
       hours: data.hours,
+      ...(data.note ? { note: data.note } : {}),
+      ...(data.loggedAt ? { logged_at: data.loggedAt } : {}),
     };
-    if (data.note) insert["note"] = data.note;
-    if (data.loggedAt) insert["logged_at"] = data.loggedAt;
     const { error } = await db.from("study_logs").insert(insert);
     if (error) throw new Error(error.message);
   });
@@ -258,7 +252,7 @@ export const getStudyHeatmap = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<StudyLogHeatmapRow[]> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data, error } = await db
       .from("study_logs")
@@ -289,7 +283,7 @@ export const generatePlanFromGap = createServerFn({ method: "POST" })
   .inputValidator((input: GeneratePlanInput) => input)
   .handler(async ({ data, context }): Promise<StudyPlan> => {
     const { supabase, userId } = context;
-    const db = supabase as AnyDb;
+    const db = supabase;
 
     const { data: latestGap } = await supabase
       .from("gap_analyses")
@@ -325,7 +319,7 @@ export const generatePlanFromGap = createServerFn({ method: "POST" })
     if (planError) throw new Error(planError.message);
 
     if ((gapItems ?? []).length > 0) {
-      const items = (gapItems ?? []).map((g: AnyDb, i: number) => {
+      const items = (gapItems ?? []).map((g, i) => {
         const skillRow = g.skills as { canonical_name: string } | null;
         return {
           plan_id: plan.id,

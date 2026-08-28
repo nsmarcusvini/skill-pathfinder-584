@@ -4,8 +4,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ExternalLink, Plus, AlertTriangle, Award, CheckCircle2, BookOpen, Clock,
-  Pencil, Trash2,
+  ExternalLink,
+  Plus,
+  AlertTriangle,
+  Award,
+  CheckCircle2,
+  BookOpen,
+  Clock,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/rumvia/page-header";
@@ -16,19 +23,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarket } from "@/hooks/use-market";
 import { useAuth } from "@/hooks/use-auth";
 import { useGap } from "@/hooks/use-gap";
 import {
-  getCertsCatalog, getUserCerts, upsertUserCert, deleteUserCert,
+  getCertsCatalog,
+  getUserCerts,
+  upsertUserCert,
+  deleteUserCert,
   addLearningItemToStudyPlan,
-  type CertCatalogItem, type UserCert, type CertStatus, type CertDifficulty,
+  type CertCatalogItem,
+  type UserCert,
+  type CertStatus,
+  type CertDifficulty,
 } from "@/lib/learning.functions";
 import { getStudyPlans } from "@/lib/study.functions";
 
@@ -36,7 +57,10 @@ export const Route = createFileRoute("/_conta/certificacoes")({
   head: () => ({
     meta: [
       { title: "Certificações — RUMVIA" },
-      { name: "description", content: "Catálogo de certificações filtrado pela sua trilha, com impacto no seu gap." },
+      {
+        name: "description",
+        content: "Catálogo de certificações filtrado pela sua trilha, com impacto no seu gap.",
+      },
     ],
   }),
   component: CertificacoesPage,
@@ -81,11 +105,15 @@ function CertCard({
         <div className="flex flex-col gap-0.5">
           <span className="font-semibold text-sm">{cert.name}</span>
           <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
-            {cert.issuer}{cert.level ? ` · ${cert.level}` : ""}
+            {cert.issuer}
+            {cert.level ? ` · ${cert.level}` : ""}
           </span>
         </div>
         {cert.userStatus && (
-          <span className="text-xs font-semibold shrink-0" style={{ color: STATUS_COLOR[cert.userStatus] }}>
+          <span
+            className="text-xs font-semibold shrink-0"
+            style={{ color: STATUS_COLOR[cert.userStatus] }}
+          >
             {STATUS_LABEL[cert.userStatus]}
           </span>
         )}
@@ -93,7 +121,9 @@ function CertCard({
 
       <div className="flex flex-wrap gap-2 text-xs">
         {cert.difficulty && (
-          <Badge variant="outline" className="text-xs">{DIFFICULTY_LABEL[cert.difficulty]}</Badge>
+          <Badge variant="outline" className="text-xs">
+            {DIFFICULTY_LABEL[cert.difficulty]}
+          </Badge>
         )}
         {cert.costUsd !== null && (
           <Badge variant="outline" className="text-xs">
@@ -101,11 +131,14 @@ function CertCard({
           </Badge>
         )}
         {cert.validityMonths ? (
-          <Badge variant="outline" className="text-xs">{cert.validityMonths}m validade</Badge>
+          <Badge variant="outline" className="text-xs">
+            {cert.validityMonths}m validade
+          </Badge>
         ) : cert.validityMonths === 0 ? null : null}
         {cert.examDurationMin ? (
           <Badge variant="outline" className="text-xs flex items-center gap-1">
-            <Clock size={9} />{cert.examDurationMin}min
+            <Clock size={9} />
+            {cert.examDurationMin}min
           </Badge>
         ) : null}
         {lacunas > 0 && (
@@ -114,7 +147,10 @@ function CertCard({
           </Badge>
         )}
         {cert.expiringAlert && (
-          <Badge className="text-xs flex items-center gap-1" style={{ background: "var(--color-danger)", color: "#fff" }}>
+          <Badge
+            className="text-xs flex items-center gap-1"
+            style={{ background: "var(--color-danger)", color: "#fff" }}
+          >
             <AlertTriangle size={9} /> Expira em breve
           </Badge>
         )}
@@ -133,7 +169,12 @@ function CertCard({
           </a>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => onAddToPlan(cert)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs"
+            onClick={() => onAddToPlan(cert)}
+          >
             + Plano
           </Button>
           <Button size="sm" className="h-6 text-xs" onClick={() => onAddToUser(cert)}>
@@ -265,7 +306,10 @@ function CertificacoesPage() {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader eyebrow="Aprendizado" title="Certificações" />
-        <EmptyState title="Selecione uma trilha" description="Escolha sua trilha para ver o catálogo." />
+        <EmptyState
+          title="Selecione uma trilha"
+          description="Escolha sua trilha para ver o catálogo."
+        />
       </div>
     );
   }
@@ -293,12 +337,19 @@ function CertificacoesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas as dificuldades</SelectItem>
-                {(["iniciante", "intermediario", "avancado", "especialista"] as CertDifficulty[]).map((d) => (
-                  <SelectItem key={d} value={d}>{DIFFICULTY_LABEL[d]}</SelectItem>
+                {(
+                  ["iniciante", "intermediario", "avancado", "especialista"] as CertDifficulty[]
+                ).map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {DIFFICULTY_LABEL[d]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-xs ml-auto" style={{ color: "var(--color-muted-foreground, #888)" }}>
+            <span
+              className="text-xs ml-auto"
+              style={{ color: "var(--color-muted-foreground, #888)" }}
+            >
               {sorted.length} certificaç{sorted.length === 1 ? "ão" : "ões"}
             </span>
           </div>
@@ -327,7 +378,8 @@ function CertificacoesPage() {
         <TabsContent value="minhas" className="flex flex-col gap-4 mt-4">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">
-              {userCertsQuery.data?.length ?? 0} certificaç{userCertsQuery.data?.length === 1 ? "ão" : "ões"}
+              {userCertsQuery.data?.length ?? 0} certificaç
+              {userCertsQuery.data?.length === 1 ? "ão" : "ões"}
             </span>
             <Button size="sm" variant="outline" onClick={() => setShowCustom(true)}>
               <Plus size={13} className="mr-1" /> Adicionar custom
@@ -335,12 +387,18 @@ function CertificacoesPage() {
           </div>
 
           {isAnonymous && (
-            <EmptyState title="Conta permanente necessária" description="Crie uma conta para registrar suas certificações." />
+            <EmptyState
+              title="Conta permanente necessária"
+              description="Crie uma conta para registrar suas certificações."
+            />
           )}
 
           {!isAnonymous && userCertsQuery.isLoading && <LoadingState />}
           {!isAnonymous && userCertsQuery.isSuccess && (userCertsQuery.data ?? []).length === 0 && (
-            <EmptyState title="Nenhuma certificação" description="Adicione certificações do catálogo ou registre uma custom." />
+            <EmptyState
+              title="Nenhuma certificação"
+              description="Adicione certificações do catálogo ou registre uma custom."
+            />
           )}
 
           <div className="flex flex-col gap-3">
@@ -353,26 +411,45 @@ function CertificacoesPage() {
                       <span className="font-semibold text-sm">{uc.name}</span>
                     </div>
                     {uc.issuer && (
-                      <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>{uc.issuer}</span>
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-muted-foreground, #888)" }}
+                      >
+                        {uc.issuer}
+                      </span>
                     )}
                     <div className="flex flex-wrap gap-2 mt-1 text-xs">
-                      <span style={{ color: STATUS_COLOR[uc.status] }}>{STATUS_LABEL[uc.status]}</span>
+                      <span style={{ color: STATUS_COLOR[uc.status] }}>
+                        {STATUS_LABEL[uc.status]}
+                      </span>
                       {uc.obtainedAt && <span>Obtida: {uc.obtainedAt}</span>}
                       {uc.expiresAt && (
-                        <span style={{ color: uc.expiringAlert ? "var(--color-danger)" : "inherit" }}>
-                          {uc.expiringAlert && <AlertTriangle size={10} className="inline mr-0.5" />}
+                        <span
+                          style={{ color: uc.expiringAlert ? "var(--color-danger)" : "inherit" }}
+                        >
+                          {uc.expiringAlert && (
+                            <AlertTriangle size={10} className="inline mr-0.5" />
+                          )}
                           Expira: {uc.expiresAt}
                         </span>
                       )}
                       {uc.credentialUrl && (
-                        <a href={uc.credentialUrl} target="_blank" rel="noopener noreferrer"
-                           className="flex items-center gap-0.5" style={{ color: "var(--color-accent-600, #416180)" }}>
+                        <a
+                          href={uc.credentialUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-0.5"
+                          style={{ color: "var(--color-accent-600, #416180)" }}
+                        >
                           <ExternalLink size={9} /> Credencial
                         </a>
                       )}
                     </div>
                   </div>
-                  <button onClick={() => deleteMutation.mutate(uc.id)} className="opacity-40 hover:opacity-100 shrink-0">
+                  <button
+                    onClick={() => deleteMutation.mutate(uc.id)}
+                    className="opacity-40 hover:opacity-100 shrink-0"
+                  >
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -383,19 +460,30 @@ function CertificacoesPage() {
       </Tabs>
 
       {/* Edit / add to user dialog */}
-      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editTarget?.userStatus ? "Atualizar" : "Adicionar"}: {editTarget?.name}</DialogTitle>
+            <DialogTitle>
+              {editTarget?.userStatus ? "Atualizar" : "Adicionar"}: {editTarget?.name}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <div className="flex flex-col gap-1">
               <Label className="text-xs">Status</Label>
               <Select value={editStatus} onValueChange={(v) => setEditStatus(v as CertStatus)}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {(Object.keys(STATUS_LABEL) as CertStatus[]).map((s) => (
-                    <SelectItem key={s} value={s} className="text-sm">{STATUS_LABEL[s]}</SelectItem>
+                    <SelectItem key={s} value={s} className="text-sm">
+                      {STATUS_LABEL[s]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -404,11 +492,21 @@ function CertificacoesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">Data de obtenção</Label>
-                  <Input type="date" className="h-8 text-sm" value={editObtained} onChange={(e) => setEditObtained(e.target.value)} />
+                  <Input
+                    type="date"
+                    className="h-8 text-sm"
+                    value={editObtained}
+                    onChange={(e) => setEditObtained(e.target.value)}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">Expira em</Label>
-                  <Input type="date" className="h-8 text-sm" value={editExpires} onChange={(e) => setEditExpires(e.target.value)} />
+                  <Input
+                    type="date"
+                    className="h-8 text-sm"
+                    value={editExpires}
+                    onChange={(e) => setEditExpires(e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -416,18 +514,31 @@ function CertificacoesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">URL da credencial</Label>
-                  <Input className="h-8 text-sm" value={editCredUrl} onChange={(e) => setEditCredUrl(e.target.value)} placeholder="https://…" />
+                  <Input
+                    className="h-8 text-sm"
+                    value={editCredUrl}
+                    onChange={(e) => setEditCredUrl(e.target.value)}
+                    placeholder="https://…"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">ID da credencial</Label>
-                  <Input className="h-8 text-sm" value={editCredId} onChange={(e) => setEditCredId(e.target.value)} />
+                  <Input
+                    className="h-8 text-sm"
+                    value={editCredId}
+                    onChange={(e) => setEditCredId(e.target.value)}
+                  />
                 </div>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditTarget(null)}>Cancelar</Button>
-            <Button onClick={() => upsertMutation.mutate()} disabled={upsertMutation.isPending}>Salvar</Button>
+            <Button variant="ghost" onClick={() => setEditTarget(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => upsertMutation.mutate()} disabled={upsertMutation.isPending}>
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -435,15 +546,23 @@ function CertificacoesPage() {
       {/* Custom cert dialog */}
       <Dialog open={showCustom} onOpenChange={setShowCustom}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Adicionar certificação custom</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Adicionar certificação custom</DialogTitle>
+          </DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <div className="flex flex-col gap-1">
               <Label className="text-xs">Nome da certificação</Label>
-              <Input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="ex: ISO 27001 Lead Implementer" />
+              <Input
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="ex: ISO 27001 Lead Implementer"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowCustom(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setShowCustom(false)}>
+              Cancelar
+            </Button>
             <Button
               disabled={!customName.trim() || upsertMutation.isPending}
               onClick={() => {
@@ -464,9 +583,16 @@ function CertificacoesPage() {
       </Dialog>
 
       {/* Add to plan dialog */}
-      <Dialog open={!!planTarget} onOpenChange={(open) => { if (!open) setPlanTarget(null); }}>
+      <Dialog
+        open={!!planTarget}
+        onOpenChange={(open) => {
+          if (!open) setPlanTarget(null);
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>Adicionar ao plano de estudos</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Adicionar ao plano de estudos</DialogTitle>
+          </DialogHeader>
           <div className="flex flex-col gap-3 py-2">
             <p className="text-sm">{planTarget?.name}</p>
             {(plansQuery.data ?? []).length === 0 ? (
@@ -477,10 +603,14 @@ function CertificacoesPage() {
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">Plano</Label>
                 <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {(plansQuery.data ?? []).map((p) => (
-                      <SelectItem key={p.id} value={p.id} className="text-sm">{p.title}</SelectItem>
+                      <SelectItem key={p.id} value={p.id} className="text-sm">
+                        {p.title}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -488,7 +618,9 @@ function CertificacoesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setPlanTarget(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setPlanTarget(null)}>
+              Cancelar
+            </Button>
             <Button
               disabled={!selectedPlanId || addToPlanMutation.isPending}
               onClick={() => addToPlanMutation.mutate()}

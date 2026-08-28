@@ -2,6 +2,7 @@ import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Award,
+  Briefcase,
   Building2,
   FileText,
   GraduationCap,
@@ -21,9 +22,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMarket, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", to: "/dashboard", icon: <LayoutDashboard className="size-4" aria-hidden /> },
+  {
+    label: "Dashboard",
+    to: "/dashboard",
+    icon: <LayoutDashboard className="size-4" aria-hidden />,
+  },
   { label: "Meu CV", to: "/cv", icon: <FileText className="size-4" aria-hidden /> },
-  { label: "Minhas skills", to: "/minhas-skills", icon: <ListChecks className="size-4" aria-hidden /> },
+  {
+    label: "Minhas skills",
+    to: "/minhas-skills",
+    icon: <ListChecks className="size-4" aria-hidden />,
+  },
+  { label: "Vagas", to: "/vagas", icon: <Briefcase className="size-4" aria-hidden /> },
   { label: "Ferramentas", to: "/ferramentas", icon: <Wrench className="size-4" aria-hidden /> },
   { label: "Empresas", to: "/empresas", icon: <Building2 className="size-4" aria-hidden /> },
   { label: "Salários", to: "/salarios", icon: <Wallet className="size-4" aria-hidden /> },
@@ -31,19 +41,31 @@ const NAV: NavItem[] = [
   { label: "Certificações", to: "/certificacoes", icon: <Award className="size-4" aria-hidden /> },
   { label: "Cursos", to: "/cursos", icon: <GraduationCap className="size-4" aria-hidden /> },
   { label: "Conta", to: "/conta", icon: <Settings className="size-4" aria-hidden /> },
-  { label: "Admin", to: "/admin", icon: <ShieldCheck className="size-4" aria-hidden /> },
 ];
+
+/** Só entra no menu de quem tem profiles.is_admin. A proteção real é server-side
+ *  (assertAdmin em admin.functions.ts); esconder aqui evita link quebrado. */
+const ADMIN_NAV: NavItem = {
+  label: "Admin",
+  to: "/admin",
+  icon: <ShieldCheck className="size-4" aria-hidden />,
+};
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
   const { profile, user, signOut } = useAuth();
   const market = useMarket();
   const navigate = useNavigate();
 
+  const nav = React.useMemo(
+    () => (profile?.is_admin ? [...NAV, ADMIN_NAV] : NAV),
+    [profile?.is_admin],
+  );
+
   const trackOptions = market.tracks.map((t) => ({ value: t.id, label: t.name }));
 
   return (
     <AppShell
-      nav={NAV}
+      nav={nav}
       trackOptions={trackOptions}
       track={market.trackId ?? undefined}
       onTrackChange={(value) => void market.setTrackId(value)}

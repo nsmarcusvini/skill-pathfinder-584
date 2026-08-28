@@ -4,9 +4,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getAdapter } from "./adapters";
 import {
   deactivateStaleJobs,
+  dedupeJobPostings,
   finishRun,
   ingestJobs,
   startRun,
+  type DedupeResult,
   type IngestCounters,
 } from "./pipeline.server";
 import type { AdapterConfig } from "./types";
@@ -25,8 +27,11 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
   sources: SourceResult[];
   extraction?: Array<{ processed: number; skills_written: number; remaining: number }>;
   deactivated: number;
+  dedupe: DedupeResult;
 }> {
-  let query = supabaseAdmin.from("job_sources").select("id, key, adapter, config, is_active, source_type");
+  let query = supabaseAdmin
+    .from("job_sources")
+    .select("id, key, adapter, config, is_active, source_type");
   if (sourceKeys && sourceKeys.length > 0) query = query.in("key", sourceKeys);
   else query = query.eq("is_active", true);
 
@@ -38,7 +43,15 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
   // Sequencial por fonte; a concorrência (máx. 5) vive no cliente HTTP.
   for (const source of sources ?? []) {
     if (source.source_type === "push") {
-      results.push({ source_key: source.key, status: "skipped", received: 0, created: 0, updated: 0, rejected: 0, error: "fonte push: recebe por webhook" });
+      results.push({
+        source_key: source.key,
+        status: "skipped",
+        received: 0,
+        created: 0,
+        updated: 0,
+        rejected: 0,
+        error: "fonte push: recebe por webhook",
+      });
       continue;
     }
     const adapter = getAdapter(source.adapter);
@@ -68,12 +81,31 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
     } catch (err) {
       // Falha em uma fonte não derruba as outras.
       const message = err instanceof Error ? err.message : String(err);
-      await finishRun(runId, source.id, { received: 0, created: 0, updated: 0, rejected: 0, errors: [] }, "error", message.slice(0, 1000));
-      results.push({ source_key: source.key, status: "error", received: 0, created: 0, updated: 0, rejected: 0, error: message });
+      await finishRun(
+        runId,
+        source.id,
+        { received: 0, created: 0, updated: 0, rejected: 0, errors: [] },
+        "error",
+        message.slice(0, 1000),
+      );
+      results.push({
+        source_key: source.key,
+        status: "error",
+        received: 0,
+        created: 0,
+        updated: 0,
+        rejected: 0,
+        error: message,
+      });
     }
   }
 
   const deactivated = await deactivateStaleJobs();
+
+  // Depois de desativar, nunca antes: a eleição só olha vagas ativas, e assim
+  // uma vaga cujo canônico acabou de expirar é liberada no mesmo ciclo em vez
+  // de ficar invisível até a próxima execução.
+  const dedupe = await dedupeJobPostings();
 
   // Extração de skills em lote logo após a ingestão (idempotente, sem LLM).
   const { extractJdSkills } = await import("@/lib/jd/extract.server");
@@ -84,5 +116,5 @@ export async function runIngest(sourceKeys?: string[]): Promise<{
     if (result.processed === 0 || result.remaining === 0) break;
   }
 
-  return { sources: results, deactivated, extraction };
+  return { sources: results, deactivated, dedupe, extraction };
 }

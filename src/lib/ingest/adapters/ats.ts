@@ -27,7 +27,10 @@ export const greenhouseAdapter: JobAdapter = {
         `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(token)}/jobs?content=true`,
       );
       return (data.jobs ?? []).map((job): NormalizedJob => {
-        const html = typeof job.content === "string" ? job.content.replace(/&lt;/g, "<").replace(/&gt;/g, ">") : null;
+        const html =
+          typeof job.content === "string"
+            ? job.content.replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+            : null;
         const text = stripHtml(html);
         const location = job.location?.name ?? null;
         return {
@@ -143,7 +146,8 @@ export const workableAdapter: JobAdapter = {
       return (data.jobs ?? []).map((job): NormalizedJob => {
         const html = job.description ?? null;
         const text = stripHtml(`${html ?? ""}\n${job.requirements ?? ""}`);
-        const location = [job.city, job.state, job.country].filter(Boolean).join(", ") || job.location || null;
+        const location =
+          [job.city, job.state, job.country].filter(Boolean).join(", ") || job.location || null;
         return {
           external_id: String(job.shortcode ?? job.id),
           source_key: "workable",
@@ -189,7 +193,9 @@ export const smartrecruitersAdapter: JobAdapter = {
           is_remote: detectRemote(location, null, job.location?.remote),
           country,
           description_html: null,
-          description_text: job.jobAd?.sections?.jobDescription?.text ? stripHtml(job.jobAd.sections.jobDescription.text) : null,
+          description_text: job.jobAd?.sections?.jobDescription?.text
+            ? stripHtml(job.jobAd.sections.jobDescription.text)
+            : null,
           salary_min: null,
           salary_max: null,
           salary_currency: null,

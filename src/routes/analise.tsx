@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Circle,
   Loader2,
+  Plus,
   Save,
   Wallet,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { CvDropzone } from "@/components/app/cv-dropzone";
+import { AdicionarSkill } from "@/components/app/adicionar-skill";
 import { PublicHeader } from "@/components/app/public-header";
 import { AuthDialog } from "@/components/auth/auth-dialog";
 import { RequireAccount } from "@/components/auth/require-account";
@@ -80,7 +82,14 @@ const STAGE_STEPS: { key: Stage; label: string }[] = [
   { key: "comparando", label: "Comparando com as vagas" },
 ];
 
-const STAGE_ORDER: Stage[] = ["aguardando", "enviando", "lendo", "identificando", "comparando", "pronto"];
+const STAGE_ORDER: Stage[] = [
+  "aguardando",
+  "enviando",
+  "lendo",
+  "identificando",
+  "comparando",
+  "pronto",
+];
 
 function AnalisePage() {
   const navigate = useNavigate();
@@ -219,7 +228,9 @@ function AnalisePage() {
   }
 
   const trackName = tracks.find((t) => t.id === trackId)?.name ?? "sua trilha";
-  const faltantes = (gap?.items ?? []).filter((i) => i.status === "faltante" || i.status === "parcial");
+  const faltantes = (gap?.items ?? []).filter(
+    (i) => i.status === "faltante" || i.status === "parcial",
+  );
   const top3 = faltantes.slice(0, 3);
   const restantes = Math.max(0, faltantes.length - top3.length);
   const radarData = (gap?.categoryScores ?? []).map((c) => ({ categoria: c.name, score: c.score }));
@@ -343,9 +354,7 @@ function AnalisePage() {
                 <select
                   className="field"
                   value={segment}
-                  onChange={(e) =>
-                    void trocarRecorte({ segment: e.target.value as MarketSegment })
-                  }
+                  onChange={(e) => void trocarRecorte({ segment: e.target.value as MarketSegment })}
                 >
                   {(["br", "remoto_global"] as MarketSegment[]).map((s) => (
                     <option key={s} value={s}>
@@ -367,8 +376,8 @@ function AnalisePage() {
                     <GapRing value={gap.score} size={180} thickness={12} label="Aderência" />
                     <p className="mt-3 max-w-xs text-center text-caption text-neutral-700">
                       Comparado a {gap.postingsSample} vagas de {trackName}{" "}
-                      {SENIORITY_LABEL[seniority]} em {SEGMENT_LABEL[gap.marketSegment as MarketSegment]}{" "}
-                      nos últimos 90 dias.
+                      {SENIORITY_LABEL[seniority]} em{" "}
+                      {SEGMENT_LABEL[gap.marketSegment as MarketSegment]} nos últimos 90 dias.
                     </p>
                   </Blueprint>
 
@@ -386,7 +395,9 @@ function AnalisePage() {
                     <MetricCard
                       label="Vagas analisadas"
                       value={gap.postingsSample}
-                      hint={gap.lowConfidence ? "Amostra pequena: precisão menor" : "Últimos 90 dias"}
+                      hint={
+                        gap.lowConfidence ? "Amostra pequena: precisão menor" : "Últimos 90 dias"
+                      }
                       icon={<BarChart3 className="size-4" aria-hidden />}
                     />
                     <MetricCard
@@ -396,6 +407,27 @@ function AnalisePage() {
                     />
                   </div>
                 </div>
+
+                <Blueprint className="flex flex-wrap items-center gap-3 p-4">
+                  <Plus className="size-4 shrink-0 text-accent-700" aria-hidden />
+                  <div className="flex-1">
+                    <p className="text-body text-neutral-900">
+                      Reconhecemos <strong>{recognized}</strong> skill(s) no seu currículo. Faltou
+                      alguma que você domina?
+                    </p>
+                    <p className="mt-0.5 text-caption text-neutral-600">
+                      A leitura é por dicionário, não por IA — ela não inventa, mas também não
+                      adivinha. O que você adicionar entra no cálculo na hora.
+                    </p>
+                  </div>
+                  <AdicionarSkill
+                    label="Adicionar skill"
+                    onAdicionada={() => {
+                      // Recalcula a prévia sem sair da página.
+                      void queryClient.invalidateQueries({ queryKey: ["analise-gap"] });
+                    }}
+                  />
+                </Blueprint>
 
                 <Blueprint className="p-5">
                   <h2 className="label-h6 text-neutral-900">Suas 3 maiores lacunas</h2>
@@ -447,9 +479,7 @@ function AnalisePage() {
                     description="O restante da lista, com peso de cada skill na trilha."
                   >
                     <Blueprint className="p-5">
-                      <h3 className="label-h6 text-neutral-900">
-                        As outras {restantes} lacunas
-                      </h3>
+                      <h3 className="label-h6 text-neutral-900">As outras {restantes} lacunas</h3>
                       <ul className="mt-2 flex flex-col gap-1">
                         {faltantes.slice(3, 9).map((i) => (
                           <li key={i.skillId} className="text-caption text-neutral-700">

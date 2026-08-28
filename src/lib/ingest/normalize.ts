@@ -29,17 +29,32 @@ export function normalizeTitle(title: string): string {
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/[|/–—-]+/g, " ")
-    .replace(/\b(m\/f\/d|remoto|remote|hibrido|hybrid|presencial|onsite|clt|pj|efetivo|vaga)\b/g, " ")
+    .replace(
+      /\b(m\/f\/d|remoto|remote|hibrido|hybrid|presencial|onsite|clt|pj|efetivo|vaga)\b/g,
+      " ",
+    )
     .replace(/[^a-z0-9+#.\s]/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
-/** Regex bilíngue de senioridade. Ordem importa: staff/lead antes de sênior. */
+/**
+ * Regex bilíngue de senioridade. Ordem importa: staff/lead antes de sênior.
+ *
+ * Os valores TÊM de ser junior | pleno | senior | staff — é o CHECK de
+ * job_postings.seniority, profiles.seniority e track_skill_baselines.seniority.
+ * Emitir qualquer outra coisa faz o INSERT da vaga ser rejeitado inteiro.
+ */
 const SENIORITY_RULES: Array<{ seniority: string; re: RegExp }> = [
-  { seniority: "especialista", re: /\b(staff|principal|lead|tech lead|head|especialista|specialist|architect|arquiteto)\b/ },
+  {
+    seniority: "staff",
+    re: /\b(staff|principal|lead|tech lead|head|especialista|specialist|architect|arquiteto)\b/,
+  },
   { seniority: "senior", re: /\b(sr\.?|senior|senior|sênior|iii|3)\b/ },
-  { seniority: "junior", re: /\b(jr\.?|junior|júnior|entry[- ]?level|trainee|estagio|estágio|intern|internship|i)\b/ },
+  {
+    seniority: "junior",
+    re: /\b(jr\.?|junior|júnior|entry[- ]?level|trainee|estagio|estágio|intern|internship|i)\b/,
+  },
   { seniority: "pleno", re: /\b(pleno|mid[- ]?level|mid|middle|ii|2)\b/ },
 ];
 
@@ -51,8 +66,41 @@ export function inferSeniority(title: string, hint?: string | null): string | nu
   return null;
 }
 
-const PT_STOPWORDS = ["você", "voce", "nós", "para", "com", "experiência", "experiencia", "conhecimento", "vaga", "empresa", "atuação", "atuacao", "desejável", "desejavel", "não", "nao", "que", "dos", "das"];
-const EN_STOPWORDS = ["you", "we", "the", "with", "experience", "knowledge", "role", "team", "will", "our", "and", "about"];
+const PT_STOPWORDS = [
+  "você",
+  "voce",
+  "nós",
+  "para",
+  "com",
+  "experiência",
+  "experiencia",
+  "conhecimento",
+  "vaga",
+  "empresa",
+  "atuação",
+  "atuacao",
+  "desejável",
+  "desejavel",
+  "não",
+  "nao",
+  "que",
+  "dos",
+  "das",
+];
+const EN_STOPWORDS = [
+  "you",
+  "we",
+  "the",
+  "with",
+  "experience",
+  "knowledge",
+  "role",
+  "team",
+  "will",
+  "our",
+  "and",
+  "about",
+];
 
 export function detectLang(text: string | null): "pt" | "en" | null {
   if (!text) return null;
@@ -66,10 +114,37 @@ export function detectLang(text: string | null): "pt" | "en" | null {
 }
 
 const BR_CITIES = [
-  "brasil", "brazil", "são paulo", "sao paulo", "rio de janeiro", "belo horizonte", "curitiba",
-  "porto alegre", "florianópolis", "florianopolis", "recife", "fortaleza", "salvador", "brasília",
-  "brasilia", "campinas", "goiânia", "goiania", "manaus", "belém", "belem", "vitória", "vitoria",
-  "joinville", "santos", "sorocaba", "ribeirão preto", "ribeirao preto", "natal", "maceió", "maceio",
+  "brasil",
+  "brazil",
+  "são paulo",
+  "sao paulo",
+  "rio de janeiro",
+  "belo horizonte",
+  "curitiba",
+  "porto alegre",
+  "florianópolis",
+  "florianopolis",
+  "recife",
+  "fortaleza",
+  "salvador",
+  "brasília",
+  "brasilia",
+  "campinas",
+  "goiânia",
+  "goiania",
+  "manaus",
+  "belém",
+  "belem",
+  "vitória",
+  "vitoria",
+  "joinville",
+  "santos",
+  "sorocaba",
+  "ribeirão preto",
+  "ribeirao preto",
+  "natal",
+  "maceió",
+  "maceio",
 ];
 
 export function normalizeCountry(location: string | null, explicit?: string | null): string | null {
@@ -89,7 +164,10 @@ export function normalizeCountry(location: string | null, explicit?: string | nu
   return null;
 }
 
-export function normalizeCurrency(currency: string | null | undefined, country: string | null): string | null {
+export function normalizeCurrency(
+  currency: string | null | undefined,
+  country: string | null,
+): string | null {
   if (currency) {
     const c = currency.trim().toUpperCase();
     if (c === "R$" || c === "BRL") return "BRL";
@@ -152,13 +230,25 @@ export function classifyMarketSegment(input: {
 
   // 1. País BR ou local brasileiro
   if (input.country === "BR" || BR_CITIES.some((c) => location.includes(c))) {
-    return { market_segment: "br", remote_restriction: input.is_remote ? "brazil_only" : null, rule: "1_pais_ou_local_br" };
+    return {
+      market_segment: "br",
+      remote_restriction: input.is_remote ? "brazil_only" : null,
+      rule: "1_pais_ou_local_br",
+    };
   }
 
   // 2. Remoto com restrição a Brasil/LatAm
   if (input.is_remote) {
-    if (/brazil only|brazil-only|apenas brasil|somente brasil|residir no brasil|based in brazil/.test(text)) {
-      return { market_segment: "br", remote_restriction: "brazil_only", rule: "2_remoto_restrito_brasil" };
+    if (
+      /brazil only|brazil-only|apenas brasil|somente brasil|residir no brasil|based in brazil/.test(
+        text,
+      )
+    ) {
+      return {
+        market_segment: "br",
+        remote_restriction: "brazil_only",
+        rule: "2_remoto_restrito_brasil",
+      };
     }
     if (/latam|latin america|américa latina|america latina/.test(text)) {
       return { market_segment: "br", remote_restriction: "latam", rule: "2_remoto_restrito_latam" };
@@ -171,14 +261,22 @@ export function classifyMarketSegment(input: {
   return { market_segment: "outro", remote_restriction: null, rule: "4_presencial_fora_br" };
 }
 
-export function detectRemote(location: string | null, text: string | null, flag?: boolean | null): boolean {
+export function detectRemote(
+  location: string | null,
+  text: string | null,
+  flag?: boolean | null,
+): boolean {
   if (flag === true) return true;
   const haystack = `${location ?? ""} ${text?.slice(0, 2000) ?? ""}`.toLowerCase();
   return /\bremote\b|\bremoto\b|home ?office|anywhere|worldwide|100% remoto/.test(haystack);
 }
 
 export function dedupeHash(companyName: string, title: string, location: string | null): string {
-  const base = `${deaccent(companyName).toLowerCase().trim()}|${normalizeTitle(title)}|${deaccent(location ?? "").toLowerCase().trim()}`;
+  const base = `${deaccent(companyName).toLowerCase().trim()}|${normalizeTitle(title)}|${deaccent(
+    location ?? "",
+  )
+    .toLowerCase()
+    .trim()}`;
   let h1 = 0x811c9dc5;
   for (let i = 0; i < base.length; i += 1) {
     h1 ^= base.charCodeAt(i);

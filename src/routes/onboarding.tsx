@@ -8,6 +8,7 @@ import { Blueprint } from "@/components/rumvia/blueprint";
 import { PageHeader } from "@/components/rumvia/page-header";
 import { LoadingState } from "@/components/rumvia/states";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { AdicionarSkill } from "@/components/app/adicionar-skill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +23,8 @@ export const Route = createFileRoute("/onboarding")({
       { title: "Onboarding — RUMVIA" },
       {
         name: "description",
-        content: "Confirme sua trilha, senioridade e segmento de mercado para calibrar sua análise.",
+        content:
+          "Confirme sua trilha, senioridade e segmento de mercado para calibrar sua análise.",
       },
       { property: "og:title", content: "Onboarding — RUMVIA" },
       { property: "og:description", content: "Configure sua trilha de carreira no RUMVIA." },
@@ -138,23 +140,28 @@ function OnboardingPage() {
     <section className="flex flex-col gap-4">
       <div>
         <h2 className="label-h6 text-neutral-700">Trilha de carreira</h2>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {/* .card do design system não tem padding — sem p-4 o texto encosta na borda. */}
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {market.tracks.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTrackId(t.id)}
               className={cn(
-                "card cursor-pointer text-left",
+                "card flex min-h-28 cursor-pointer flex-col p-4 text-left transition-colors hover:border-accent-600",
                 trackId === t.id && "border-accent-700 bg-accent-100",
               )}
             >
-              <span className="label-h6 flex items-center gap-1 text-neutral-900">
-                {t.name}
-                {trackId === t.id ? <Check className="size-3 text-accent-700" aria-hidden /> : null}
+              <span className="label-h6 flex items-start justify-between gap-2 text-neutral-900">
+                <span>{t.name}</span>
+                {trackId === t.id ? (
+                  <Check className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
+                ) : null}
               </span>
               {t.description ? (
-                <span className="mt-1 block text-caption text-neutral-700">{t.description}</span>
+                <span className="mt-2 block text-caption leading-relaxed text-neutral-700">
+                  {t.description}
+                </span>
               ) : null}
             </button>
           ))}
@@ -251,8 +258,7 @@ function OnboardingPage() {
               hint: "Você escolhe Brasil como primário e alterna quando quiser",
             },
           ].map((opt) => {
-            const selected =
-              opt.value === "ambos" ? false : segment === opt.value;
+            const selected = opt.value === "ambos" ? false : segment === opt.value;
             return (
               <button
                 key={opt.value}
@@ -263,12 +269,19 @@ function OnboardingPage() {
                   setCurrency(SEGMENT_CURRENCY[next]);
                 }}
                 className={cn(
-                  "card cursor-pointer text-left",
+                  "card flex min-h-28 cursor-pointer flex-col p-4 text-left transition-colors hover:border-accent-600",
                   selected && "border-accent-700 bg-accent-100",
                 )}
               >
-                <span className="label-h6 text-neutral-900">{opt.label}</span>
-                <span className="mt-1 block text-caption text-neutral-700">{opt.hint}</span>
+                <span className="label-h6 flex items-start justify-between gap-2 text-neutral-900">
+                  <span>{opt.label}</span>
+                  {selected ? (
+                    <Check className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
+                  ) : null}
+                </span>
+                <span className="mt-2 block text-caption leading-relaxed text-neutral-700">
+                  {opt.hint}
+                </span>
               </button>
             );
           })}
@@ -294,13 +307,15 @@ function OnboardingPage() {
   const stepCv = (
     <section className="flex flex-col gap-3">
       <p className="text-caption text-neutral-700">
-        Envie seu currículo para extrairmos suas skills automaticamente. Você também pode pular e
-        preencher suas skills manualmente depois.
+        Envie seu currículo para extrairmos suas skills automaticamente. A leitura é por dicionário,
+        sem IA — ela não inventa, mas também não adivinha. Você pode acrescentar à mão o que faltar,
+        agora ou depois.
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => void navigate({ to: "/cv" })}>
           Enviar CV
         </Button>
+        <AdicionarSkill label="Adicionar skill à mão" align="start" />
         <Button variant="ghost" onClick={finalizar} loading={saving}>
           Pular por enquanto
         </Button>
@@ -320,6 +335,21 @@ function OnboardingPage() {
           {stepTrilha}
           {stepSenioridade}
           {stepSegmento}
+
+          {/* O parser lê por dicionário: reconhece o que conhece, e cala sobre o
+              resto. Este é o momento em que a pessoa está olhando os próprios
+              dados e percebe o que ficou de fora. */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-divider pt-4">
+            <div className="flex-1">
+              <h2 className="label-h6 text-neutral-700">Faltou alguma skill?</h2>
+              <p className="mt-1 text-caption text-neutral-600">
+                Acrescente o que o currículo não deixou explícito. Entra no cálculo da aderência
+                imediatamente.
+              </p>
+            </div>
+            <AdicionarSkill label="Adicionar skill" />
+          </div>
+
           <div className="flex justify-end border-t border-divider pt-4">
             <Button onClick={finalizar} loading={saving}>
               Confirmar e ir para o dashboard

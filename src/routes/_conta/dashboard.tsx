@@ -9,9 +9,17 @@ import {
   RadarChart,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, Briefcase, Building2, CircleCheck, CircleSlash, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  Briefcase,
+  Building2,
+  CircleCheck,
+  CircleSlash,
+  Wallet,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/rumvia/page-header";
+import { AdicionarSkill } from "@/components/app/adicionar-skill";
 import { Blueprint } from "@/components/rumvia/blueprint";
 import { ChartCard } from "@/components/rumvia/chart-card";
 import { GapRing } from "@/components/rumvia/gap-ring";
@@ -46,7 +54,8 @@ export const Route = createFileRoute("/_conta/dashboard")({
       { title: "Dashboard — RUMVIA" },
       {
         name: "description",
-        content: "Sua aderência à trilha escolhida, lacunas prioritárias e demanda real do mercado.",
+        content:
+          "Sua aderência à trilha escolhida, lacunas prioritárias e demanda real do mercado.",
       },
       { property: "og:title", content: "Dashboard — RUMVIA" },
       { property: "og:description", content: "Panorama da sua aderência ao mercado." },
@@ -66,15 +75,8 @@ function formatCurrency(value: number, currency: string) {
 }
 
 function DashboardPage() {
-  const {
-    track,
-    segment,
-    setSegment,
-    seniority,
-    setSeniority,
-    periodDays,
-    setPeriodDays,
-  } = useMarket();
+  const { track, segment, setSegment, seniority, setSeniority, periodDays, setPeriodDays } =
+    useMarket();
   const gap = useGap();
   const data = gap.data;
 
@@ -104,9 +106,14 @@ function DashboardPage() {
         title="Dashboard"
         subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]} · ${SENIORITY_LABEL[seniority]}`}
         actions={
-          <Button asChild variant="outline">
-            <Link to="/minhas-skills">Ajustar minhas skills</Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* O parser não pega tudo, e é olhando o painel que a pessoa percebe
+                o que ficou faltando. Adicionar aqui recalcula a aderência na hora. */}
+            <AdicionarSkill label="Adicionar skill" />
+            <Button asChild variant="outline">
+              <Link to="/minhas-skills">Ajustar minhas skills</Link>
+            </Button>
+          </div>
         }
       />
 

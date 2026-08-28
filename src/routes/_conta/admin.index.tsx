@@ -8,6 +8,16 @@ export const Route = createFileRoute("/_conta/admin/")({
 
 const CARDS = [
   {
+    to: "/admin/usuarios",
+    title: "Usuários",
+    text: "Quem usa o RUMVIA, o que cada um já gerou, e quem pode administrar. Conceda ou remova admin e desative contas.",
+  },
+  {
+    to: "/admin/salarios",
+    title: "Salários",
+    text: "Contribuições de usuários aguardando aprovação. Corrija valores, aprove ou rejeite — só o aprovado entra na mediana.",
+  },
+  {
     to: "/admin/fontes",
     title: "Fontes de vagas",
     text: "Status da última execução, contagem de vagas e botão para rodar a ingestão agora.",
@@ -42,10 +52,18 @@ const CARDS = [
 function AdminHome() {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader eyebrow="Interno" title="Admin" subtitle="Ingestão de vagas, importação manual e descoberta de ATS." />
+      <PageHeader
+        eyebrow="Interno"
+        title="Admin"
+        subtitle="Usuários, ingestão de vagas, curadoria de skills e saúde do sistema."
+      />
       <div className="grid gap-px bg-divider md:grid-cols-3">
         {CARDS.map((card) => (
-          <Link key={card.to} to={card.to} className="flex flex-col gap-2 bg-bg p-4 hover:bg-surface">
+          <Link
+            key={card.to}
+            to={card.to}
+            className="flex flex-col gap-2 bg-bg p-4 hover:bg-surface"
+          >
             <span className="font-display text-base uppercase tracking-wide">{card.title}</span>
             <span className="text-sm text-text-muted">{card.text}</span>
           </Link>

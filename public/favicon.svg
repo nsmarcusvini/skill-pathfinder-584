@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- RUMVIA — marca "R" no Design System: cantos retos, accent-900 sobre bg.
+       Geometria espelhada em public/favicon.ico e apple-touch-icon.png. -->
+  <rect width="32" height="32" fill="#1d2d3d"/>
+  <!-- marcas de registro nos cantos, como o .blueprint -->
+  <path d="M2 2h4M2 2v4M30 2h-4M30 2v4M2 30h4M2 30v-4M30 30h-4M30 30v-4"
+        stroke="#416180" stroke-width="1.5" fill="none"/>
+  <!-- haste -->
+  <rect x="8" y="6" width="4" height="20" fill="#f2f2f3"/>
+  <!-- bojo: barra superior, lateral direita e barra do meio deixam o vazado
+       em x[12,19] y[10,13] — largo o bastante para sobreviver a 16px -->
+  <rect x="12" y="6" width="11" height="4" fill="#f2f2f3"/>
+  <rect x="19" y="10" width="4" height="3" fill="#f2f2f3"/>
+  <rect x="12" y="13" width="11" height="4" fill="#f2f2f3"/>
+  <!-- perna -->
+  <path d="M15 17h4l5 9h-4z" fill="#f2f2f3"/>
+</svg>

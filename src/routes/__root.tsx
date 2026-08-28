@@ -24,10 +24,7 @@ function NotFoundComponent() {
         <p className="text-sm" style={{ color: "var(--color-muted-foreground, #888)" }}>
           Essa página não existe ou foi movida.
         </p>
-        <Link
-          to="/"
-          className="mx-auto border px-4 py-2 text-sm hover:bg-surface"
-        >
+        <Link to="/" className="mx-auto border px-4 py-2 text-sm hover:bg-surface">
           Voltar ao início
         </Link>
       </div>
@@ -51,7 +48,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="border px-4 py-2 text-sm hover:bg-surface"
           >
             Tentar novamente
@@ -96,7 +96,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      // SVG primeiro: navegadores modernos preferem, o .ico fica de fallback.
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.ico", type: "image/x-icon", sizes: "any" },
+      // iOS ignora SVG em apple-touch-icon: precisa ser PNG, senão a tela de
+      // início usa um screenshot da página no lugar do ícone.
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
   }),
   shellComponent: RootShell,

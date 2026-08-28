@@ -86,7 +86,6 @@ function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-
       {/* ═══ HEADER ═══ */}
       <header className="sticky top-0 z-30 flex h-12 items-center border-b border-divider bg-bg">
         <div className="rumvia-container flex w-full items-center">
@@ -108,7 +107,6 @@ function LandingPage() {
       <section className="bg-accent-900 py-20">
         <div className="rumvia-container">
           <div className="grid items-center gap-14 lg:grid-cols-[1fr_440px]">
-
             {/* Copy */}
             <div>
               <p className="label-h6 mb-4 text-accent-400">// Análise de aderência gratuita</p>
@@ -122,9 +120,12 @@ function LandingPage() {
                 </em>{" "}
                 pede?
               </h1>
-              <p className="mt-5 text-body" style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}>
-                Comparamos sua experiência com centenas de vagas reais — Brasil e remoto global —
-                e mostramos em porcentagem o que você domina e{" "}
+              <p
+                className="mt-5 text-body"
+                style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}
+              >
+                Comparamos sua experiência com centenas de vagas reais — Brasil e remoto global — e
+                mostramos em porcentagem o que você domina e{" "}
                 <strong className="text-bg">o que está te custando oportunidades</strong>.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -164,7 +165,6 @@ function LandingPage() {
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </section>
@@ -212,7 +212,10 @@ function LandingPage() {
         <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Processo</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Três passos. Resultado imediato.</h2>
-          <p className="mt-3 text-body text-neutral-600" style={{ maxWidth: 560, lineHeight: 1.65 }}>
+          <p
+            className="mt-3 text-body text-neutral-600"
+            style={{ maxWidth: 560, lineHeight: 1.65 }}
+          >
             Sem formulário extenso. Sem espera. Você envia o CV e já vê onde está em relação ao
             mercado.
           </p>
@@ -244,7 +247,6 @@ function LandingPage() {
             Tudo para saber onde está e como chegar onde quer
           </h2>
           <div className="mt-10 grid gap-px bg-divider sm:grid-cols-2">
-
             {/* Score de gap */}
             <div className="flex flex-col gap-3 bg-bg p-8">
               <span className="label-h6 text-neutral-500">Aderência ao mercado</span>
@@ -261,11 +263,15 @@ function LandingPage() {
                   74%
                 </span>
                 <div className="flex flex-1 flex-col gap-1">
-                  <span className="text-caption text-neutral-600">DevOps / SRE · Pleno · Brasil</span>
+                  <span className="text-caption text-neutral-600">
+                    DevOps / SRE · Pleno · Brasil
+                  </span>
                   <div className="h-1.5 w-full bg-neutral-200">
                     <div className="h-1.5 bg-accent-500" style={{ width: "74%" }} />
                   </div>
-                  <span className="font-mono text-caption text-neutral-500">Aderência crescendo</span>
+                  <span className="font-mono text-caption text-neutral-500">
+                    Aderência crescendo
+                  </span>
                 </div>
               </div>
             </div>
@@ -390,7 +396,6 @@ function LandingPage() {
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -490,9 +495,12 @@ function LandingPage() {
           >
             Você está competindo no escuro?
           </h2>
-          <p className="mt-4 text-body" style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}>
-            Centenas de devs já sabem exatamente o que precisam estudar para chegar na próxima
-            vaga. Você ainda não sabe o que está te faltando.
+          <p
+            className="mt-4 text-body"
+            style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}
+          >
+            Centenas de devs já sabem exatamente o que precisam estudar para chegar na próxima vaga.
+            Você ainda não sabe o que está te faltando.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -602,7 +610,6 @@ function LandingPage() {
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

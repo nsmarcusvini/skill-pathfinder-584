@@ -74,6 +74,54 @@ export type Database = {
         }
         Relationships: []
       }
+      certifications_catalog: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          difficulty: string | null
+          exam_duration_min: number | null
+          id: string
+          is_active: boolean
+          issuer: string
+          level: string | null
+          name: string
+          official_url: string | null
+          skill_ids: string[]
+          track_ids: string[]
+          validity_months: number | null
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          difficulty?: string | null
+          exam_duration_min?: number | null
+          id?: string
+          is_active?: boolean
+          issuer: string
+          level?: string | null
+          name: string
+          official_url?: string | null
+          skill_ids?: string[]
+          track_ids?: string[]
+          validity_months?: number | null
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          difficulty?: string | null
+          exam_duration_min?: number | null
+          id?: string
+          is_active?: boolean
+          issuer?: string
+          level?: string | null
+          name?: string
+          official_url?: string | null
+          skill_ids?: string[]
+          track_ids?: string[]
+          validity_months?: number | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
@@ -113,6 +161,57 @@ export type Database = {
           size_range?: string | null
           slug?: string
           website?: string | null
+        }
+        Relationships: []
+      }
+      courses_catalog: {
+        Row: {
+          created_at: string
+          duration_hours: number | null
+          format: string | null
+          id: string
+          is_active: boolean
+          language: string
+          level: string | null
+          price_type: string | null
+          provider: string
+          rating: number | null
+          skill_ids: string[]
+          title: string
+          track_ids: string[]
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_hours?: number | null
+          format?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string
+          level?: string | null
+          price_type?: string | null
+          provider: string
+          rating?: number | null
+          skill_ids?: string[]
+          title: string
+          track_ids?: string[]
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_hours?: number | null
+          format?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string
+          level?: string | null
+          price_type?: string | null
+          provider?: string
+          rating?: number | null
+          skill_ids?: string[]
+          title?: string
+          track_ids?: string[]
+          url?: string | null
         }
         Relationships: []
       }
@@ -475,6 +574,13 @@ export type Database = {
             referencedRelation: "job_postings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "job_posting_raw_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings_canonical"
+            referencedColumns: ["id"]
+          },
         ]
       }
       job_posting_skills: {
@@ -520,6 +626,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "job_posting_skills_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings_canonical"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "job_posting_skills_skill_id_fkey"
             columns: ["skill_id"]
             isOneToOne: false
@@ -531,6 +644,8 @@ export type Database = {
       job_postings: {
         Row: {
           apply_url: string | null
+          benefits_text: string | null
+          canonical_job_id: string | null
           city: string | null
           company_id: string | null
           company_name_raw: string | null
@@ -546,10 +661,14 @@ export type Database = {
           ingested_at: string
           is_active: boolean
           is_remote: boolean
+          last_seen_at: string | null
+          lifecycle_status: string
           location_raw: string | null
           market_segment: string
           posted_at: string | null
+          qualifications_text: string | null
           remote_restriction: string | null
+          requirements_text: string | null
           role_variant_id: string | null
           salary_currency: string | null
           salary_is_estimated: boolean
@@ -559,13 +678,19 @@ export type Database = {
           seniority: string | null
           skills_extracted_at: string | null
           source_id: string
+          source_job_id: string | null
+          source_updated_at: string | null
+          source_url: string | null
           state: string | null
           title: string
           title_normalized: string | null
           track_id: string | null
+          work_modality: string | null
         }
         Insert: {
           apply_url?: string | null
+          benefits_text?: string | null
+          canonical_job_id?: string | null
           city?: string | null
           company_id?: string | null
           company_name_raw?: string | null
@@ -581,10 +706,14 @@ export type Database = {
           ingested_at?: string
           is_active?: boolean
           is_remote?: boolean
+          last_seen_at?: string | null
+          lifecycle_status?: string
           location_raw?: string | null
           market_segment: string
           posted_at?: string | null
+          qualifications_text?: string | null
           remote_restriction?: string | null
+          requirements_text?: string | null
           role_variant_id?: string | null
           salary_currency?: string | null
           salary_is_estimated?: boolean
@@ -594,13 +723,19 @@ export type Database = {
           seniority?: string | null
           skills_extracted_at?: string | null
           source_id: string
+          source_job_id?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
           state?: string | null
           title: string
           title_normalized?: string | null
           track_id?: string | null
+          work_modality?: string | null
         }
         Update: {
           apply_url?: string | null
+          benefits_text?: string | null
+          canonical_job_id?: string | null
           city?: string | null
           company_id?: string | null
           company_name_raw?: string | null
@@ -616,10 +751,14 @@ export type Database = {
           ingested_at?: string
           is_active?: boolean
           is_remote?: boolean
+          last_seen_at?: string | null
+          lifecycle_status?: string
           location_raw?: string | null
           market_segment?: string
           posted_at?: string | null
+          qualifications_text?: string | null
           remote_restriction?: string | null
+          requirements_text?: string | null
           role_variant_id?: string | null
           salary_currency?: string | null
           salary_is_estimated?: boolean
@@ -629,12 +768,30 @@ export type Database = {
           seniority?: string | null
           skills_extracted_at?: string | null
           source_id?: string
+          source_job_id?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
           state?: string | null
           title?: string
           title_normalized?: string | null
           track_id?: string | null
+          work_modality?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "job_postings_canonical_job_id_fkey"
+            columns: ["canonical_job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_canonical_job_id_fkey"
+            columns: ["canonical_job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings_canonical"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "job_postings_company_id_fkey"
             columns: ["company_id"]
@@ -713,6 +870,39 @@ export type Database = {
           name?: string
           source_type?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -867,6 +1057,71 @@ export type Database = {
           },
         ]
       }
+      provider_snapshots: {
+        Row: {
+          dataset_id: string | null
+          error: string | null
+          id: string
+          ingested_at: string | null
+          jobs_created: number
+          jobs_rejected: number
+          jobs_updated: number
+          last_polled_at: string | null
+          poll_count: number
+          provider: string
+          provider_snapshot_id: string
+          records_downloaded: number
+          request: Json
+          source_id: string
+          status: string
+          triggered_at: string
+        }
+        Insert: {
+          dataset_id?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string | null
+          jobs_created?: number
+          jobs_rejected?: number
+          jobs_updated?: number
+          last_polled_at?: string | null
+          poll_count?: number
+          provider?: string
+          provider_snapshot_id: string
+          records_downloaded?: number
+          request?: Json
+          source_id: string
+          status?: string
+          triggered_at?: string
+        }
+        Update: {
+          dataset_id?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string | null
+          jobs_created?: number
+          jobs_rejected?: number
+          jobs_updated?: number
+          last_polled_at?: string | null
+          poll_count?: number
+          provider?: string
+          provider_snapshot_id?: string
+          records_downloaded?: number
+          request?: Json
+          source_id?: string
+          status?: string
+          triggered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_snapshots_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "job_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_observations: {
         Row: {
           amount_max: number | null
@@ -878,8 +1133,12 @@ export type Database = {
           market_segment: string
           observed_at: string
           period: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           seniority: string | null
           source: string
+          status: string
           track_id: string | null
           user_id: string | null
         }
@@ -893,8 +1152,12 @@ export type Database = {
           market_segment: string
           observed_at?: string
           period?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           seniority?: string | null
           source: string
+          status?: string
           track_id?: string | null
           user_id?: string | null
         }
@@ -908,8 +1171,12 @@ export type Database = {
           market_segment?: string
           observed_at?: string
           period?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           seniority?: string | null
           source?: string
+          status?: string
           track_id?: string | null
           user_id?: string | null
         }
@@ -919,6 +1186,13 @@ export type Database = {
             columns: ["job_posting_id"]
             isOneToOne: false
             referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_observations_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings_canonical"
             referencedColumns: ["id"]
           },
           {
@@ -1063,6 +1337,163 @@ export type Database = {
           },
         ]
       }
+      study_items: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          estimated_hours: number | null
+          id: string
+          notes: string | null
+          plan_id: string
+          priority: number
+          progress_percent: number
+          resource_url: string | null
+          skill_id: string | null
+          source_gap_item_id: string | null
+          spent_hours: number
+          start_date: string | null
+          status: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          notes?: string | null
+          plan_id: string
+          priority?: number
+          progress_percent?: number
+          resource_url?: string | null
+          skill_id?: string | null
+          source_gap_item_id?: string | null
+          spent_hours?: number
+          start_date?: string | null
+          status?: string
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          notes?: string | null
+          plan_id?: string
+          priority?: number
+          progress_percent?: number
+          resource_url?: string | null
+          skill_id?: string | null
+          source_gap_item_id?: string | null
+          spent_hours?: number
+          start_date?: string | null
+          status?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "study_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_items_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_logs: {
+        Row: {
+          created_at: string
+          hours: number
+          id: string
+          item_id: string
+          logged_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hours?: number
+          id?: string
+          item_id: string
+          logged_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hours?: number
+          id?: string
+          item_id?: string
+          logged_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_logs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "study_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          status: string
+          target_date: string | null
+          title: string
+          track_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          target_date?: string | null
+          title: string
+          track_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          target_date?: string | null
+          title?: string
+          track_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_plans_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       track_role_variants: {
         Row: {
           created_at: string
@@ -1148,6 +1579,100 @@ export type Database = {
             columns: ["track_id"]
             isOneToOne: false
             referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_certifications: {
+        Row: {
+          certification_id: string | null
+          created_at: string
+          credential_id: string | null
+          credential_url: string | null
+          custom_name: string | null
+          expires_at: string | null
+          id: string
+          obtained_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          certification_id?: string | null
+          created_at?: string
+          credential_id?: string | null
+          credential_url?: string | null
+          custom_name?: string | null
+          expires_at?: string | null
+          id?: string
+          obtained_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          certification_id?: string | null
+          created_at?: string
+          credential_id?: string | null
+          credential_url?: string | null
+          custom_name?: string | null
+          expires_at?: string | null
+          id?: string
+          obtained_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_certifications_certification_id_fkey"
+            columns: ["certification_id"]
+            isOneToOne: false
+            referencedRelation: "certifications_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_courses: {
+        Row: {
+          certificate_url: string | null
+          completed_at: string | null
+          course_id: string | null
+          created_at: string
+          custom_title: string | null
+          id: string
+          progress_percent: number
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          certificate_url?: string | null
+          completed_at?: string | null
+          course_id?: string | null
+          created_at?: string
+          custom_title?: string | null
+          id?: string
+          progress_percent?: number
+          started_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          certificate_url?: string | null
+          completed_at?: string | null
+          course_id?: string | null
+          created_at?: string
+          custom_title?: string | null
+          id?: string
+          progress_percent?: number
+          started_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_courses_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses_catalog"
             referencedColumns: ["id"]
           },
         ]
@@ -1317,6 +1842,187 @@ export type Database = {
       }
     }
     Views: {
+      job_postings_canonical: {
+        Row: {
+          apply_url: string | null
+          benefits_text: string | null
+          canonical_job_id: string | null
+          city: string | null
+          company_id: string | null
+          company_name_raw: string | null
+          country: string | null
+          dedupe_hash: string | null
+          description_lang: string | null
+          description_text: string | null
+          description_tsv: unknown
+          employment_type: string | null
+          expires_at: string | null
+          external_id: string | null
+          id: string | null
+          ingested_at: string | null
+          is_active: boolean | null
+          is_remote: boolean | null
+          last_seen_at: string | null
+          lifecycle_status: string | null
+          location_raw: string | null
+          market_segment: string | null
+          posted_at: string | null
+          qualifications_text: string | null
+          remote_restriction: string | null
+          requirements_text: string | null
+          role_variant_id: string | null
+          salary_currency: string | null
+          salary_is_estimated: boolean | null
+          salary_max: number | null
+          salary_min: number | null
+          salary_period: string | null
+          seniority: string | null
+          skills_extracted_at: string | null
+          source_id: string | null
+          source_job_id: string | null
+          source_updated_at: string | null
+          source_url: string | null
+          state: string | null
+          title: string | null
+          title_normalized: string | null
+          track_id: string | null
+          work_modality: string | null
+        }
+        Insert: {
+          apply_url?: string | null
+          benefits_text?: string | null
+          canonical_job_id?: string | null
+          city?: string | null
+          company_id?: string | null
+          company_name_raw?: string | null
+          country?: string | null
+          dedupe_hash?: string | null
+          description_lang?: string | null
+          description_text?: string | null
+          description_tsv?: unknown
+          employment_type?: string | null
+          expires_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          ingested_at?: string | null
+          is_active?: boolean | null
+          is_remote?: boolean | null
+          last_seen_at?: string | null
+          lifecycle_status?: string | null
+          location_raw?: string | null
+          market_segment?: string | null
+          posted_at?: string | null
+          qualifications_text?: string | null
+          remote_restriction?: string | null
+          requirements_text?: string | null
+          role_variant_id?: string | null
+          salary_currency?: string | null
+          salary_is_estimated?: boolean | null
+          salary_max?: number | null
+          salary_min?: number | null
+          salary_period?: string | null
+          seniority?: string | null
+          skills_extracted_at?: string | null
+          source_id?: string | null
+          source_job_id?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
+          state?: string | null
+          title?: string | null
+          title_normalized?: string | null
+          track_id?: string | null
+          work_modality?: string | null
+        }
+        Update: {
+          apply_url?: string | null
+          benefits_text?: string | null
+          canonical_job_id?: string | null
+          city?: string | null
+          company_id?: string | null
+          company_name_raw?: string | null
+          country?: string | null
+          dedupe_hash?: string | null
+          description_lang?: string | null
+          description_text?: string | null
+          description_tsv?: unknown
+          employment_type?: string | null
+          expires_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          ingested_at?: string | null
+          is_active?: boolean | null
+          is_remote?: boolean | null
+          last_seen_at?: string | null
+          lifecycle_status?: string | null
+          location_raw?: string | null
+          market_segment?: string | null
+          posted_at?: string | null
+          qualifications_text?: string | null
+          remote_restriction?: string | null
+          requirements_text?: string | null
+          role_variant_id?: string | null
+          salary_currency?: string | null
+          salary_is_estimated?: boolean | null
+          salary_max?: number | null
+          salary_min?: number | null
+          salary_period?: string | null
+          seniority?: string | null
+          skills_extracted_at?: string | null
+          source_id?: string | null
+          source_job_id?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
+          state?: string | null
+          title?: string | null
+          title_normalized?: string | null
+          track_id?: string | null
+          work_modality?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_postings_canonical_job_id_fkey"
+            columns: ["canonical_job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_canonical_job_id_fkey"
+            columns: ["canonical_job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings_canonical"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_role_variant_id_fkey"
+            columns: ["role_variant_id"]
+            isOneToOne: false
+            referencedRelation: "track_role_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "job_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_postings_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "career_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mv_company_hiring: {
         Row: {
           avg_salary_max: number | null
@@ -1471,10 +2177,20 @@ export type Database = {
           total_jobs: number
         }[]
       }
+      dedupe_job_postings: {
+        Args: { _proximity_days?: number; _window_days?: number }
+        Returns: {
+          alteradas: number
+          duplicatas: number
+          grupos: number
+        }[]
+      }
+      expire_old_jobs: { Args: never; Returns: number }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       landing_stats: { Args: never; Returns: Json }
       market_demand: {
         Args: {
+          _include_unranked?: boolean
           _segments: string[]
           _seniorities: string[]
           _since: string
@@ -1488,6 +2204,7 @@ export type Database = {
       }
       market_scope_stats: {
         Args: {
+          _include_unranked?: boolean
           _segments: string[]
           _seniorities: string[]
           _since: string
@@ -1500,6 +2217,8 @@ export type Database = {
         }[]
       }
       match_company: { Args: { _name: string }; Returns: string }
+      notify_expiring_certs: { Args: never; Returns: undefined }
+      purge_inactive_anonymous: { Args: never; Returns: number }
       refresh_market_views: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

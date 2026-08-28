@@ -15,8 +15,12 @@ function parseMoney(value: unknown): number | null {
 export const remotiveAdapter: JobAdapter = {
   key: "remotive",
   async fetchJobs(cfg) {
-    const search = cfg.query ? `?search=${encodeURIComponent(String(cfg.query))}&limit=200` : "?limit=200";
-    const data = await fetchJson<{ jobs: Array<any> }>(`https://remotive.com/api/remote-jobs${search}`);
+    const search = cfg.query
+      ? `?search=${encodeURIComponent(String(cfg.query))}&limit=200`
+      : "?limit=200";
+    const data = await fetchJson<{ jobs: Array<any> }>(
+      `https://remotive.com/api/remote-jobs${search}`,
+    );
     return (data.jobs ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.description ?? null);
       return {
@@ -88,9 +92,10 @@ export const himalayasAdapter: JobAdapter = {
         source_key: "himalayas",
         title: String(job.title ?? ""),
         company_name: String(job.companyName ?? "Desconhecida"),
-        location_raw: Array.isArray(job.locationRestrictions) && job.locationRestrictions.length > 0
-          ? job.locationRestrictions.join(", ")
-          : "Worldwide",
+        location_raw:
+          Array.isArray(job.locationRestrictions) && job.locationRestrictions.length > 0
+            ? job.locationRestrictions.join(", ")
+            : "Worldwide",
         is_remote: true,
         country: null,
         description_html: job.description ?? null,
@@ -112,7 +117,9 @@ export const himalayasAdapter: JobAdapter = {
 export const jobicyAdapter: JobAdapter = {
   key: "jobicy",
   async fetchJobs() {
-    const data = await fetchJson<{ jobs: Array<any> }>("https://jobicy.com/api/v2/remote-jobs?count=100");
+    const data = await fetchJson<{ jobs: Array<any> }>(
+      "https://jobicy.com/api/v2/remote-jobs?count=100",
+    );
     return (data.jobs ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.jobDescription ?? job.jobExcerpt ?? null);
       const salary = toAnnual(
@@ -134,8 +141,12 @@ export const jobicyAdapter: JobAdapter = {
         salary_max: salary.salary_max,
         salary_currency: job.salaryCurrency ?? null,
         salary_period: salary.salary_period,
-        employment_type: Array.isArray(job.jobType) ? job.jobType.join(", ") : (job.jobType ?? null),
-        seniority_hint: Array.isArray(job.jobLevel) ? job.jobLevel.join(" ") : (job.jobLevel ?? null),
+        employment_type: Array.isArray(job.jobType)
+          ? job.jobType.join(", ")
+          : (job.jobType ?? null),
+        seniority_hint: Array.isArray(job.jobLevel)
+          ? job.jobLevel.join(" ")
+          : (job.jobLevel ?? null),
         posted_at: job.pubDate ?? null,
         apply_url: job.url ?? null,
         raw: job,
@@ -147,7 +158,9 @@ export const jobicyAdapter: JobAdapter = {
 export const arbeitnowAdapter: JobAdapter = {
   key: "arbeitnow",
   async fetchJobs() {
-    const data = await fetchJson<{ data: Array<any> }>("https://www.arbeitnow.com/api/job-board-api");
+    const data = await fetchJson<{ data: Array<any> }>(
+      "https://www.arbeitnow.com/api/job-board-api",
+    );
     return (data.data ?? []).map((job): NormalizedJob => {
       const text = stripHtml(job.description ?? null);
       return {

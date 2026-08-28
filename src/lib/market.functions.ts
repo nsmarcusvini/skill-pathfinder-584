@@ -111,8 +111,7 @@ export const getToolRanking = createServerFn({ method: "POST" })
       _since: sinceDaysAgo(data.periodDays),
       ...(data.categories?.length ? { _categories: data.categories } : {}),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: rows, error } = await supabase.rpc("tool_ranking", rpcArgs as any);
+    const { data: rows, error } = await supabase.rpc("tool_ranking", rpcArgs);
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => ({
       skillId: r.skill_id,
@@ -157,8 +156,7 @@ export const getToolDetail = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const d = rows?.[0];
     if (!d) return null;
-    const companies =
-      (d.companies as Array<{ name: string; jobs: number }> | null) ?? [];
+    const companies = (d.companies as Array<{ name: string; jobs: number }> | null) ?? [];
     const cooccurrence =
       (d.cooccurrence as Array<{ skill_id: string; name: string; jobs: number }> | null) ?? [];
     return {
@@ -414,7 +412,7 @@ export const getSalarySkillImpact = createServerFn({ method: "POST" })
         _track_id: data.trackId,
         _segments: [data.segment],
         _since: sinceDaysAgo(data.periodDays),
-      } as any),
+      }),
     ]);
 
     const totalSample = (statRows ?? []).reduce((sum, r) => sum + (r.sample_size ?? 0), 0);
@@ -434,7 +432,7 @@ export const getSalarySkillImpact = createServerFn({ method: "POST" })
           _skill_id: skill.skill_id,
           _segments: [data.segment],
           _since: sinceDaysAgo(data.periodDays),
-        } as any),
+        }),
       ),
     );
 

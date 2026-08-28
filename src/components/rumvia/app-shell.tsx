@@ -145,7 +145,10 @@ export function AppShell({
             key={item.to}
             to={item.to as never}
             className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-neutral-600 hover:bg-surface"
-            activeProps={{ className: "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-accent-700 bg-surface font-semibold" }}
+            activeProps={{
+              className:
+                "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-accent-700 bg-surface font-semibold",
+            }}
             title={item.label}
           >
             <span aria-hidden>{item.icon}</span>

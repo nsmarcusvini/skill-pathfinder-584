@@ -54,7 +54,12 @@ function splitCsvLine(line: string, delimiter: string): string[] {
 
 function toNumber(value: string): number | null {
   if (!value) return null;
-  const n = Number(value.replace(/[^0-9.,-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", "."));
+  const n = Number(
+    value
+      .replace(/[^0-9.,-]/g, "")
+      .replace(/\.(?=\d{3}\b)/g, "")
+      .replace(",", "."),
+  );
   return Number.isFinite(n) ? n : null;
 }
 
@@ -62,7 +67,8 @@ function toNumber(value: string): number | null {
 export function parseCsv(content: string, sourceKey = "csv_manual"): CsvRowResult[] {
   const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
-  const delimiter = (lines[0]!.match(/;/g)?.length ?? 0) > (lines[0]!.match(/,/g)?.length ?? 0) ? ";" : ",";
+  const delimiter =
+    (lines[0]!.match(/;/g)?.length ?? 0) > (lines[0]!.match(/,/g)?.length ?? 0) ? ";" : ",";
   const header = splitCsvLine(lines[0]!, delimiter).map((h) => h.toLowerCase());
   const results: CsvRowResult[] = [];
 
@@ -78,18 +84,23 @@ export function parseCsv(content: string, sourceKey = "csv_manual"): CsvRowResul
     const applyUrl = get("apply_url");
     if (!title) errors.push("title é obrigatório");
     if (!company) errors.push("company_name é obrigatório");
-    if (applyUrl && !/^https?:\/\//i.test(applyUrl)) errors.push("apply_url deve começar com http(s)://");
+    if (applyUrl && !/^https?:\/\//i.test(applyUrl))
+      errors.push("apply_url deve começar com http(s)://");
     const postedAt = get("posted_at");
-    if (postedAt && Number.isNaN(Date.parse(postedAt))) errors.push("posted_at inválido (use AAAA-MM-DD)");
+    if (postedAt && Number.isNaN(Date.parse(postedAt)))
+      errors.push("posted_at inválido (use AAAA-MM-DD)");
     const currency = get("salary_currency").toUpperCase();
-    if (currency && !/^[A-Z]{3}$/.test(currency)) errors.push("salary_currency deve ter 3 letras (BRL, USD)");
+    if (currency && !/^[A-Z]{3}$/.test(currency))
+      errors.push("salary_currency deve ter 3 letras (BRL, USD)");
 
     if (errors.length > 0) {
       results.push({ line: i + 1, job: null, errors });
       continue;
     }
 
-    const externalId = get("external_id") || `${company}-${title}-${get("location_raw")}`.toLowerCase().replace(/\s+/g, "-").slice(0, 120);
+    const externalId =
+      get("external_id") ||
+      `${company}-${title}-${get("location_raw")}`.toLowerCase().replace(/\s+/g, "-").slice(0, 120);
     const description = get("description_text") || null;
 
     results.push({

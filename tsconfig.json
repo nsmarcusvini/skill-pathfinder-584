@@ -1,5 +1,10 @@
 {
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
+  // Os testes rodam por `bun test`, que já os tipa com os globais do Bun.
+  // Incluir "bun" em compilerOptions.types aqui contaminaria o app inteiro: o
+  // fetch global do Bun tem `preconnect`, o que conflita com o fetch customizado
+  // dos clientes Supabase e quebra 4 arquivos que funcionam.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

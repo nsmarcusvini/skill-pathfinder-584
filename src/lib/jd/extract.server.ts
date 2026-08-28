@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
 import {
   buildCatalogIndex,
   bestTrigram,
@@ -37,7 +38,11 @@ interface JobRow {
   company_name_raw: string | null;
 }
 
-async function loadCatalog(): Promise<{ index: CatalogIndex; knownTerms: Set<string>; blocked: Set<string> }> {
+async function loadCatalog(): Promise<{
+  index: CatalogIndex;
+  knownTerms: Set<string>;
+  blocked: Set<string>;
+}> {
   const [{ data: skills }, { data: aliases }, { data: blocklist }] = await Promise.all([
     supabaseAdmin.from("skills").select("id, canonical_name, is_ambiguous, match_patterns"),
     supabaseAdmin.from("skill_aliases").select("skill_id, alias"),
@@ -118,10 +123,16 @@ export async function extractJdSkills(options?: {
       extraction_method: match.matched_by,
     }));
 
-    // idempotente: substitui o conjunto de skills daquela vaga
+    // Idempotente: substitui o conjunto de skills daquela vaga.
+    // O upsert (em vez de insert) mantém isto seguro quando duas execuções se
+    // sobrepõem — cron às 6h e um "Rodar ingestão" manual, por exemplo. Com
+    // insert puro, a segunda execução colidia na unique (job_posting_id, skill_id)
+    // e derrubava a extração inteira.
     await supabaseAdmin.from("job_posting_skills").delete().eq("job_posting_id", job.id);
     if (payload.length > 0) {
-      const { error: insertError } = await supabaseAdmin.from("job_posting_skills").insert(payload);
+      const { error: insertError } = await supabaseAdmin
+        .from("job_posting_skills")
+        .upsert(payload, { onConflict: "job_posting_id,skill_id" });
       if (insertError) throw new Error(`Falha ao gravar skills da vaga: ${insertError.message}`);
       skillsWritten += payload.length;
     }
@@ -166,7 +177,10 @@ export async function extractJdSkills(options?: {
 }
 
 /** Agrega candidatos na fila de curadoria, somando ocorrências e vagas distintas. */
-async function upsertPendingTerms(aggregates: TermAggregate[], index: CatalogIndex): Promise<number> {
+async function upsertPendingTerms(
+  aggregates: TermAggregate[],
+  index: CatalogIndex,
+): Promise<number> {
   if (aggregates.length === 0) return 0;
 
   const { data: existing } = await supabaseAdmin
@@ -175,7 +189,14 @@ async function upsertPendingTerms(aggregates: TermAggregate[], index: CatalogInd
 
   const byTerm = new Map((existing ?? []).map((row) => [normalize(row.term), row]));
   const now = new Date().toISOString();
-  let queued = 0;
+
+  // Antes havia um await por termo dentro do laço. Um lote de 200 vagas mina
+  // milhares de termos, então eram milhares de idas e voltas sequenciais ao
+  // Supabase: a extração parava ~4 minutos ao fim de CADA lote, dando a
+  // impressão de processo travado. Agora monta tudo em memória e grava em lote.
+  type TermoPendente = Database["public"]["Tables"]["pending_skill_terms"]["Insert"];
+  const paraInserir: TermoPendente[] = [];
+  const paraAtualizar: TermoPendente[] = [];
 
   for (const aggregate of aggregates) {
     const key = normalize(aggregate.term);
@@ -183,20 +204,20 @@ async function upsertPendingTerms(aggregates: TermAggregate[], index: CatalogInd
 
     if (previous) {
       if (previous.status !== "novo") continue; // aprovado/rejeitado não volta para a fila
-      await supabaseAdmin
-        .from("pending_skill_terms")
-        .update({
-          occurrences: (previous.occurrences ?? 0) + aggregate.occurrences,
-          distinct_jobs: (previous.distinct_jobs ?? 0) + aggregate.jobs.size,
-          last_seen: now,
-        })
-        .eq("id", previous.id);
-      queued += 1;
+      // O upsert por id precisa das colunas NOT NULL: sem `term`, a tentativa de
+      // INSERT falha antes de o conflito ser resolvido.
+      paraAtualizar.push({
+        id: previous.id,
+        term: previous.term,
+        occurrences: (previous.occurrences ?? 0) + aggregate.occurrences,
+        distinct_jobs: (previous.distinct_jobs ?? 0) + aggregate.jobs.size,
+        last_seen: now,
+      });
       continue;
     }
 
     const suggestion = bestTrigram(aggregate.term, index);
-    await supabaseAdmin.from("pending_skill_terms").insert({
+    paraInserir.push({
       term: aggregate.term,
       lang: aggregate.lang,
       occurrences: aggregate.occurrences,
@@ -205,11 +226,28 @@ async function upsertPendingTerms(aggregates: TermAggregate[], index: CatalogInd
       first_seen: now,
       last_seen: now,
       status: "novo",
-      suggested_skill_id:
-        suggestion.score >= TRIGRAM_SUGGEST_THRESHOLD ? suggestion.skillId : null,
+      suggested_skill_id: suggestion.score >= TRIGRAM_SUGGEST_THRESHOLD ? suggestion.skillId : null,
       context: "jd",
     });
-    queued += 1;
+  }
+
+  const CHUNK = 500;
+  let queued = 0;
+
+  for (let i = 0; i < paraInserir.length; i += CHUNK) {
+    const fatia = paraInserir.slice(i, i + CHUNK);
+    const { error } = await supabaseAdmin.from("pending_skill_terms").insert(fatia);
+    // Termo que colide com a unique de lower(term) não é erro fatal: só não
+    // entra de novo na fila. Um lote inteiro não pode cair por causa disso.
+    if (!error) queued += fatia.length;
+  }
+
+  for (let i = 0; i < paraAtualizar.length; i += CHUNK) {
+    const fatia = paraAtualizar.slice(i, i + CHUNK);
+    const { error } = await supabaseAdmin
+      .from("pending_skill_terms")
+      .upsert(fatia, { onConflict: "id" });
+    if (!error) queued += fatia.length;
   }
 
   return queued;
@@ -223,14 +261,20 @@ export async function reprocessJdSkills(input: {
   const results: ExtractionResult[] = [];
   if (input.jobIds && input.jobIds.length > 0) {
     for (let i = 0; i < input.jobIds.length; i += BATCH_SIZE) {
-      results.push(await extractJdSkills({ jobIds: input.jobIds.slice(i, i + BATCH_SIZE), force: true }));
+      results.push(
+        await extractJdSkills({ jobIds: input.jobIds.slice(i, i + BATCH_SIZE), force: true }),
+      );
     }
     return results;
   }
 
   // por período: no máximo 10 lotes por chamada, o resto fica para a próxima
   for (let batch = 0; batch < 10; batch++) {
-    const result = await extractJdSkills({ since: input.since ?? "", force: true, limit: BATCH_SIZE });
+    const result = await extractJdSkills({
+      since: input.since ?? "",
+      force: true,
+      limit: BATCH_SIZE,
+    });
     results.push(result);
     if (result.processed < BATCH_SIZE) break;
   }
@@ -270,7 +314,10 @@ export async function extractionHealth(): Promise<ExtractionHealth> {
   ]);
 
   const [{ count: jobsTotal }, { count: jobsExtracted }] = await Promise.all([
-    supabaseAdmin.from("job_postings").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabaseAdmin
+      .from("job_postings")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
     supabaseAdmin
       .from("job_postings")
       .select("id", { count: "exact", head: true })
@@ -279,7 +326,8 @@ export async function extractionHealth(): Promise<ExtractionHealth> {
   ]);
 
   const perJob = new Map<string, number>();
-  for (const row of counts) perJob.set(row.job_posting_id, (perJob.get(row.job_posting_id) ?? 0) + 1);
+  for (const row of counts)
+    perJob.set(row.job_posting_id, (perJob.get(row.job_posting_id) ?? 0) + 1);
 
   const extracted = jobsExtracted ?? 0;
   const values: number[] = [];
@@ -293,7 +341,7 @@ export async function extractionHealth(): Promise<ExtractionHealth> {
       ? 0
       : values.length % 2 === 1
         ? values[(values.length - 1) / 2]!
-        : ((values[values.length / 2 - 1]! + values[values.length / 2]!) / 2);
+        : (values[values.length / 2 - 1]! + values[values.length / 2]!) / 2;
 
   const below = values.filter((v) => v < 3).length;
   const pct = values.length === 0 ? 0 : Math.round((below / values.length) * 1000) / 10;

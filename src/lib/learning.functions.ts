@@ -25,6 +25,8 @@ export interface CertCatalogItem {
   userStatus: CertStatus | null;
   userCertId: string | null;
   expiresAt: string | null;
+  /** true quando a certificação do usuário vence nos próximos 90 dias. */
+  expiringAlert: boolean;
 }
 
 export interface CourseCatalogItem {
@@ -73,9 +75,6 @@ export interface UserCourse {
   certificateUrl: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyDb = any;
-
 // ─── Certifications Catalog ──────────────────────────────────────────────────
 
 export const getCertsCatalog = createServerFn({ method: "POST" })
@@ -83,26 +82,20 @@ export const getCertsCatalog = createServerFn({ method: "POST" })
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CertCatalogItem[]> => {
     const { supabase, userId } = context;
-    const db = supabase as AnyDb;
 
     const [{ data: certs }, { data: userCerts }] = await Promise.all([
-      db
-        .from("certifications_catalog")
-        .select("*")
-        .contains("track_ids", [data.trackId]),
-      db
+      supabase.from("certifications_catalog").select("*").contains("track_ids", [data.trackId]),
+      supabase
         .from("user_certifications")
         .select("id, certification_id, status, expires_at")
         .eq("user_id", userId),
     ]);
 
-    const userMap = new Map(
-      (userCerts ?? []).map((u: AnyDb) => [u.certification_id as string, u]),
-    );
+    const userMap = new Map((userCerts ?? []).map((u) => [u.certification_id, u] as const));
 
-    return (certs ?? []).map((c: AnyDb) => {
-      const uc = userMap.get(c.id as string);
-      const expiresAt = uc?.expires_at as string | null ?? null;
+    return (certs ?? []).map((c) => {
+      const uc = userMap.get(c.id);
+      const expiresAt = uc?.expires_at ?? null;
       const daysToExpiry = expiresAt
         ? Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000)
         : null;
@@ -134,25 +127,19 @@ export const getCoursesCatalog = createServerFn({ method: "POST" })
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CourseCatalogItem[]> => {
     const { supabase, userId } = context;
-    const db = supabase as AnyDb;
 
     const [{ data: courses }, { data: userCourses }] = await Promise.all([
-      db
-        .from("courses_catalog")
-        .select("*")
-        .contains("track_ids", [data.trackId]),
-      db
+      supabase.from("courses_catalog").select("*").contains("track_ids", [data.trackId]),
+      supabase
         .from("user_courses")
         .select("id, course_id, status, progress_percent")
         .eq("user_id", userId),
     ]);
 
-    const userMap = new Map(
-      (userCourses ?? []).map((u: AnyDb) => [u.course_id as string, u]),
-    );
+    const userMap = new Map((userCourses ?? []).map((u) => [u.course_id, u] as const));
 
-    return (courses ?? []).map((c: AnyDb) => {
-      const uc = userMap.get(c.id as string);
+    return (courses ?? []).map((c) => {
+      const uc = userMap.get(c.id);
       return {
         id: c.id as string,
         title: c.title as string,
@@ -181,15 +168,17 @@ export const getUserCerts = createServerFn({ method: "POST" })
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<UserCert[]> => {
     const { userId } = context;
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { data, error } = await db
       .from("user_certifications")
-      .select("id, certification_id, custom_name, status, obtained_at, expires_at, credential_url, credential_id, certifications_catalog(name, issuer)")
+      .select(
+        "id, certification_id, custom_name, status, obtained_at, expires_at, credential_url, credential_id, certifications_catalog(name, issuer)",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const now = Date.now();
-    return (data ?? []).map((r: AnyDb) => {
+    return (data ?? []).map((r) => {
       const cat = r.certifications_catalog as { name: string; issuer: string } | null;
       const expiresAt = (r.expires_at as string | null) ?? null;
       const daysToExpiry = expiresAt
@@ -226,17 +215,17 @@ export const upsertUserCert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpsertUserCertInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
-    const row: Record<string, unknown> = {
+    const db = context.supabase;
+    const row = {
       user_id: context.userId,
       status: data.status,
+      ...(data.certId ? { certification_id: data.certId } : {}),
+      ...(data.customName ? { custom_name: data.customName } : {}),
+      ...(data.obtainedAt ? { obtained_at: data.obtainedAt } : {}),
+      ...(data.expiresAt ? { expires_at: data.expiresAt } : {}),
+      ...(data.credentialUrl ? { credential_url: data.credentialUrl } : {}),
+      ...(data.credentialId ? { credential_id: data.credentialId } : {}),
     };
-    if (data.certId) row["certification_id"] = data.certId;
-    if (data.customName) row["custom_name"] = data.customName;
-    if (data.obtainedAt) row["obtained_at"] = data.obtainedAt;
-    if (data.expiresAt) row["expires_at"] = data.expiresAt;
-    if (data.credentialUrl) row["credential_url"] = data.credentialUrl;
-    if (data.credentialId) row["credential_id"] = data.credentialId;
 
     if (data.existingId) {
       const { error } = await db.from("user_certifications").update(row).eq("id", data.existingId);
@@ -251,7 +240,7 @@ export const deleteUserCert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { error } = await db
       .from("user_certifications")
       .delete()
@@ -267,14 +256,16 @@ export const getUserCourses = createServerFn({ method: "POST" })
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<UserCourse[]> => {
     const { userId } = context;
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { data, error } = await db
       .from("user_courses")
-      .select("id, course_id, custom_title, status, progress_percent, started_at, completed_at, certificate_url, courses_catalog(title, provider)")
+      .select(
+        "id, course_id, custom_title, status, progress_percent, started_at, completed_at, certificate_url, courses_catalog(title, provider)",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r: AnyDb) => {
+    return (data ?? []).map((r) => {
       const cat = r.courses_catalog as { title: string; provider: string } | null;
       return {
         id: r.id as string,
@@ -306,17 +297,17 @@ export const upsertUserCourse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpsertUserCourseInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
-    const row: Record<string, unknown> = {
+    const db = context.supabase;
+    const row = {
       user_id: context.userId,
       status: data.status,
+      ...(data.courseId ? { course_id: data.courseId } : {}),
+      ...(data.customTitle ? { custom_title: data.customTitle } : {}),
+      ...(data.progressPercent !== undefined ? { progress_percent: data.progressPercent } : {}),
+      ...(data.startedAt ? { started_at: data.startedAt } : {}),
+      ...(data.completedAt ? { completed_at: data.completedAt } : {}),
+      ...(data.certificateUrl ? { certificate_url: data.certificateUrl } : {}),
     };
-    if (data.courseId) row["course_id"] = data.courseId;
-    if (data.customTitle) row["custom_title"] = data.customTitle;
-    if (data.progressPercent !== undefined) row["progress_percent"] = data.progressPercent;
-    if (data.startedAt) row["started_at"] = data.startedAt;
-    if (data.completedAt) row["completed_at"] = data.completedAt;
-    if (data.certificateUrl) row["certificate_url"] = data.certificateUrl;
 
     if (data.existingId) {
       const { error } = await db.from("user_courses").update(row).eq("id", data.existingId);
@@ -331,7 +322,7 @@ export const deleteUserCourse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { error } = await db
       .from("user_courses")
       .delete()
@@ -345,11 +336,15 @@ export const deleteUserCourse = createServerFn({ method: "POST" })
 export const addLearningItemToStudyPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { planId: string; title: string; type: "curso" | "certificacao"; resourceUrl?: string }) =>
-      input,
+    (input: {
+      planId: string;
+      title: string;
+      type: "curso" | "certificacao";
+      resourceUrl?: string;
+    }) => input,
   )
   .handler(async ({ data, context }): Promise<void> => {
-    const db = context.supabase as AnyDb;
+    const db = context.supabase;
     const { error } = await db.from("study_items").insert({
       plan_id: data.planId,
       user_id: context.userId,

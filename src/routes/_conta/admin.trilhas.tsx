@@ -14,7 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { listTracks, toggleTrack, upsertTrack, type AdminTrack } from "@/lib/admin.functions";
 
@@ -65,7 +69,9 @@ function AdminTrilhasPage() {
     onSuccess: () => {
       invalidate();
       setOpen(false);
-      toast.success(form.id ? "Trilha atualizada." : "Trilha criada. Adicione skills via migração de banco.");
+      toast.success(
+        form.id ? "Trilha atualizada." : "Trilha criada. Adicione skills via migração de banco.",
+      );
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -105,9 +111,15 @@ function AdminTrilhasPage() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span className="font-display text-base uppercase tracking-wide">{t.name}</span>
-                  <code className="text-xs px-1 border" style={{ fontFamily: "monospace" }}>{t.key}</code>
+                  <code className="text-xs px-1 border" style={{ fontFamily: "monospace" }}>
+                    {t.key}
+                  </code>
                   {!t.is_active && (
-                    <Badge variant="outline" className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
+                    <Badge
+                      variant="outline"
+                      className="text-xs"
+                      style={{ color: "var(--color-muted-foreground, #888)" }}
+                    >
                       inativa
                     </Badge>
                   )}
@@ -126,7 +138,10 @@ function AdminTrilhasPage() {
               </div>
 
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <div className="flex items-center gap-3 text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
+                <div
+                  className="flex items-center gap-3 text-xs"
+                  style={{ color: "var(--color-muted-foreground, #888)" }}
+                >
                   <span>{t.skills_count} skills</span>
                   <span>{t.jobs_br.toLocaleString("pt-BR")} vagas BR</span>
                   <span>{t.jobs_global.toLocaleString("pt-BR")} vagas global</span>
@@ -137,7 +152,11 @@ function AdminTrilhasPage() {
                     onClick={() => toggleMutation.mutate({ id: t.id, is_active: !t.is_active })}
                     className="opacity-60 hover:opacity-100"
                   >
-                    {t.is_active ? <ToggleRight size={18} style={{ color: "var(--color-success)" }} /> : <ToggleLeft size={18} />}
+                    {t.is_active ? (
+                      <ToggleRight size={18} style={{ color: "var(--color-success)" }} />
+                    ) : (
+                      <ToggleLeft size={18} />
+                    )}
                   </button>
                   <button onClick={() => openEdit(t)} className="opacity-60 hover:opacity-100">
                     <Pencil size={13} />
@@ -149,11 +168,19 @@ function AdminTrilhasPage() {
         ))}
       </div>
 
-      <div className="border-t pt-4 text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>
+      <div
+        className="border-t pt-4 text-xs"
+        style={{ color: "var(--color-muted-foreground, #888)" }}
+      >
         Para adicionar skills a uma trilha nova, siga <code>docs/ADICIONAR_TRILHA.md</code>.
       </div>
 
-      <Dialog open={open} onOpenChange={(v) => { if (!v) setOpen(false); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) setOpen(false);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{form.id ? "Editar trilha" : "Nova trilha"}</DialogTitle>
@@ -197,7 +224,9 @@ function AdminTrilhasPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button
               disabled={
                 !form.key.trim() ||
