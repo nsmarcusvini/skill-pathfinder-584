@@ -35,7 +35,15 @@ export const applyCvAnalysis = createServerFn({ method: "POST" })
       .maybeSingle();
 
     const trackId = data.trackId ?? version?.detected_track_id ?? null;
-    const seniority = data.seniority ?? version?.detected_seniority ?? "pleno";
+    // Decisão de produto (não é falta de detecção): toda importação de CV
+    // nasce como "senior", e a senioridade que o parser detectou de fato
+    // (version?.detected_seniority) é ignorada de propósito aqui — só entra
+    // no retorno via detectionConfidence, para quem quiser auditar depois.
+    // Quando o usuário corrige manualmente pelo seletor em /analise
+    // ("Corrija aqui se estiver errado"), essa correção chega em
+    // data.seniority e continua valendo — só o valor vindo da DETECÇÃO
+    // automática é substituído.
+    const seniority = data.seniority ?? "senior";
 
     const profileUpdate: {
       seniority: string;

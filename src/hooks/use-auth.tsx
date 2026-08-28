@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import type { Database } from "@/integrations/supabase/types";
 import { requestTurnstileToken } from "@/lib/turnstile";
+import { isAuthRateLimited, SIGNUP_COOLDOWN_MESSAGE } from "@/lib/signup-guard";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -16,6 +17,8 @@ export type AuthResult = {
   emailTaken?: boolean;
   /** true quando a ação exige verificação de e-mail antes de concluir. */
   needsEmailConfirmation?: boolean;
+  /** true quando o erro foi 429 do Supabase Auth — UI decide o cooldown. */
+  rateLimited?: boolean;
 };
 
 export interface AuthValue {
@@ -61,8 +64,17 @@ function isEmailTaken(message: string): boolean {
   return EMAIL_TAKEN_PATTERNS.some((p) => m.includes(p));
 }
 
-function traduzErro(message: string): string {
+/**
+ * Aceita o erro inteiro (não só a mensagem) porque precisa do `.status` para
+ * reconhecer 429 de forma confiável — o texto que o GoTrue manda varia por
+ * rota ("email rate limit exceeded", "you can only request this after N
+ * seconds"...), então checar só substring de mensagem já deixou passar caso
+ * antes.
+ */
+function traduzErro(error: { message: string; status?: number | undefined }): string {
+  const message = error.message;
   const m = message.toLowerCase();
+  if (isAuthRateLimited(error)) return SIGNUP_COOLDOWN_MESSAGE;
   if (isEmailTaken(message)) return "Este e-mail já possui uma conta no RUMVIA.";
   if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
   if (m.includes("email not confirmed")) return "Confirme seu e-mail antes de entrar.";
@@ -70,8 +82,6 @@ function traduzErro(message: string): string {
     return "A senha precisa ter pelo menos 8 caracteres.";
   if (m.includes("pwned") || m.includes("compromised"))
     return "Essa senha aparece em vazamentos conhecidos. Escolha outra.";
-  if (m.includes("rate limit") || m.includes("too many"))
-    return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
   if (m.includes("manual linking") || m.includes("linking is disabled"))
     return "Não foi possível vincular o Google agora. Use e-mail e senha.";
   if (m.includes("captcha")) return "Verificação de segurança falhou. Recarregue a página.";
@@ -178,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           ...(captchaToken ? { options: { captchaToken } } : {}),
         });
-        if (error) return { error: traduzErro(error.message) };
+        if (error) return { error: traduzErro(error) };
         if (data.user) await markPermanent(data.user.id);
         return { error: null };
       },
@@ -195,7 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
         if (error) {
-          return { error: traduzErro(error.message), emailTaken: isEmailTaken(error.message) };
+          return {
+            error: traduzErro(error),
+            emailTaken: isEmailTaken(error.message),
+            rateLimited: isAuthRateLimited(error),
+          };
         }
         if (data.user) await markPermanent(data.user.id, fullName);
         return { error: null, needsEmailConfirmation: !data.session };
@@ -209,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               provider: "google",
               options: { redirectTo: `${window.location.origin}/auth/callback` },
             });
-            if (error) return { error: traduzErro(error.message) };
+            if (error) return { error: traduzErro(error) };
             return { error: null };
           }
           const result = (await lovable.auth.signInWithOAuth("google", {
@@ -221,11 +235,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               typeof oauthError === "string"
                 ? oauthError
                 : ((oauthError as { message?: string }).message ?? "Falha no login com Google.");
-            return { error: traduzErro(message) };
+            return { error: traduzErro({ message }) };
           }
           return { error: null };
         } catch (err) {
-          return { error: traduzErro((err as Error).message) };
+          return { error: traduzErro({ message: (err as Error).message }) };
         }
       },
 
@@ -244,7 +258,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
 
         if (error) {
-          return { error: traduzErro(error.message), emailTaken: isEmailTaken(error.message) };
+          return {
+            error: traduzErro(error),
+            emailTaken: isEmailTaken(error.message),
+            rateLimited: isAuthRateLimited(error),
+          };
         }
 
         await markPermanent(user.id, fullName);
@@ -255,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth/callback?tipo=recuperacao`,
         });
-        if (error) return { error: traduzErro(error.message) };
+        if (error) return { error: traduzErro(error) };
         return { error: null };
       },
 

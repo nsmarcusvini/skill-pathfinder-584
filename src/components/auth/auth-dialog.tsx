@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { GoogleButton } from "./google-button";
 import { useAuth } from "@/hooks/use-auth";
 import { loginSchema, signUpSchema, type LoginValues, type SignUpValues } from "@/lib/auth-schemas";
+import { markSignupAttempt, secondsUntilSignupAllowed } from "@/lib/signup-guard";
 
 export type AuthDialogMode = "entrar" | "criar";
 
@@ -56,6 +57,11 @@ export function AuthDialog({
     defaultValues: { fullName: "", email: "", password: "", passwordConfirm: "" },
   });
 
+  // Mesma trava de cadastro.tsx, e pelo mesmo motivo: form.formState.isSubmitting
+  // do react-hook-form só muda depois do zod resolver validar (assíncrono),
+  // então não fecha sozinho a janela de um duplo clique bem rápido.
+  const enviandoRef = React.useRef(false);
+
   async function handleLogin(values: LoginValues) {
     const { error } = await auth.signIn(values.email, values.password);
     if (error) {
@@ -67,28 +73,47 @@ export function AuthDialog({
     onSuccess?.();
   }
 
-  async function handleSignUp(values: SignUpValues) {
-    const result = auth.isAnonymous
-      ? await auth.convertAnonymousAccount(values.email, values.password, values.fullName)
-      : await auth.signUp(values.email, values.password, values.fullName);
+  const handleSignUp = React.useCallback(
+    async (values: SignUpValues) => {
+      if (enviandoRef.current) return;
 
-    if (result.emailTaken) {
-      setConflictEmail(values.email);
-      return;
-    }
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
+      const restante = secondsUntilSignupAllowed(values.email);
+      if (restante > 0) {
+        toast.info(`Aguarde ${restante}s antes de tentar de novo com este e-mail.`);
+        return;
+      }
 
-    toast.success(
-      result.needsEmailConfirmation
-        ? "Conta criada. Enviamos um e-mail de verificação para você."
-        : "Conta criada.",
-    );
-    onOpenChange(false);
-    onSuccess?.();
-  }
+      enviandoRef.current = true;
+      markSignupAttempt(values.email);
+      try {
+        const result = auth.isAnonymous
+          ? await auth.convertAnonymousAccount(values.email, values.password, values.fullName)
+          : await auth.signUp(values.email, values.password, values.fullName);
+
+        if (result.emailTaken) {
+          setConflictEmail(values.email);
+          return;
+        }
+        if (result.error) {
+          // Sem retry automático — 429 inclusive. O cooldown marcado acima
+          // já impede a próxima tentativa imediata para este e-mail.
+          toast.error(result.error);
+          return;
+        }
+
+        toast.success(
+          result.needsEmailConfirmation
+            ? "Conta criada. Enviamos um e-mail de verificação para você."
+            : "Conta criada.",
+        );
+        onOpenChange(false);
+        onSuccess?.();
+      } finally {
+        enviandoRef.current = false;
+      }
+    },
+    [auth, onOpenChange, onSuccess],
+  );
 
   async function handleGoogle() {
     const { error } = await auth.signInWithGoogle();

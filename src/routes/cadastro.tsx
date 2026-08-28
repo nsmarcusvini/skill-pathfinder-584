@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentCv, hasExtractedCv } from "@/hooks/use-current-cv";
 import { signUpSchema, type SignUpValues } from "@/lib/auth-schemas";
+import { markSignupAttempt, secondsUntilSignupAllowed } from "@/lib/signup-guard";
 
 export const Route = createFileRoute("/cadastro")({
   // Depende de sessão (useAuth) e de uma leitura no banco (useCurrentCv) para
@@ -61,31 +62,62 @@ function CadastroPage() {
     defaultValues: { fullName: "", email: "", password: "", passwordConfirm: "" },
   });
 
+  // Trava SÍNCRONA, checada e setada como a primeira linha do handler — não
+  // depende de re-render nenhum. form.formState.isSubmitting do
+  // react-hook-form também protege, mas é assíncrono (só muda depois da
+  // validação do zod resolver rodar, um microtask): num duplo clique bem
+  // rápido, o segundo clique pode chegar antes do botão desabilitar.
+  const enviandoRef = React.useRef(false);
+
+  const onSubmit = React.useCallback(
+    async (values: SignUpValues) => {
+      if (enviandoRef.current) return;
+
+      // Cooldown por e-mail ANTES de qualquer chamada de rede — impede o
+      // 429 em vez de só reagir a ele. Cobre também o caso de um 429
+      // anterior: markSignupAttempt roda mesmo quando a tentativa falha
+      // (linha abaixo), então o próximo clique nos 60s nem chega a sair
+      // do navegador.
+      const restante = secondsUntilSignupAllowed(values.email);
+      if (restante > 0) {
+        toast.info(`Aguarde ${restante}s antes de tentar de novo com este e-mail.`);
+        return;
+      }
+
+      enviandoRef.current = true;
+      markSignupAttempt(values.email);
+      try {
+        // Visitante anônimo: convertemos a MESMA conta, preservando o
+        // user.id e tudo que já foi analisado nesta sessão.
+        const result = auth.isAnonymous
+          ? await auth.convertAnonymousAccount(values.email, values.password, values.fullName)
+          : await auth.signUp(values.email, values.password, values.fullName);
+
+        if (result.emailTaken) {
+          setConflictEmail(values.email);
+          return;
+        }
+        if (result.error) {
+          // Sem retry automático aqui — 429 inclusive. O cooldown que acabou
+          // de ser marcado é o que impede a próxima tentativa imediata.
+          toast.error(result.error);
+          return;
+        }
+        toast.success(
+          result.needsEmailConfirmation
+            ? "Conta criada. Verifique seu e-mail para confirmar o endereço."
+            : "Conta criada.",
+        );
+        void navigate({ to: "/onboarding", replace: true });
+      } finally {
+        enviandoRef.current = false;
+      }
+    },
+    [auth, navigate],
+  );
+
   if (carregando || semCv) {
     return <LoadingState label="Verificando sua análise…" />;
-  }
-
-  async function onSubmit(values: SignUpValues) {
-    // Visitante anônimo: convertemos a MESMA conta, preservando o user.id
-    // e tudo que já foi analisado nesta sessão.
-    const result = auth.isAnonymous
-      ? await auth.convertAnonymousAccount(values.email, values.password, values.fullName)
-      : await auth.signUp(values.email, values.password, values.fullName);
-
-    if (result.emailTaken) {
-      setConflictEmail(values.email);
-      return;
-    }
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success(
-      result.needsEmailConfirmation
-        ? "Conta criada. Verifique seu e-mail para confirmar o endereço."
-        : "Conta criada.",
-    );
-    void navigate({ to: "/onboarding", replace: true });
   }
 
   if (conflictEmail) {
