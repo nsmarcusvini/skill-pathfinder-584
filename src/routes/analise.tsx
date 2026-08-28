@@ -182,13 +182,14 @@ function AnalisePage() {
         setStage("comparando");
 
         await queryClient.invalidateQueries({ queryKey: ["analise-gap"] });
+        await queryClient.invalidateQueries({ queryKey: ["analise-cv", user?.id] });
         setStage("pronto");
       } catch (err) {
         setErro((err as Error).message);
         setStage("aguardando");
       }
     },
-    [queryClient, runApply, runParse],
+    [queryClient, runApply, runParse, user?.id],
   );
 
   // Dispara o processamento quando chega um CV novo pela landing.
