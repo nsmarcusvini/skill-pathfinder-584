@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { AppShell, type NavItem } from "@/components/rumvia/app-shell";
+import { Tour } from "@/components/rumvia/tour";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useMarket, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
@@ -26,21 +27,68 @@ const NAV: NavItem[] = [
     label: "Dashboard",
     to: "/dashboard",
     icon: <LayoutDashboard className="size-4" aria-hidden />,
+    tourId: "tour-nav-dashboard",
   },
-  { label: "Meu CV", to: "/cv", icon: <FileText className="size-4" aria-hidden /> },
+  {
+    label: "Meu CV",
+    to: "/cv",
+    icon: <FileText className="size-4" aria-hidden />,
+    tourId: "tour-nav-cv",
+  },
   {
     label: "Minhas skills",
     to: "/minhas-skills",
     icon: <ListChecks className="size-4" aria-hidden />,
+    tourId: "tour-nav-minhas-skills",
   },
-  { label: "Vagas", to: "/vagas", icon: <Briefcase className="size-4" aria-hidden /> },
-  { label: "Stacks em Alta", to: "/ferramentas", icon: <Wrench className="size-4" aria-hidden /> },
-  { label: "Empresas", to: "/empresas", icon: <Building2 className="size-4" aria-hidden /> },
-  { label: "Salários", to: "/salarios", icon: <Wallet className="size-4" aria-hidden /> },
-  { label: "Progresso", to: "/progresso", icon: <Gauge className="size-4" aria-hidden /> },
-  { label: "Certificações", to: "/certificacoes", icon: <Award className="size-4" aria-hidden /> },
-  { label: "Cursos", to: "/cursos", icon: <GraduationCap className="size-4" aria-hidden /> },
-  { label: "Conta", to: "/conta", icon: <Settings className="size-4" aria-hidden /> },
+  {
+    label: "Vagas",
+    to: "/vagas",
+    icon: <Briefcase className="size-4" aria-hidden />,
+    tourId: "tour-nav-vagas",
+  },
+  {
+    label: "Stacks em Alta",
+    to: "/ferramentas",
+    icon: <Wrench className="size-4" aria-hidden />,
+    tourId: "tour-nav-ferramentas",
+  },
+  {
+    label: "Empresas",
+    to: "/empresas",
+    icon: <Building2 className="size-4" aria-hidden />,
+    tourId: "tour-nav-empresas",
+  },
+  {
+    label: "Salários",
+    to: "/salarios",
+    icon: <Wallet className="size-4" aria-hidden />,
+    tourId: "tour-nav-salarios",
+  },
+  {
+    label: "Progresso",
+    to: "/progresso",
+    icon: <Gauge className="size-4" aria-hidden />,
+    tourId: "tour-nav-progresso",
+  },
+  {
+    label: "Certificações",
+    to: "/certificacoes",
+    icon: <Award className="size-4" aria-hidden />,
+    tourId: "tour-nav-certificacoes",
+  },
+  {
+    label: "Cursos",
+    to: "/cursos",
+    icon: <GraduationCap className="size-4" aria-hidden />,
+    tourId: "tour-nav-cursos",
+  },
+  {
+    label: "Conta",
+    to: "/conta",
+    icon: <Settings className="size-4" aria-hidden />,
+    tourId: "tour-nav-conta",
+  },
 ];
 
 /** Só entra no menu de quem tem profiles.is_admin. A proteção real é server-side
@@ -95,6 +143,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
+      <Tour />
     </AppShell>
   );
 }

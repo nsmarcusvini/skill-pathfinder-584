@@ -1006,6 +1006,9 @@ export type Database = {
           state: string | null
           target_currency: string
           target_region: string
+          tour_status: string
+          tour_step: number
+          tour_updated_at: string | null
           updated_at: string
           years_experience: number | null
         }
@@ -1025,6 +1028,9 @@ export type Database = {
           state?: string | null
           target_currency?: string
           target_region?: string
+          tour_status?: string
+          tour_step?: number
+          tour_updated_at?: string | null
           updated_at?: string
           years_experience?: number | null
         }
@@ -1044,6 +1050,9 @@ export type Database = {
           state?: string | null
           target_currency?: string
           target_region?: string
+          tour_status?: string
+          tour_step?: number
+          tour_updated_at?: string | null
           updated_at?: string
           years_experience?: number | null
         }

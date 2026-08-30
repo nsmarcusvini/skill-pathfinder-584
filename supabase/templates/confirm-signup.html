@@ -1,0 +1,104 @@
+<!--
+  Template "Confirm signup" do Supabase Auth.
+
+  ATENÇÃO ao escopo real: no RUMVIA quase toda conta nasce de uma sessão
+  anônima convertida (convertAnonymousAccount -> updateUser), e esse caminho
+  dispara o template "Change Email Address", não este. Este aqui só é usado
+  quando signUp() é chamado com o visitante SEM sessão anônima — o caminho de
+  fallback de src/hooks/use-auth.tsx quando signInAnonymously falhou.
+
+  Mesmo sendo caminho secundário, vale estilizar: é o e-mail que a pessoa
+  recebe justamente quando algo já saiu do trilho.
+
+  Cole em: Supabase Dashboard -> Authentication -> Emails -> Confirm signup
+  -> Message body (aba Source/HTML).
+
+  Paleta de src/lib/design-tokens.ts.
+-->
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Confirme seu e-mail — RUMVIA</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f2f2f3;">
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
+      Confirme seu e-mail para ativar sua conta no RUMVIA.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f2f3;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background-color:#ffffff; border:1px solid rgba(29,31,32,0.16);">
+
+            <tr>
+              <td style="background-color:#1d2d3d; padding:28px 32px;">
+                <span style="font-family:'Barlow Condensed', Arial, Helvetica, sans-serif; font-weight:600; font-size:22px; letter-spacing:0.02em; color:#f2f2f3; text-transform:uppercase;">
+                  RUMVIA
+                </span>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:40px 32px 8px 32px;">
+                <h1 style="margin:0 0 20px 0; font-family:'Barlow Condensed', Arial, Helvetica, sans-serif; font-weight:600; font-size:26px; line-height:1.2; color:#1d1f20; text-transform:uppercase; letter-spacing:0.01em;">
+                  Confirme seu e-mail
+                </h1>
+                <p style="margin:0 0 28px 0; font-family:'Barlow', Arial, Helvetica, sans-serif; font-size:15px; line-height:1.6; color:#1d1f20;">
+                  Falta um passo para ativar sua conta no RUMVIA e ver sua aderência ao mercado.
+                  Clique no botão abaixo para confirmar este endereço.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px 32px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background-color:#416180;">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        target="_blank"
+                        style="display:inline-block; padding:13px 28px; font-family:'Barlow', Arial, Helvetica, sans-serif; font-weight:600; font-size:14px; letter-spacing:0.03em; text-transform:uppercase; color:#f2f2f3; text-decoration:none; border:1px solid #416180;"
+                      >
+                        Confirmar meu e-mail
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px;">
+                <div style="border-top:1px solid rgba(29,31,32,0.16);"></div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:24px 32px 8px 32px;">
+                <p style="margin:0; font-family:'Barlow', Arial, Helvetica, sans-serif; font-size:13px; line-height:1.6; color:#5d5d60;">
+                  Não criou essa conta? Pode ignorar este e-mail com segurança — sem a confirmação,
+                  nada é ativado.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:24px 32px 32px 32px;">
+                <p style="margin:0; font-family:'Barlow', Arial, Helvetica, sans-serif; font-size:12px; line-height:1.6; color:#7a7a7d;">
+                  Você recebeu este e-mail porque criou uma conta no
+                  <span style="color:#416180;">RUMVIA</span> — comparação do seu currículo com a
+                  demanda real do mercado de tecnologia.
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

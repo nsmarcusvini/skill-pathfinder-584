@@ -1,1 +1,38 @@
 project_id = "hskvwzkouhkwumzshbci"
+
+# Fonte versionada dos templates de e-mail. NÃO aplica sozinho no projeto
+# hospedado — a Supabase CLI não está instalada neste ambiente. Até alguém
+# rodar `supabase login && supabase link && supabase config push` (ou colar
+# manualmente pelo painel), o conteúdo real vive só no painel, em
+# Authentication -> Emails.
+#
+# Em uso hoje:
+#   change_email  -> convertAnonymousAccount() via updateUser({email}).
+#                    É o e-mail que praticamente TODA conta do RUMVIA recebe,
+#                    porque o cadastro converte a sessão anônima.
+#   recovery      -> resetPasswordForEmail(), rota /recuperar-senha.
+#   confirmation  -> signUp() puro; só ocorre quando não havia sessão anônima.
+#
+# Prontos mas inertes (o app não dispara nenhum dos dois hoje):
+#   magic_link    -> exigiria signInWithOtp(), que não existe no código.
+#   invite        -> exigiria auth.admin.inviteUserByEmail() ou o botão do painel.
+
+[auth.email.template.change_email]
+subject = "Confirme seu novo e-mail — RUMVIA"
+content_path = "./supabase/templates/change-email.html"
+
+[auth.email.template.recovery]
+subject = "Redefinir sua senha — RUMVIA"
+content_path = "./supabase/templates/reset-password.html"
+
+[auth.email.template.confirmation]
+subject = "Confirme seu e-mail — RUMVIA"
+content_path = "./supabase/templates/confirm-signup.html"
+
+[auth.email.template.magic_link]
+subject = "Seu link de acesso — RUMVIA"
+content_path = "./supabase/templates/magic-link.html"
+
+[auth.email.template.invite]
+subject = "Você foi convidado para o RUMVIA"
+content_path = "./supabase/templates/invite.html"

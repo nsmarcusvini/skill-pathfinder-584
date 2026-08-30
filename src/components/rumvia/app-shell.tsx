@@ -7,6 +7,8 @@ export interface NavItem {
   label: string;
   to: string;
   icon?: React.ReactNode;
+  /** Âncora do tour guiado (data-tour). Só o menu desktop recebe o atributo. */
+  tourId?: string;
 }
 
 export interface SelectOption {
@@ -90,6 +92,7 @@ export function AppShell({
               to={item.to as never}
               activeProps={{ "data-active": "true" }}
               title={item.label}
+              data-tour={item.tourId}
             >
               <span className="shrink-0">{item.icon}</span>
               {/* Sempre montado; encolhe e apaga junto, no mesmo ritmo da
@@ -145,37 +148,39 @@ export function AppShell({
         <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-divider bg-bg px-4">
           <span className="label-h6 shrink-0 text-accent-700 md:hidden">RUMVIA</span>
 
-          {trackOptions.length > 0 ? (
+          <div data-tour="tour-topbar-filtros" className="flex min-w-0 items-center gap-3">
+            {trackOptions.length > 0 ? (
+              <label className="flex min-w-0 items-center gap-2">
+                <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Trilha</span>
+                <select
+                  className="field h-7 w-auto min-w-0 py-0"
+                  value={track}
+                  onChange={(e) => onTrackChange?.(e.target.value)}
+                >
+                  {trackOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <label className="flex min-w-0 items-center gap-2">
-              <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Trilha</span>
+              <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Segmento</span>
               <select
                 className="field h-7 w-auto min-w-0 py-0"
-                value={track}
-                onChange={(e) => onTrackChange?.(e.target.value)}
+                value={segment}
+                onChange={(e) => onSegmentChange?.(e.target.value)}
               >
-                {trackOptions.map((o) => (
+                {segmentOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
               </select>
             </label>
-          ) : null}
-
-          <label className="flex min-w-0 items-center gap-2">
-            <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Segmento</span>
-            <select
-              className="field h-7 w-auto min-w-0 py-0"
-              value={segment}
-              onChange={(e) => onSegmentChange?.(e.target.value)}
-            >
-              {segmentOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">{topbarExtra}</div>
         </header>

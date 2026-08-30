@@ -1,7 +1,10 @@
 # Prompt 15 — Tour guiado pós-cadastro
 
-> Documento de planejamento. **Nada foi implementado.**
-> Parte A é o prompt reescrito (pronto para colar). Parte B é o plano técnico.
+> **Implementado em 2026-08-30.** Este documento é o registro do plano; o que
+> mudou na execução está anotado em `docs/PROGRESS.md` (Prompt 15) — em especial
+> o backfill, que precisou de uma segunda migration, e o bug de persistência do
+> passo, encontrado só ao rodar de verdade.
+> Parte A é o prompt reescrito. Parte B é o plano técnico.
 
 ---
 

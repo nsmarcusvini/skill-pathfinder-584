@@ -2,6 +2,7 @@ import * as React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/rumvia/page-header";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteMyAccount } from "@/lib/account.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { restartTour } from "@/hooks/use-tour";
 import {
   profileSchema,
   newPasswordSchema,
@@ -37,9 +39,24 @@ export const Route = createFileRoute("/_conta/conta")({
 function ContaPage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [exporting, setExporting] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [restartingTour, setRestartingTour] = React.useState(false);
   const [confirmText, setConfirmText] = React.useState("");
+
+  async function reverTour() {
+    if (!user) return;
+    setRestartingTour(true);
+    try {
+      await restartTour(user.id, queryClient);
+      void navigate({ to: "/dashboard" });
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRestartingTour(false);
+    }
+  }
 
   const perfilForm = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -237,6 +254,16 @@ function ContaPage() {
             </Button>
           </div>
         </form>
+      </Blueprint>
+
+      <Blueprint className="p-5">
+        <h2 className="label-h6 text-neutral-700">Tour guiado</h2>
+        <p className="mt-1 text-caption text-neutral-700">
+          Reveja a apresentação das telas do RUMVIA, passo a passo.
+        </p>
+        <Button className="mt-3" variant="outline" loading={restartingTour} onClick={reverTour}>
+          Rever tour guiado
+        </Button>
       </Blueprint>
 
       <Blueprint className="p-5">

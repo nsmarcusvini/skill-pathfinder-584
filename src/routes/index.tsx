@@ -316,39 +316,53 @@ function LandingPage() {
               )}
             </div>
 
-            {/* Faixa salarial */}
+            {/* Faixa salarial — mesmo padrão do bloco de ferramentas ao lado:
+                dado real de devopsSalary, ou EmptyState quando a amostra não
+                passa do piso. Nunca um número fixo (era R$ 9.200 / US$ 4.800
+                hardcoded enquanto salary_observations estava em zero). */}
             <div className="flex flex-col gap-3 bg-bg p-8">
               <span className="label-h6 text-neutral-500">Remuneração</span>
               <h3 className="font-heading text-h3 uppercase">Faixa salarial real</h3>
               <p className="text-body text-neutral-600" style={{ lineHeight: 1.65 }}>
                 Faixa P25–P75 para o seu nível de senioridade, separando Brasil (BRL) e remoto
-                global (USD). Quais skills te dariam o maior salto salarial — com o delta real.
+                global (USD). Exemplo abaixo: DevOps / SRE · Pleno.
               </p>
-              <div className="mt-2 flex gap-3">
-                {[
-                  {
-                    flag: "🇧🇷 Brasil · Pleno",
-                    num: "R$ 9.200",
-                    range: "P25: R$7.800 · P75: R$12.000",
-                  },
-                  {
-                    flag: "🌎 Remoto · Pleno",
-                    num: "US$ 4.800",
-                    range: "P25: US$3.800 · P75: US$6.200",
-                  },
-                ].map((s) => (
-                  <div key={s.flag} className="flex flex-1 flex-col gap-1 bg-surface p-3">
-                    <span className="font-mono text-caption text-neutral-500">{s.flag}</span>
-                    <span
-                      className="num font-heading font-bold text-neutral-900"
-                      style={{ fontSize: 26 }}
-                    >
-                      {s.num}
-                    </span>
-                    <span className="font-mono text-caption text-neutral-500">{s.range}</span>
-                  </div>
-                ))}
-              </div>
+              {stats?.devopsSalary && stats.devopsSalary.length > 0 ? (
+                <div className="mt-2 flex gap-3">
+                  {stats.devopsSalary.map((s) => {
+                    const isBr = s.segment === "br";
+                    const fmt = (n: number) =>
+                      new Intl.NumberFormat("pt-BR", {
+                        style: "currency",
+                        currency: s.currency,
+                        maximumFractionDigits: 0,
+                      }).format(n);
+                    return (
+                      <div
+                        key={s.segment}
+                        className="flex flex-1 flex-col gap-1 bg-surface p-3"
+                      >
+                        <span className="font-mono text-caption text-neutral-500">
+                          {isBr ? "🇧🇷 Brasil · Pleno" : "🌎 Remoto · Pleno"}
+                        </span>
+                        <span
+                          className="num font-heading font-bold text-neutral-900"
+                          style={{ fontSize: 26 }}
+                        >
+                          {fmt(s.p50)}/mês
+                        </span>
+                        <span className="font-mono text-caption text-neutral-500">
+                          P25: {fmt(s.p25)} · P75: {fmt(s.p75)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 text-caption text-neutral-500">
+                  {stats ? "Ainda sem dados suficientes nesta trilha." : "Carregando dados…"}
+                </p>
+              )}
             </div>
 
             {/* Plano de estudos */}
@@ -403,59 +417,6 @@ function LandingPage() {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ PROOF BANNER ═══ */}
-      <section className="bg-accent-900 py-16">
-        <div className="rumvia-container">
-          <div className="flex flex-wrap items-center justify-between gap-10">
-            <div style={{ maxWidth: 520 }}>
-              <blockquote
-                className="font-heading font-semibold uppercase text-bg"
-                style={{ fontSize: 28, lineHeight: 1.2 }}
-              >
-                "Fui de{" "}
-                <em className="text-accent-400" style={{ fontStyle: "normal" }}>
-                  68% para 91%
-                </em>{" "}
-                de aderência em quatro meses seguindo o plano. Recebi a proposta que estava
-                esperando."
-              </blockquote>
-              <p className="mt-4 text-caption" style={{ color: "rgba(242,242,243,0.5)" }}>
-                — Desenvolvedor DevOps · São Paulo
-              </p>
-            </div>
-            <div className="flex gap-4">
-              {[
-                { num: "+23pp", label: "Ganho médio de aderência após 90 dias" },
-                { num: "< 4min", label: "Para ver o primeiro resultado" },
-              ].map((c) => (
-                <div
-                  key={c.num}
-                  className="flex flex-col gap-1 p-5"
-                  style={{
-                    background: "rgba(242,242,243,0.08)",
-                    border: "1px solid rgba(242,242,243,0.12)",
-                    minWidth: 148,
-                  }}
-                >
-                  <span
-                    className="num font-heading font-bold text-accent-400"
-                    style={{ fontSize: 36, lineHeight: 1 }}
-                  >
-                    {c.num}
-                  </span>
-                  <span
-                    className="text-caption"
-                    style={{ color: "rgba(242,242,243,0.55)", lineHeight: 1.4 }}
-                  >
-                    {c.label}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
         </div>

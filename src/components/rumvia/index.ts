@@ -7,3 +7,4 @@ export { DataTable, type DataTableColumn } from "./data-table";
 export { EmptyState, LoadingState, ErrorState } from "./states";
 export { ChartCard } from "./chart-card";
 export { AppShell, type NavItem } from "./app-shell";
+export { Tour } from "./tour";

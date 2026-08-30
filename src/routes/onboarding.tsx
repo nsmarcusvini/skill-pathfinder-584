@@ -8,7 +8,6 @@ import { Blueprint } from "@/components/rumvia/blueprint";
 import { PageHeader } from "@/components/rumvia/page-header";
 import { LoadingState } from "@/components/rumvia/states";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { AdicionarSkill } from "@/components/app/adicionar-skill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -308,14 +307,13 @@ function OnboardingPage() {
     <section className="flex flex-col gap-3">
       <p className="text-caption text-neutral-700">
         Envie seu currículo para extrairmos suas skills automaticamente. A leitura é por dicionário,
-        sem IA — ela não inventa, mas também não adivinha. Você pode acrescentar à mão o que faltar,
-        agora ou depois.
+        sem IA — ela não inventa, mas também não adivinha. Você pode acrescentar à mão o que faltar
+        depois.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => void navigate({ to: "/cv" })}>
           Enviar CV
         </Button>
-        <AdicionarSkill label="Adicionar skill à mão" align="start" />
         <Button variant="ghost" onClick={finalizar} loading={saving}>
           Pular por enquanto
         </Button>
@@ -335,20 +333,6 @@ function OnboardingPage() {
           {stepTrilha}
           {stepSenioridade}
           {stepSegmento}
-
-          {/* O parser lê por dicionário: reconhece o que conhece, e cala sobre o
-              resto. Este é o momento em que a pessoa está olhando os próprios
-              dados e percebe o que ficou de fora. */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-divider pt-4">
-            <div className="flex-1">
-              <h2 className="label-h6 text-neutral-700">Faltou alguma skill?</h2>
-              <p className="mt-1 text-caption text-neutral-600">
-                Acrescente o que o currículo não deixou explícito. Entra no cálculo da aderência
-                imediatamente.
-              </p>
-            </div>
-            <AdicionarSkill label="Adicionar skill" />
-          </div>
 
           <div className="flex justify-end border-t border-divider pt-4">
             <Button onClick={finalizar} loading={saving}>
