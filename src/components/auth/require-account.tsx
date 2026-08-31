@@ -33,11 +33,7 @@ export function RequireAccount({
   return (
     <>
       <div className="relative isolate">
-        <div
-          aria-hidden
-          inert
-          className="pointer-events-none select-none blur-[6px] saturate-50"
-        >
+        <div aria-hidden inert className="pointer-events-none select-none blur-[6px] saturate-50">
           {placeholderLabel ? (
             <div className="card flex h-40 items-center justify-center">
               <span className="label-h6 text-neutral-600">{placeholderLabel}</span>
@@ -53,7 +49,7 @@ export function RequireAccount({
             <h3 className="label-h6 mt-2 text-neutral-900">{title}</h3>
             <p className="mt-1 text-caption text-neutral-700">{description}</p>
             <Button className="mt-3 w-full" onClick={() => setDialogOpen(true)}>
-              Criar conta gratuita
+              Criar conta e assinar
             </Button>
           </div>
         </div>

@@ -29,8 +29,11 @@ export const Route = createFileRoute("/onboarding")({
       { property: "og:description", content: "Configure sua trilha de carreira no RUMVIA." },
     ],
   }),
+  // Pagar vem ANTES do onboarding: o produto inteiro é pago, e fazer alguém
+  // preencher trilha/senioridade para só então descobrir que não entra é o
+  // pior momento possível para apresentar o preço.
   component: () => (
-    <ProtectedRoute requireAccount>
+    <ProtectedRoute requireAccount requireSubscription>
       <OnboardingPage />
     </ProtectedRoute>
   ),

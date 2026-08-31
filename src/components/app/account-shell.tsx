@@ -1,15 +1,17 @@
 import * as React from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Award,
   Briefcase,
   Building2,
+  CreditCard,
   FileText,
   GraduationCap,
   Gauge,
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Lock,
   Settings,
   ShieldCheck,
   Wallet,
@@ -17,9 +19,11 @@ import {
 } from "lucide-react";
 
 import { AppShell, type NavItem } from "@/components/rumvia/app-shell";
+import { Blueprint } from "@/components/rumvia/blueprint";
 import { Tour } from "@/components/rumvia/tour";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 import { useMarket, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
 
 const NAV: NavItem[] = [
@@ -84,6 +88,11 @@ const NAV: NavItem[] = [
     tourId: "tour-nav-cursos",
   },
   {
+    label: "Assinatura",
+    to: "/assinatura",
+    icon: <CreditCard className="size-4" aria-hidden />,
+  },
+  {
     label: "Conta",
     to: "/conta",
     icon: <Settings className="size-4" aria-hidden />,
@@ -99,10 +108,33 @@ const ADMIN_NAV: NavItem = {
   icon: <ShieldCheck className="size-4" aria-hidden />,
 };
 
+/**
+ * Recado permanente para quem entrou na conta mas ainda não pagou. Só sobra
+ * `/conta` navegável (o paywall barra o resto), então o aviso mora aqui, no
+ * shell, e não em cada tela. Em `/assinatura` a própria página já avisa —
+ * repetir viraria dois alertas empilhados.
+ */
+function FaixaAcessoBloqueado() {
+  return (
+    <Blueprint className="mb-4 flex flex-wrap items-center gap-3 border-danger p-4" role="alert">
+      <Lock className="size-4 shrink-0 text-danger" aria-hidden />
+      <p className="flex-1 text-caption text-neutral-700">
+        <strong>Acesso bloqueado.</strong> Seu painel só abre depois que a assinatura for paga.
+      </p>
+      <Button size="sm" asChild>
+        <Link to="/assinatura">Assinar agora</Link>
+      </Button>
+    </Blueprint>
+  );
+}
+
 export function AccountShell({ children }: { children: React.ReactNode }) {
   const { profile, user, signOut } = useAuth();
   const market = useMarket();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { canAccess, resolvendo } = useSubscription();
+  const mostrarFaixa = !resolvendo && !canAccess && pathname !== "/assinatura";
 
   const nav = React.useMemo(
     () => (profile?.is_admin ? [...NAV, ADMIN_NAV] : NAV),
@@ -142,6 +174,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
         </div>
       }
     >
+      {mostrarFaixa ? <FaixaAcessoBloqueado /> : null}
       {children}
       <Tour />
     </AppShell>

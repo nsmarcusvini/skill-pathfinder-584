@@ -31,6 +31,7 @@ import { ChartCard } from "@/components/rumvia/chart-card";
 import { GapRing } from "@/components/rumvia/gap-ring";
 import { MetricCard } from "@/components/rumvia/metric-card";
 import { PageHeader } from "@/components/rumvia/page-header";
+import { AVISO_ACESSO_PAGO } from "@/lib/plan-copy";
 import { SkillBadge } from "@/components/rumvia/skill-badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -267,10 +268,10 @@ function AnalisePage() {
             <Save className="size-4 text-accent-700" aria-hidden />
             <p className="flex-1 text-caption text-neutral-700">
               Salve sua análise criando uma conta — o CV e as skills desta sessão continuam sendo
-              seus, nada é reprocessado.
+              seus, nada é reprocessado. {AVISO_ACESSO_PAGO}
             </p>
             <Button size="sm" asChild>
-              <Link to="/cadastro">Criar conta grátis</Link>
+              <Link to="/cadastro">Criar conta e assinar</Link>
             </Button>
           </Blueprint>
         ) : null}
@@ -565,12 +566,20 @@ function AnalisePage() {
 
                 {isAnonymous ? (
                   <Blueprint className="flex flex-wrap items-center justify-between gap-3 p-5">
-                    <p className="text-body text-neutral-700">
-                      A análise completa — todas as lacunas, salários e plano de estudos — fica na
-                      sua conta. É grátis e mantém tudo que você já enviou.
-                    </p>
+                    <div className="flex-1">
+                      <p className="text-body text-neutral-700">
+                        A análise completa — todas as lacunas, salários e plano de estudos — fica na
+                        sua conta, que mantém tudo que você já enviou.
+                      </p>
+                      <p className="mt-1 text-caption text-neutral-600">
+                        {AVISO_ACESSO_PAGO}{" "}
+                        <Link to="/" hash="planos" className="underline">
+                          Ver planos e preços
+                        </Link>
+                      </p>
+                    </div>
                     <Button size="lg" asChild>
-                      <Link to="/cadastro">Criar conta grátis para ver a análise completa</Link>
+                      <Link to="/cadastro">Criar conta e assinar</Link>
                     </Button>
                   </Blueprint>
                 ) : (

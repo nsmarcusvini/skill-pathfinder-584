@@ -91,6 +91,16 @@ Cron jobs do `pg_cron` chamam URLs do próprio app via `pg_net`
     em componente. shadcn tem que respeitar radius 0. Escala de gap:
     critical/low/mid/high — cor vem dos tokens.
 
+12. **A conta é paga. Só a prévia é grátis.** `/` e `/analise` rodam sem cadastro;
+    tudo em `_conta/*` e o `/onboarding` exigem assinatura ativa. Rota nova de `_conta`
+    já nasce paga — não precisa fazer nada, `_conta.tsx` cobre. As duas exceções são
+    `/assinatura` (é onde se paga) e `/conta` (exportar/excluir é direito LGPD, não
+    benefício de plano); mexer nessa lista é decisão de produto, não de código.
+    Nenhum texto novo pode chamar a **conta** de grátis — a frase de bloqueio é
+    `AVISO_ACESSO_PAGO` em `src/lib/plan-copy.ts` e é a mesma em todo o funil. Preço
+    nunca vai para JSX: vem de `billing_plans`. Esconder botão não é proteção — a
+    server function que serve dado pago usa `requireActiveSubscription`.
+
 ## Layout do projeto
 
 ```
@@ -112,12 +122,14 @@ src/
       certificacoes.tsx        # ❌ esqueleto (Prompt 12)
       cursos.tsx               # ❌ esqueleto (Prompt 12)
       conta.tsx                # ✅ pronto
+      assinatura.tsx           # ✅ pronto (AbacatePay, R$ 24,90/mês)
       admin.*.tsx              # ⚠️ parcial (falta trilhas e saúde)
     api/public/                # Endpoints de servidor (o que seria Edge Function)
       ingest-jobs.ts
       extract-jd-skills.ts
       refresh-market-views.ts
       ingest-webhook.ts
+      abacatepay-webhook.ts    # eventos de pagamento (secret + HMAC)
   lib/
     skill-matcher.ts           # ⚠️ MATCHER ÚNICO — não duplicar em outro lugar
     gap.functions.ts           # ⚠️ FÓRMULA ÚNICA de aderência
@@ -129,10 +141,14 @@ src/
       pipeline.server.ts       # Reutilizado por PULL e PUSH webhook
     jd/                        # Extração de skills de vagas
     design-tokens.ts
+    billing.functions.ts       # assinatura: overview, checkout, cancelamento
+    plan-copy.ts               # ⚠️ texto do plano — landing e /assinatura leem daqui
+    abacatepay/                # client REST v2 + processamento de webhook
   hooks/
     use-auth.tsx               # ⚠️ anonymous sign-in + conversão — não regredir
     use-market.tsx             # trilha + segmento globais
     use-gap.tsx
+    use-subscription.tsx       # ⚠️ FONTE ÚNICA de isPro/canAccess no front
   components/
     rumvia/                    # Design System RUMVIA
     auth/
@@ -176,7 +192,12 @@ supabase/
 - [ ] **Prompt 13** — Admin de trilhas + painel de saúde
 - [ ] **Prompt 14** — Expurgo de anônimos + notificações + LGPD (export/delete) +
       responsividade + smoke test
-- [ ] **Prompt 8C** — Stripe (avulso R$7,99 + Pro R$30/mês) — só depois do funil validar
+- [x] **Prompt 8C** — AbacatePay: assinatura Pro R$ 24,90/mês + paywall obrigatório
+      (2026-08-31). Substituiu o Stripe do plano original. **O produto é pago:** só a
+      prévia do CV (`/`, `/analise`) roda sem conta; `_conta/*` e `/onboarding` exigem
+      assinatura ativa. Exceções: `/assinatura` (é onde se paga) e `/conta` (LGPD —
+      exportar/excluir não pode ser trancado). Admin entra sem pagar
+      (`can_access_paid_features`). Runbook em `docs/ABACATEPAY.md`.
 
 Detalhes completos de cada um vivem em `docs/roadmap/`.
 
@@ -188,6 +209,10 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
 - **`use-market.tsx` deriva segmento de `profile.target_region`.** Se o onboarding
   não estiver gravando esse campo, tudo cai em `br` por default. Verificar em
   `src/routes/onboarding.tsx` antes de mexer em Ferramentas.
+- **AbacatePay recusa endpoint de webhook em localhost.** Precisa de HTTPS público em
+  `APP_BASE_URL`. Para testar em dev, exponha o app com um túnel (cloudflared/ngrok) antes
+  de rodar `bun run scripts/abacatepay-setup.ts`.
+
 - **Anonymous sign-in precisa estar habilitado no painel do Supabase**
   (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
 

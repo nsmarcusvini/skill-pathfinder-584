@@ -19,6 +19,7 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RecuperarSenhaRouteImport } from './routes/recuperar-senha'
 import { Route as ContaAdminRouteImport } from './routes/_conta/admin'
+import { Route as ContaAssinaturaRouteImport } from './routes/_conta/assinatura'
 import { Route as ContaCertificacoesRouteImport } from './routes/_conta/certificacoes'
 import { Route as ContaContaRouteImport } from './routes/_conta/conta'
 import { Route as ContaCursosRouteImport } from './routes/_conta/cursos'
@@ -40,6 +41,7 @@ import { Route as ContaAdminSaudeRouteImport } from './routes/_conta/admin.saude
 import { Route as ContaAdminSkillsRouteImport } from './routes/_conta/admin.skills'
 import { Route as ContaAdminTrilhasRouteImport } from './routes/_conta/admin.trilhas'
 import { Route as ContaAdminUsuariosRouteImport } from './routes/_conta/admin.usuarios'
+import { Route as ApiPublicAbacatepayWebhookRouteImport } from './routes/api/public/abacatepay-webhook'
 import { Route as ApiPublicExtractJdSkillsRouteImport } from './routes/api/public/extract-jd-skills'
 import { Route as ApiPublicIngestAsyncRouteImport } from './routes/api/public/ingest-async'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
@@ -93,6 +95,11 @@ const RecuperarSenhaRoute = RecuperarSenhaRouteImport.update({
 const ContaAdminRoute = ContaAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => ContaRoute,
+} as any)
+const ContaAssinaturaRoute = ContaAssinaturaRouteImport.update({
+  id: '/assinatura',
+  path: '/assinatura',
   getParentRoute: () => ContaRoute,
 } as any)
 const ContaCertificacoesRoute = ContaCertificacoesRouteImport.update({
@@ -200,6 +207,12 @@ const ContaAdminUsuariosRoute = ContaAdminUsuariosRouteImport.update({
   path: '/usuarios',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ApiPublicAbacatepayWebhookRoute =
+  ApiPublicAbacatepayWebhookRouteImport.update({
+    id: '/api/public/abacatepay-webhook',
+    path: '/api/public/abacatepay-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicExtractJdSkillsRoute =
   ApiPublicExtractJdSkillsRouteImport.update({
     id: '/api/public/extract-jd-skills',
@@ -238,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
   '/admin': typeof ContaAdminRouteWithChildren
+  '/assinatura': typeof ContaAssinaturaRoute
   '/certificacoes': typeof ContaCertificacoesRoute
   '/conta': typeof ContaContaRoute
   '/cursos': typeof ContaCursosRoute
@@ -258,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/admin/usuarios': typeof ContaAdminUsuariosRoute
+  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -274,6 +289,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/assinatura': typeof ContaAssinaturaRoute
   '/certificacoes': typeof ContaCertificacoesRoute
   '/conta': typeof ContaContaRoute
   '/cursos': typeof ContaCursosRoute
@@ -294,6 +310,7 @@ export interface FileRoutesByTo {
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/admin/usuarios': typeof ContaAdminUsuariosRoute
+  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -313,6 +330,7 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
   '/_conta/admin': typeof ContaAdminRouteWithChildren
+  '/_conta/assinatura': typeof ContaAssinaturaRoute
   '/_conta/certificacoes': typeof ContaCertificacoesRoute
   '/_conta/conta': typeof ContaContaRoute
   '/_conta/cursos': typeof ContaCursosRoute
@@ -333,6 +351,7 @@ export interface FileRoutesById {
   '/_conta/admin/skills': typeof ContaAdminSkillsRoute
   '/_conta/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/_conta/admin/usuarios': typeof ContaAdminUsuariosRoute
+  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -352,6 +371,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/recuperar-senha'
     | '/admin'
+    | '/assinatura'
     | '/certificacoes'
     | '/conta'
     | '/cursos'
@@ -372,6 +392,7 @@ export interface FileRouteTypes {
     | '/admin/skills'
     | '/admin/trilhas'
     | '/admin/usuarios'
+    | '/api/public/abacatepay-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -388,6 +409,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacidade'
     | '/recuperar-senha'
+    | '/assinatura'
     | '/certificacoes'
     | '/conta'
     | '/cursos'
@@ -408,6 +430,7 @@ export interface FileRouteTypes {
     | '/admin/skills'
     | '/admin/trilhas'
     | '/admin/usuarios'
+    | '/api/public/abacatepay-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -426,6 +449,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/recuperar-senha'
     | '/_conta/admin'
+    | '/_conta/assinatura'
     | '/_conta/certificacoes'
     | '/_conta/conta'
     | '/_conta/cursos'
@@ -446,6 +470,7 @@ export interface FileRouteTypes {
     | '/_conta/admin/skills'
     | '/_conta/admin/trilhas'
     | '/_conta/admin/usuarios'
+    | '/api/public/abacatepay-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -465,6 +490,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ApiPublicAbacatepayWebhookRoute: typeof ApiPublicAbacatepayWebhookRoute
   ApiPublicExtractJdSkillsRoute: typeof ApiPublicExtractJdSkillsRoute
   ApiPublicIngestAsyncRoute: typeof ApiPublicIngestAsyncRoute
   ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
@@ -542,6 +568,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof ContaAdminRouteImport
+      parentRoute: typeof ContaRoute
+    }
+    '/_conta/assinatura': {
+      id: '/_conta/assinatura'
+      path: '/assinatura'
+      fullPath: '/assinatura'
+      preLoaderRoute: typeof ContaAssinaturaRouteImport
       parentRoute: typeof ContaRoute
     }
     '/_conta/certificacoes': {
@@ -691,6 +724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminUsuariosRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/api/public/abacatepay-webhook': {
+      id: '/api/public/abacatepay-webhook'
+      path: '/api/public/abacatepay-webhook'
+      fullPath: '/api/public/abacatepay-webhook'
+      preLoaderRoute: typeof ApiPublicAbacatepayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/extract-jd-skills': {
       id: '/api/public/extract-jd-skills'
       path: '/api/public/extract-jd-skills'
@@ -759,6 +799,7 @@ const ContaAdminRouteWithChildren = ContaAdminRoute._addFileChildren(
 
 interface ContaRouteChildren {
   ContaAdminRoute: typeof ContaAdminRouteWithChildren
+  ContaAssinaturaRoute: typeof ContaAssinaturaRoute
   ContaCertificacoesRoute: typeof ContaCertificacoesRoute
   ContaContaRoute: typeof ContaContaRoute
   ContaCursosRoute: typeof ContaCursosRoute
@@ -774,6 +815,7 @@ interface ContaRouteChildren {
 
 const ContaRouteChildren: ContaRouteChildren = {
   ContaAdminRoute: ContaAdminRouteWithChildren,
+  ContaAssinaturaRoute: ContaAssinaturaRoute,
   ContaCertificacoesRoute: ContaCertificacoesRoute,
   ContaContaRoute: ContaContaRoute,
   ContaCursosRoute: ContaCursosRoute,
@@ -800,6 +842,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ApiPublicAbacatepayWebhookRoute: ApiPublicAbacatepayWebhookRoute,
   ApiPublicExtractJdSkillsRoute: ApiPublicExtractJdSkillsRoute,
   ApiPublicIngestAsyncRoute: ApiPublicIngestAsyncRoute,
   ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,

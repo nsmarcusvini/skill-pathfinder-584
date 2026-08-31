@@ -35,6 +35,104 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          dev_mode: boolean
+          event_id: string
+          event_type: string
+          handle_error: string | null
+          handled: boolean
+          id: string
+          payload: Json
+          received_at: string
+          subscription_id: string | null
+        }
+        Insert: {
+          dev_mode?: boolean
+          event_id: string
+          event_type: string
+          handle_error?: string | null
+          handled?: boolean
+          id?: string
+          payload: Json
+          received_at?: string
+          subscription_id?: string | null
+        }
+        Update: {
+          dev_mode?: boolean
+          event_id?: string
+          event_type?: string
+          handle_error?: string | null
+          handled?: boolean
+          id?: string
+          payload?: Json
+          received_at?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_plans: {
+        Row: {
+          abacate_product_id: string | null
+          created_at: string
+          currency: string
+          cycle: string
+          description: string | null
+          id: string
+          is_active: boolean
+          key: string
+          max_retry: number
+          methods: string[]
+          name: string
+          price_cents: number
+          retry_every_days: number
+          trial_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          abacate_product_id?: string | null
+          created_at?: string
+          currency?: string
+          cycle?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          max_retry?: number
+          methods?: string[]
+          name: string
+          price_cents: number
+          retry_every_days?: number
+          trial_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          abacate_product_id?: string | null
+          created_at?: string
+          currency?: string
+          cycle?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          max_retry?: number
+          methods?: string[]
+          name?: string
+          price_cents?: number
+          retry_every_days?: number
+          trial_days?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       career_tracks: {
         Row: {
           color_token: string
@@ -1503,6 +1601,92 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          abacate_bill_id: string | null
+          abacate_customer_id: string | null
+          abacate_subscription_id: string | null
+          amount_cents: number
+          cancelled_at: string | null
+          cancelled_due_to: string | null
+          checkout_url: string | null
+          created_at: string
+          currency: string
+          current_period_end: string | null
+          current_period_start: string | null
+          dev_mode: boolean
+          external_id: string
+          id: string
+          last_payment_at: string | null
+          last_receipt_url: string | null
+          metadata: Json
+          method: string | null
+          plan_id: string
+          status: string
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          abacate_bill_id?: string | null
+          abacate_customer_id?: string | null
+          abacate_subscription_id?: string | null
+          amount_cents: number
+          cancelled_at?: string | null
+          cancelled_due_to?: string | null
+          checkout_url?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          dev_mode?: boolean
+          external_id: string
+          id?: string
+          last_payment_at?: string | null
+          last_receipt_url?: string | null
+          metadata?: Json
+          method?: string | null
+          plan_id: string
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          abacate_bill_id?: string | null
+          abacate_customer_id?: string | null
+          abacate_subscription_id?: string | null
+          amount_cents?: number
+          cancelled_at?: string | null
+          cancelled_due_to?: string | null
+          checkout_url?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          dev_mode?: boolean
+          external_id?: string
+          id?: string
+          last_payment_at?: string | null
+          last_receipt_url?: string | null
+          metadata?: Json
+          method?: string | null
+          plan_id?: string
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       track_role_variants: {
         Row: {
           created_at: string
@@ -2195,6 +2379,8 @@ export type Database = {
         }[]
       }
       expire_old_jobs: { Args: never; Returns: number }
+      can_access_paid_features: { Args: { _user_id: string }; Returns: boolean }
+      has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       job_locations: {
         Args: { _segments: string[]; _track_id: string }

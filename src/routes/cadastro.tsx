@@ -8,6 +8,7 @@ import { AlertTriangle } from "lucide-react";
 import { AuthLayout, FieldError } from "@/components/auth/auth-layout";
 import { GoogleButton } from "@/components/auth/google-button";
 import { LoadingState } from "@/components/rumvia/states";
+import { AVISO_ACESSO_PAGO } from "@/lib/plan-copy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -108,7 +109,10 @@ function CadastroPage() {
             ? "Conta criada. Verifique seu e-mail para confirmar o endereço."
             : "Conta criada.",
         );
-        void navigate({ to: "/onboarding", replace: true });
+        // Conta criada ≠ conta liberada. O acesso ao painel só abre com a
+        // assinatura paga, então o próximo passo é o pagamento — nunca o
+        // onboarding, que já é área paga.
+        void navigate({ to: "/assinatura", search: { bloqueado: "1" }, replace: true });
       } finally {
         enviandoRef.current = false;
       }
@@ -127,8 +131,8 @@ function CadastroPage() {
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
           <p className="text-caption text-neutral-700">
             Já existe uma conta RUMVIA com <strong>{conflictEmail}</strong>. Se você entrar nela,{" "}
-            <strong>a análise desta sessão anônima será descartada</strong> e o CV enviado agora
-            não será transferido.
+            <strong>a análise desta sessão anônima será descartada</strong> e o CV enviado agora não
+            será transferido.
           </p>
         </div>
         <div className="mt-4 flex flex-col gap-2">
@@ -154,8 +158,8 @@ function CadastroPage() {
       title="Criar conta"
       subtitle={
         auth.isAnonymous
-          ? "Sua análise atual continua válida: o cadastro apenas transforma esta sessão em conta permanente."
-          : "Leva menos de um minuto."
+          ? "Sua análise atual continua válida: o cadastro apenas transforma esta sessão em conta permanente. O passo seguinte é a assinatura."
+          : "Leva menos de um minuto. O passo seguinte é a assinatura."
       }
       footer={
         <p className="text-caption text-neutral-700">
@@ -206,8 +210,11 @@ function CadastroPage() {
           <FieldError message={form.formState.errors.passwordConfirm?.message} />
         </div>
         <Button type="submit" loading={form.formState.isSubmitting}>
-          Criar conta
+          Criar conta e ir para o pagamento
         </Button>
+        {/* Dito antes do clique, não depois: ninguém deve descobrir o paywall
+            só ao ser redirecionado. */}
+        <p className="text-caption text-neutral-600">{AVISO_ACESSO_PAGO}</p>
       </form>
 
       <div className="my-4 flex items-center gap-3">

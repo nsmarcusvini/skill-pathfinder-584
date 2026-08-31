@@ -4,7 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
 import { CvDropzone } from "@/components/app/cv-dropzone";
+import { formatCents } from "@/components/rumvia/paywall";
 import { Button } from "@/components/ui/button";
+import { usePublicPlan } from "@/hooks/use-subscription";
+import { AVISO_ACESSO_PAGO, PLANO_INCLUI, PREVIA_GRATUITA } from "@/lib/plan-copy";
 import { getLandingStats } from "@/lib/public-stats.functions";
 
 export const Route = createFileRoute("/")({
@@ -49,8 +52,12 @@ const HOW_IT_WORKS = [
 
 const FAQ_ITEMS = [
   {
-    q: "É realmente gratuito?",
-    a: "Sim. A análise prévia — score de aderência, top skills em falta, amostra das ferramentas mais pedidas — é gratuita e não exige cadastro. Para funcionalidades completas como histórico de gap, plano de estudos e alertas, você cria uma conta gratuitamente.",
+    q: "O que é gratuito e o que é pago?",
+    a: "A prévia é gratuita e não exige cadastro: score de aderência, amostra das skills em falta e das ferramentas mais pedidas. O RUMVIA completo — painel, histórico de gap, plano de estudos, salários, empresas e progresso — é assinatura mensal. Criar a conta não libera o acesso: o painel só abre depois que a assinatura for confirmada.",
+  },
+  {
+    q: "Quanto custa e como cobram?",
+    a: "Uma assinatura mensal, cobrada no cartão de crédito e renovada automaticamente até você cancelar. O valor está na seção Planos, acima. O pagamento é processado pela AbacatePay — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
   },
   {
     q: "Como vocês analisam o currículo?",
@@ -66,7 +73,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Meus dados ficam salvos e seguros?",
-    a: "O arquivo do currículo fica armazenado até você excluí-lo — ou por 7 dias caso não crie conta. Você pode exportar todos os seus dados em JSON ou excluir a conta a qualquer momento em Configurações → Minha conta. Seguimos a LGPD.",
+    a: "O arquivo do currículo fica armazenado até você excluí-lo — ou por 7 dias caso não crie conta. Exportar seus dados em JSON e excluir a conta continuam disponíveis em Configurações → Minha conta mesmo sem assinatura ativa: o dado é seu, pagando ou não. Seguimos a LGPD.",
   },
   {
     q: "Funciona para quem está migrando de área?",
@@ -82,6 +89,10 @@ function LandingPage() {
     staleTime: 5 * 60 * 1000,
     queryFn: () => loadStats(),
   });
+  const { data: plan } = usePublicPlan();
+  // Preço nunca é escrito no JSX (regra 1) — vem de billing_plans, a mesma
+  // fonte que o checkout cobra. Sem plano carregado, o card não inventa número.
+  const preco = plan ? formatCents(plan.priceCents, plan.currency) : null;
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
 
   return (
@@ -96,10 +107,14 @@ function LandingPage() {
             <Link to="/login" className="text-caption text-neutral-600 hover:text-accent-700">
               Entrar
             </Link>
-            {/* /analise primeiro: conta só se cria depois de extrair o currículo. */}
+            <a href="#planos" className="text-caption text-neutral-600 hover:text-accent-700">
+              Planos
+            </a>
+            {/* /analise primeiro: conta só se cria depois de extrair o currículo.
+                Não diz "grátis" — a prévia é, a conta não. */}
             <Button asChild size="sm">
               <Link to="/analise" search={{ cv: undefined }}>
-                Criar conta grátis
+                Analisar meu CV
               </Link>
             </Button>
           </nav>
@@ -142,7 +157,8 @@ function LandingPage() {
                 </Button>
               </div>
               <p className="mt-4 font-mono text-caption" style={{ color: "rgba(242,242,243,0.4)" }}>
-                → Sem cadastro para a prévia · Resultado em menos de 30 segundos
+                → Prévia sem cadastro · Resultado em menos de 30 segundos
+                {preco ? ` · Painel completo por ${preco}/mês` : ""}
               </p>
             </div>
 
@@ -338,10 +354,7 @@ function LandingPage() {
                         maximumFractionDigits: 0,
                       }).format(n);
                     return (
-                      <div
-                        key={s.segment}
-                        className="flex flex-1 flex-col gap-1 bg-surface p-3"
-                      >
+                      <div key={s.segment} className="flex flex-1 flex-col gap-1 bg-surface p-3">
                         <span className="font-mono text-caption text-neutral-500">
                           {isBr ? "🇧🇷 Brasil · Pleno" : "🌎 Remoto · Pleno"}
                         </span>
@@ -422,8 +435,108 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* ═══ PLANOS ═══ */}
+      <section id="planos" className="py-16">
+        <div className="rumvia-container">
+          <p className="label-h6 text-neutral-500">// Planos e preços</p>
+          <h2 className="mt-3 font-heading text-h2 uppercase">Um plano. Sem pegadinha.</h2>
+          <p
+            className="mt-3 text-body text-neutral-600"
+            style={{ maxWidth: 620, lineHeight: 1.65 }}
+          >
+            A prévia do seu currículo é gratuita e não pede cadastro. O RUMVIA completo é assinatura
+            mensal — <strong className="text-neutral-900">{AVISO_ACESSO_PAGO}</strong>
+          </p>
+
+          <div className="mt-10 grid gap-px bg-divider lg:grid-cols-2">
+            {/* Prévia gratuita */}
+            <div className="flex flex-col gap-4 bg-bg p-8">
+              <div>
+                <span className="label-h6 text-neutral-500">Prévia</span>
+                <p
+                  className="mt-2 font-heading font-bold uppercase"
+                  style={{ fontSize: 34, lineHeight: 1 }}
+                >
+                  Grátis
+                </p>
+                <p className="mt-1 font-mono text-caption text-neutral-500">
+                  sem cadastro · sem cartão
+                </p>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {PREVIA_GRATUITA.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-body text-neutral-600">
+                    <span className="mt-1 font-mono text-caption text-neutral-400" aria-hidden>
+                      ✓
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild variant="outline" className="mt-auto self-start">
+                <Link to="/analise" search={{ cv: undefined }}>
+                  Analisar meu CV
+                </Link>
+              </Button>
+            </div>
+
+            {/* Plano pago */}
+            <div className="flex flex-col gap-4 bg-bg p-8 ring-2 ring-accent-700 ring-inset">
+              <div>
+                <span className="label-h6 text-accent-700">
+                  {plan?.name ?? "Assinatura"} — acesso à conta
+                </span>
+                {/* Sem plano carregado não existe preço a mostrar. Um traço
+                    solto seguido de "por mês" lê como bug; a frase honesta, não. */}
+                {preco ? (
+                  <p className="mt-2 flex items-baseline gap-2">
+                    <span
+                      className="num font-heading font-bold text-accent-700"
+                      style={{ fontSize: 44, lineHeight: 1, letterSpacing: "-0.02em" }}
+                    >
+                      {preco}
+                    </span>
+                    <span className="text-body text-neutral-600">por mês</span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-body text-neutral-600">
+                    Preço indisponível no momento. Tente recarregar a página.
+                  </p>
+                )}
+                <p className="mt-1 font-mono text-caption text-neutral-500">
+                  cartão de crédito · renova sozinho · cancele quando quiser
+                  {plan?.trialDays ? ` · ${plan.trialDays} dias grátis` : ""}
+                </p>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {PLANO_INCLUI.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-body text-neutral-700">
+                    <span className="mt-1 font-mono text-caption text-accent-700" aria-hidden>
+                      ✓
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-auto flex flex-col gap-2">
+                <Button asChild size="lg" className="self-start">
+                  <Link to="/analise" search={{ cv: undefined }}>
+                    Começar pelo currículo
+                  </Link>
+                </Button>
+                {/* O funil é este, e a ordem não é negociável: a conta nasce a
+                    partir do CV já extraído, e só abre depois do pagamento. */}
+                <p className="font-mono text-caption text-neutral-500">
+                  envie o CV → veja a prévia → crie a conta → pague → painel liberado
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ FAQ ═══ */}
-      <section id="faq" className="py-16">
+      <section id="faq" className="border-t border-divider py-16">
         <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Dúvidas frequentes</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Perguntas comuns</h2>
@@ -471,6 +584,9 @@ function LandingPage() {
             Centenas de devs já sabem exatamente o que precisam estudar para chegar na próxima vaga.
             Você ainda não sabe o que está te faltando.
           </p>
+          <p className="mt-3 font-mono text-caption" style={{ color: "rgba(242,242,243,0.5)" }}>
+            A prévia é grátis e não pede cadastro. {AVISO_ACESSO_PAGO}
+          </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button
               asChild
@@ -478,7 +594,7 @@ function LandingPage() {
               style={{ background: "var(--rumvia-bg)", color: "var(--accent-700)" }}
             >
               <Link to="/analise" search={{ cv: undefined }}>
-                Analisar meu CV agora — grátis
+                Analisar meu CV agora — prévia grátis
               </Link>
             </Button>
             <Button
@@ -523,6 +639,7 @@ function LandingPage() {
                   links: [
                     { label: "Como funciona", href: "#como-funciona" },
                     { label: "Trilhas disponíveis", href: "#funcionalidades" },
+                    { label: "Planos e preços", href: "#planos" },
                     { label: "FAQ", href: "#faq" },
                   ],
                 },
