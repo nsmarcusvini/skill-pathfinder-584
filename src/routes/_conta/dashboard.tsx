@@ -76,11 +76,36 @@ function formatCurrency(value: number, currency: string) {
   }).format(value);
 }
 
+// "Últimos 12 meses" sai só daqui — ferramentas.tsx e empresas.tsx continuam
+// oferecendo os 4 períodos de PERIOD_OPTIONS.
+const DASHBOARD_PERIOD_OPTIONS = PERIOD_OPTIONS.filter((d) => d !== 365);
+
 function DashboardPage() {
   const { track, segment, setSegment, seniority, setSeniority, periodDays, setPeriodDays } =
     useMarket();
   const gap = useGap();
   const data = gap.data;
+
+  // periodDays é estado global (persiste entre /dashboard, /ferramentas e
+  // /empresas): se a pessoa tinha 365 selecionado antes dessa opção sumir
+  // daqui, o Select ficaria sem rótulo. Rebaixa para o maior período que
+  // ainda existe no dashboard.
+  React.useEffect(() => {
+    if (periodDays === 365) setPeriodDays(180);
+  }, [periodDays, setPeriodDays]);
+
+  // Denominador da fórmula (Σpeso, regra 3 do CLAUDE.md): soma o weight já
+  // calculado pelo compute-gap em cada item não-extra — mesmo critério do
+  // servidor (gap.functions.ts:397-399). Não recalcula peso nem cobertura,
+  // só agrega o que a fonte única já devolveu, para converter o gapScore de
+  // cada skill (peso × lacuna) em pontos percentuais de aderência.
+  const totalWeight = React.useMemo(
+    () =>
+      (data?.items ?? [])
+        .filter((i) => i.status !== "extra")
+        .reduce((sum, i) => sum + i.weight, 0),
+    [data],
+  );
 
   const lacunas = React.useMemo(
     () => (data?.items ?? []).filter((i) => i.status !== "extra" && i.coverage < 1).slice(0, 10),
@@ -147,7 +172,7 @@ function DashboardPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PERIOD_OPTIONS.map((d) => (
+            {DASHBOARD_PERIOD_OPTIONS.map((d) => (
               <SelectItem key={d} value={String(d)}>
                 {PERIOD_LABEL[d]}
               </SelectItem>
@@ -253,11 +278,15 @@ function DashboardPage() {
           <Blueprint className="flex flex-col">
             <div className="border-b border-divider p-3">
               <h6 className="text-neutral-700">Top 10 lacunas prioritárias</h6>
-              <p className="caption mt-1">Ordenado pelo peso da lacuna (demanda + baseline).</p>
+              <p className="caption mt-1">
+                Ordenado pelo peso da lacuna (demanda + baseline). O "+X,Xpp" em cada linha é
+                quanto sua aderência sobe se você chegar ao nível exigido só naquela skill —
+                quanto maior o peso da skill no mercado, maior o efeito de subir de nível nela.
+              </p>
             </div>
             <ul className="divide-y divide-divider">
               {lacunas.map((item) => (
-                <GapRow key={item.skillId} item={item} />
+                <GapRow key={item.skillId} item={item} totalWeight={totalWeight} />
               ))}
               {lacunas.length === 0 ? (
                 <li className="p-3 text-body text-neutral-600">Nenhuma lacuna neste recorte.</li>
@@ -311,7 +340,14 @@ function DashboardPage() {
   );
 }
 
-function GapRow({ item }: { item: GapItem }) {
+function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
+  // gapScore já é peso × (1 − cobertura) — o quanto essa skill, sozinha,
+  // segura a aderência para baixo (gap.functions.ts:421). Dividir por Σpeso
+  // dá o ganho em pontos percentuais se ela chegasse ao nível exigido, na
+  // mesma casa decimal do score exibido (gap.functions.ts:428: round(...*1000)/10).
+  const impactoPp =
+    totalWeight > 0 ? Math.round((item.gapScore / totalWeight) * 1000) / 10 : 0;
+
   // Nível 0 = a skill não está no perfil. Aí há duas leituras possíveis: ou a
   // pessoa não sabe mesmo (e o caminho é estudar), ou ela sabe e só esqueceu de
   // preencher — o parser de CV não pega tudo. Oferecer as duas saídas na mesma
@@ -342,7 +378,7 @@ function GapRow({ item }: { item: GapItem }) {
   });
 
   return (
-    <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+    <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
       <div className="min-w-0">
         <SkillBadge name={item.name} status={item.status} />
         {item.categoryName ? <span className="caption ml-2">{item.categoryName}</span> : null}
@@ -352,6 +388,12 @@ function GapRow({ item }: { item: GapItem }) {
       </span>
       <span className="num text-caption text-neutral-700">
         nível {item.userLevel}/{item.requiredLevel}
+      </span>
+      <span
+        className="num text-caption font-semibold text-accent-600"
+        title={`Se você chegar ao nível ${item.requiredLevel} nesta skill, sua aderência geral sobe cerca de ${impactoPp}pp`}
+      >
+        +{impactoPp}pp
       </span>
       <div className="flex flex-wrap items-center gap-2">
         {naoPossui ? (
