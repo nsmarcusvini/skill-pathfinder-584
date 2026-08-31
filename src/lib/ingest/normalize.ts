@@ -39,31 +39,73 @@ export function normalizeTitle(title: string): string {
 }
 
 /**
- * Regex bilíngue de senioridade. Ordem importa: staff/lead antes de sênior.
+ * Faixa que cobre pleno E sênior ao mesmo tempo. É o rótulo padrão do LinkedIn
+ * ("Mid-Senior level") e chega em `hint` na maioria das vagas do Bright Data —
+ * era a causa de 2 em cada 3 vagas da base virarem "senior": a regra de sênior
+ * casava o "senior" de dentro de "Mid-Senior" e vencia até quando o título dizia
+ * "Pleno". Escolher um dos dois lados é inventar; devolvemos null e a vaga fica
+ * sem senioridade, entrando só no degrau que aceita `_include_unranked`.
+ */
+const AMBIGUOUS_SENIORITY = /\bmid[- ]?senior\b/;
+
+/**
+ * Regex bilíngue de senioridade. Ordem importa: staff antes de tudo, e sênior
+ * por último — assim "Senior Staff Engineer" vira staff e "Pleno" não é
+ * atropelado.
  *
  * Os valores TÊM de ser junior | pleno | senior | staff — é o CHECK de
  * job_postings.seniority, profiles.seniority e track_skill_baselines.seniority.
  * Emitir qualquer outra coisa faz o INSERT da vaga ser rejeitado inteiro.
+ *
+ * Cuidados que vieram de olhar a base real, não invente de novo:
+ *  - Nada de `\b3\b` ou `\b2\b`: "L3", "Nível 2" e "3 anos" viravam senioridade.
+ *  - Nada de `\bi\b`: pegava "Engineering Manager I" como júnior, e há título que
+ *    usa " I " como separador ("Software Engineer (back-end) I Híbrido").
+ *    `ii` e `iii` são seguros — conferidos um a um na base — e ficam.
+ *  - `pl` é a abreviação brasileira de pleno ("Analista de Testes PL"), mas não
+ *    pode casar "PL/SQL": daí o lookahead negativo.
  */
 const SENIORITY_RULES: Array<{ seniority: string; re: RegExp }> = [
   {
+    // Nada de `director`/`executive` aqui: no título eles são cargo comercial,
+    // não senioridade — "Account Executive" e "Sales Director" viravam staff.
     seniority: "staff",
     re: /\b(staff|principal|lead|tech lead|head|especialista|specialist|architect|arquiteto)\b/,
   },
-  { seniority: "senior", re: /\b(sr\.?|senior|senior|sênior|iii|3)\b/ },
   {
     seniority: "junior",
-    re: /\b(jr\.?|junior|júnior|entry[- ]?level|trainee|estagio|estágio|intern|internship|i)\b/,
+    re: /\b(jr\.?|junior|júnior|entry[- ]?level|trainee|estagio|estágio|intern|internship)\b/,
   },
-  { seniority: "pleno", re: /\b(pleno|mid[- ]?level|mid|middle|ii|2)\b/ },
+  {
+    // `associate` ficou de fora: como nível do LinkedIn significa pleno, mas em
+    // título é função ("Finance Associate", "Associate Director, Media Strategy").
+    // Como a mesma regra roda no título e no hint, o dano no título é maior que
+    // o ganho no hint.
+    seniority: "pleno",
+    re: /\b(pleno|mid[- ]?level|middle|intermediate|intermediario|ii)\b|\bpl\b(?!\s*\/)/,
+  },
+  { seniority: "senior", re: /\b(sr\.?|senior|senior|sênior|iii)\b/ },
 ];
 
-export function inferSeniority(title: string, hint?: string | null): string | null {
-  const haystack = deaccent(`${hint ?? ""} ${title}`).toLowerCase();
+function matchSeniority(text: string): string | null {
+  if (AMBIGUOUS_SENIORITY.test(text)) return null;
   for (const rule of SENIORITY_RULES) {
-    if (rule.re.test(haystack)) return rule.seniority;
+    if (rule.re.test(text)) return rule.seniority;
   }
   return null;
+}
+
+/**
+ * O TÍTULO manda; o `hint` da fonte só entra quando o título é silencioso.
+ * Antes os dois eram concatenados no mesmo texto, então o rótulo genérico da
+ * fonte atropelava o que a vaga dizia de si: "Desenvolvedor Back-End Pleno" e
+ * "Data Engineer II" estavam gravados como sênior.
+ */
+export function inferSeniority(title: string, hint?: string | null): string | null {
+  const peloTitulo = matchSeniority(deaccent(title ?? "").toLowerCase());
+  if (peloTitulo) return peloTitulo;
+  if (!hint) return null;
+  return matchSeniority(deaccent(hint).toLowerCase());
 }
 
 const PT_STOPWORDS = [

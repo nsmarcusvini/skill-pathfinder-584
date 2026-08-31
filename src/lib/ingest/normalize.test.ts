@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { parseLocation, toAnnual } from "./normalize";
+import { inferSeniority, parseLocation, toAnnual } from "./normalize";
 
 describe("toAnnual", () => {
   it("anualiza as abreviações que o LinkedIn usa", () => {
@@ -96,5 +96,85 @@ describe("parseLocation", () => {
       city: "Greater Rio de Janeiro",
       state: null,
     });
+  });
+});
+
+/**
+ * Senioridade. Todos os casos abaixo são títulos ou rótulos que existem na base
+ * real — foram levantados quando se descobriu que 2 em cada 3 vagas estavam
+ * gravadas como "senior" e a faixa "pleno" tinha 2 ou 3 vagas por trilha.
+ *
+ *   bun test src/lib/ingest/normalize.test.ts
+ */
+describe("inferSeniority", () => {
+  it('não deixa o rótulo genérico da fonte atropelar o título (bug do "Mid-Senior level")', () => {
+    // O LinkedIn manda "Mid-Senior level" em quase tudo. Antes, o "senior" de
+    // dentro dele vencia e estas vagas ficavam gravadas como sênior.
+    expect(inferSeniority("Desenvolvedor Back-End Pleno", "Mid-Senior level")).toBe("pleno");
+    expect(inferSeniority("Engenheiro de Dados Pleno", "Mid-Senior level")).toBe("pleno");
+    expect(inferSeniority("Data Engineer II", "Mid-Senior level")).toBe("pleno");
+    expect(inferSeniority("Analista de Testes PL", "Mid-Senior level")).toBe("pleno");
+    expect(inferSeniority("Mid-Level Full Stack Software Engineer", "Mid-Senior level")).toBe(
+      "pleno",
+    );
+    expect(inferSeniority("Intermediate Backend Java Developer", "Mid-Senior level")).toBe("pleno");
+  });
+
+  it("devolve null quando a única pista é a faixa ambígua do LinkedIn", () => {
+    // "Mid-Senior" cobre pleno E sênior: fingir que é um dos dois foi o que
+    // encheu a base de sênior. Sem senioridade a vaga ainda conta no degrau
+    // que aceita _include_unranked.
+    expect(inferSeniority("Data Engineer", "Mid-Senior level")).toBeNull();
+    expect(inferSeniority("DevOps Engineer", "Mid-Senior level")).toBeNull();
+  });
+
+  it("continua reconhecendo sênior de verdade", () => {
+    expect(inferSeniority("Senior Data Engineer", null)).toBe("senior");
+    expect(inferSeniority("Engenheiro de Dados Sênior", null)).toBe("senior");
+    expect(inferSeniority("Sr. Site Reliability Engineer", null)).toBe("senior");
+    expect(inferSeniority("Software Engineer III - Mobile", null)).toBe("senior");
+    expect(inferSeniority("Data Engineer", "Senior")).toBe("senior");
+  });
+
+  it("não trata dígito solto como senioridade", () => {
+    // `\b3\b` e `\b2\b` transformavam "L3", "Nível 2" e "3 anos" em senioridade.
+    expect(inferSeniority("DevOps Engineer L3", null)).toBeNull();
+    expect(inferSeniority("Analista de Suporte Nível 2", null)).toBeNull();
+    expect(inferSeniority("Data Engineer (3+ anos)", null)).toBeNull();
+  });
+
+  it('não trata "i" solto como júnior', () => {
+    // Estes três estavam gravados como júnior. O último usa " I " como separador.
+    expect(inferSeniority("Software Engineering Manager I", null)).not.toBe("junior");
+    expect(inferSeniority("Site Reliability Engineer Manager I", null)).not.toBe("junior");
+    expect(inferSeniority("Software Engineer (foco em back-end) I Híbrido (Joinville)", null)).toBe(
+      null,
+    );
+  });
+
+  it("reconhece júnior de verdade", () => {
+    expect(inferSeniority("Desenvolvedor Júnior", null)).toBe("junior");
+    expect(inferSeniority("QA Engineer Jr.", null)).toBe("junior");
+    expect(inferSeniority("Summer Internship 2027 | Software Engineering", null)).toBe("junior");
+    expect(inferSeniority("Data Engineer", "Entry level")).toBe("junior");
+  });
+
+  it('não confunde "PL/SQL" com pleno', () => {
+    expect(inferSeniority("Desenvolvedor PL/SQL", null)).toBeNull();
+    expect(inferSeniority("Analista PL/SQL Oracle", null)).toBeNull();
+    // mas a abreviação brasileira de pleno continua valendo
+    expect(inferSeniority("Desenvolvedor Full Stack PL", null)).toBe("pleno");
+  });
+
+  it("staff vence sênior quando os dois aparecem", () => {
+    expect(inferSeniority("Senior Staff Engineer", null)).toBe("staff");
+    expect(inferSeniority("Tech Lead DevOps", null)).toBe("staff");
+    expect(inferSeniority("Principal Architect", null)).toBe("staff");
+  });
+
+  it("tolera título vazio e hint nulo", () => {
+    expect(inferSeniority("", null)).toBeNull();
+    expect(inferSeniority("Data Engineer", null)).toBeNull();
+    expect(inferSeniority("Data Engineer", "")).toBeNull();
   });
 });
