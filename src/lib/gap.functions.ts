@@ -214,6 +214,10 @@ export const computeGap = createServerFn({ method: "POST" })
         _segments: cfg.seg,
         _since: new Date(Date.now() - cfg.days * 24 * 60 * 60 * 1000).toISOString(),
         _include_unranked: cfg.unranked,
+        // Sempre o segmento escolhido pelo usuário, nunca cfg.seg — na ampliação
+        // "ambos_segmentos" ele traz br + remoto_global juntos, e misturar BRL com
+        // USD na mediana dá um número sem sentido (regra 5 do CLAUDE.md).
+        _salary_segment: marketSegment,
       });
       const cs = cachedStats?.[0];
 
@@ -300,6 +304,7 @@ export const computeGap = createServerFn({ method: "POST" })
         _segments: s.seg,
         _since: since,
         _include_unranked: s.unranked,
+        _salary_segment: marketSegment,
       });
       const st = statRows?.[0];
       usedStep = s.step;

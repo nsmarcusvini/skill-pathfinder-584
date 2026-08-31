@@ -38,11 +38,8 @@ import {
   PERIOD_LABEL,
   PERIOD_OPTIONS,
   SEGMENT_LABEL,
-  SENIORITY_LABEL,
-  SENIORITIES,
   useMarket,
   type MarketSegment,
-  type Seniority,
 } from "@/hooks/use-market";
 import { useGap } from "@/hooks/use-gap";
 import { useAuth } from "@/hooks/use-auth";
@@ -87,8 +84,7 @@ function formatDate(iso: string | null) {
 }
 
 function EmpresasPage() {
-  const { track, trackId, segment, setSegment, seniority, setSeniority, periodDays, setPeriodDays } =
-    useMarket();
+  const { track, trackId, segment, setSegment, periodDays, setPeriodDays } = useMarket();
   const { user } = useAuth();
   const gap = useGap();
   const queryClient = useQueryClient();
@@ -137,8 +133,11 @@ function EmpresasPage() {
   }, [gap.data]);
 
   // ── Company ranking ───────────────────────────────────────────────────────
+  // Sem filtro de senioridade: /empresas mostra quem contrata na trilha e
+  // segmento inteiros — company_ranking() trata _seniorities ausente como
+  // "todas" (default NULL na RPC), não precisa de valor nenhum aqui.
   const rankingQuery = useQuery({
-    queryKey: ["companies", trackId, segment, seniority, periodDays, grafiasSelecionadas],
+    queryKey: ["companies", trackId, segment, periodDays, grafiasSelecionadas],
     enabled: Boolean(trackId),
     staleTime: 5 * 60 * 1000,
     queryFn: () =>
@@ -146,7 +145,6 @@ function EmpresasPage() {
         data: {
           trackId: trackId!,
           segments: [segment],
-          seniorities: [seniority],
           periodDays,
           ...(grafiasSelecionadas.length > 0 ? { cities: grafiasSelecionadas } : {}),
         },
@@ -256,24 +254,12 @@ function EmpresasPage() {
       <PageHeader
         eyebrow="Mercado"
         title="Empresas"
-        subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]} · ${SENIORITY_LABEL[seniority]}`}
+        subtitle={`${track?.name ?? "Trilha"} · ${SEGMENT_LABEL[segment]}`}
       />
 
       {/* Filtros */}
       <Blueprint className="flex flex-wrap items-center gap-3 p-3">
         <span className="caption">Filtros</span>
-        <Select value={seniority} onValueChange={(v) => void setSeniority(v as Seniority)}>
-          <SelectTrigger className="w-[160px]" aria-label="Senioridade">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SENIORITIES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {SENIORITY_LABEL[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={segment} onValueChange={(v) => void setSegment(v as MarketSegment)}>
           <SelectTrigger className="w-[200px]" aria-label="Segmento">
             <SelectValue />

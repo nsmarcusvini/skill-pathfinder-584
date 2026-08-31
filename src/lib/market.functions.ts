@@ -215,7 +215,10 @@ export const getToolMonthly = createServerFn({ method: "POST" })
 interface CompanyRankingInput {
   trackId: string;
   segments: string[];
-  seniorities: string[];
+  /** Omitido = todas as senioridades. company_ranking() trata _seniorities
+   *  ausente como "sem filtro" (default NULL na RPC) — /empresas não filtra
+   *  por senioridade, então nunca envia isto. */
+  seniorities?: string[];
   periodDays: number;
   /** Grafias de cidade, como vêm de `job_locations().grafias` (ver jobs.functions.ts). */
   cities?: string[];
@@ -229,8 +232,8 @@ export const getCompanyRanking = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase.rpc("company_ranking", {
       _track_id: data.trackId,
       _segments: data.segments,
-      _seniorities: data.seniorities,
       _since: sinceDaysAgo(data.periodDays),
+      ...(data.seniorities?.length ? { _seniorities: data.seniorities } : {}),
       ...(data.cities?.length ? { _cities: data.cities } : {}),
     });
     if (error) throw new Error(error.message);

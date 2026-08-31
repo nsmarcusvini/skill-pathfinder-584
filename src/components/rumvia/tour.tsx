@@ -75,7 +75,10 @@ function TourCardBody({
           <button
             type="button"
             onClick={tour.skip}
-            aria-label="Pular tour"
+            // Rótulo diferente do botão "Pular tour" logo abaixo: os dois fazem a
+            // mesma coisa, e repetir o label faz o leitor de tela anunciar dois
+            // controles idênticos no mesmo card.
+            aria-label="Fechar tour"
             className="flex size-6 shrink-0 cursor-pointer items-center justify-center text-neutral-600 hover:text-neutral-900"
           >
             <X className="size-4" aria-hidden />
@@ -209,10 +212,12 @@ function DesktopTour({ tour }: { tour: UseTourReturn }) {
         {tour.current ? `Passo ${tour.step + 1} de ${tour.total}: ${tour.current.title}` : ""}
       </span>
 
-      {/* Camada de bloqueio: nada na página fica clicável enquanto o tour roda. */}
+      {/* Camada de bloqueio: nada na página fica clicável enquanto o tour roda —
+          o clique é capturado aqui e só avança o passo (no último, encerra). */}
       <div
         className="fixed inset-0 z-[70] bg-transparent"
         style={anchorRect ? undefined : { backgroundColor: "rgb(var(--rgb-text) / 0.6)" }}
+        onClick={() => (tour.isLast ? tour.finish() : tour.next())}
       />
 
       {anchorRect ? (

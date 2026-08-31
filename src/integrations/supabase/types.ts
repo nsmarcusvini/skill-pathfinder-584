@@ -2223,6 +2223,7 @@ export type Database = {
       market_scope_stats: {
         Args: {
           _include_unranked?: boolean
+          _salary_segment?: string
           _segments: string[]
           _seniorities: string[]
           _since: string
