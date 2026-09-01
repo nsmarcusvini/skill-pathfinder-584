@@ -123,8 +123,8 @@ APP_BASE_URL=https://…          # origem pública HTTPS, sem barra no fim
 ```
 
 Em produção, defina como variável de ambiente da hospedagem — nunca em arquivo (regra 8).
-**No Netlify, adicionar variável não reinicia as functions:** é preciso um novo deploy
-(Deploys → Trigger deploy) para ela passar a valer.
+**Na Vercel, adicionar variável não reinicia nada:** é preciso um novo deploy
+(Deployments → Redeploy) para ela passar a valer.
 
 ### 2. Aplicar as migrations
 

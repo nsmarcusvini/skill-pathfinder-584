@@ -204,8 +204,8 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
 
 ## Coisas que já sei que quebram
 
-- **Domínio de produção é `rumvia.com.br`** (DNS reapontado para o Netlify em
-  2026-08-31 — antes caía numa página do GoDaddy Website Builder). `app_settings.app_base_url`
+- **Domínio de produção é `rumvia.com.br`**, servido pela Vercel desde 2026-09-01 (antes
+  Netlify; antes disso caía numa página do GoDaddy Website Builder). `app_settings.app_base_url`
   e `.env`'s `APP_BASE_URL` já refletem isso. A nota antiga sobre "cron aponta pra URL de
   preview do Lovable" (`20260826170959_*` / `20260826171043_*`) está obsoleta: aqueles jobs
   não existem mais em `cron.job` — a ingestão roda via `bun run scripts/ingest.ts` manual
