@@ -163,4 +163,12 @@
 
   Removido `src/lib/abacatepay/`, a rota e o script antigos. `docs/ABACATEPAY.md` virou `docs/PAGAMENTOS.md`. `tsc`, `eslint` e `vite build` limpos.
 
-  **Pendente:** o deploy do Netlify não rodou sozinho após o push (`b835090`) — a rota `/api/public/asaas-webhook` segue 404 e a antiga ainda responde, ou seja, o bundle publicado é o anterior. Suspeita: auto-deploy desligado no site (o deploy anterior também precisou ser disparado à mão). Enquanto não subir, não dá para cadastrar o webhook (`bun run scripts/asaas-setup.ts`) nem testar o fluxo ponta a ponta.
+  **A hospedagem mudou no meio da migração.** O Netlify não publicou o push, e investigando descobri por quê: o site do Netlify está **sem deploy publicado** (devolve o "Not Found - Request ID" dele, não o 404 do nosso app) e serve o certificado `*.netlify.app` em vez de um para `rumvia.com.br`. Ao mesmo tempo apareceu `.vercel/output` local e `.vercel/` no `.gitignore` — o projeto está migrando para a **Vercel**, onde `rumvia.vercel.app` responde 200 e **já tem o código novo** (`/api/public/asaas-webhook` → 401; a rota antiga da AbacatePay → 404).
+
+  **Consequência a resolver: `rumvia.com.br` está fora do ar.** O DNS ainda aponta para o Netlify (A 75.2.60.5, `www` CNAME para `rumvia.netlify.app`), que está vazio. Precisa apontar para a Vercel.
+
+  **Verificado ponta a ponta na Vercel:** sem token → 401; token errado → 401; token certo → 200 com o evento gravado em `billing_events` (`handled: true`). O `dev_mode: true` da linha confirma que `ASAAS_API_KEY` também está configurada lá, já que o código deriva a flag da própria chave. Evento sintético removido depois.
+
+  **Webhook cadastrado** (`cb0bab52-4808-446d-977a-44425bc34c20`, 9 eventos) apontando para `https://rumvia.vercel.app/api/public/asaas-webhook` — escolhi a URL da Vercel, e não `rumvia.com.br`, porque o domínio está quebrado e o Asaas **interrompe a fila após 15 falhas consecutivas**. Quando o domínio apontar para a Vercel, recadastrar com `APP_BASE_URL=https://rumvia.com.br bun run scripts/asaas-setup.ts` e apagar o antigo.
+
+  **Falso positivo meu, registrado para não repetir:** o poll que criei para esperar o deploy testava `código != 404`, e a falha de TLS devolve `000`, que passou no teste. O poll anunciou "deploy concluído" quando na verdade o certificado tinha quebrado. Condição de espera precisa checar o código esperado (200/401), não a ausência de um código de erro.
