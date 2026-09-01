@@ -235,7 +235,39 @@ cobrar só por um pedaço.
 
 ---
 
-## ⚠️ Bloqueador: a loja precisa ter método recorrente habilitado
+## 🛑 BLOQUEADOR DEFINITIVO: a AbacatePay não faz cobrança recorrente
+
+**Resposta do suporte da AbacatePay, 2026-09-01:**
+
+> "Sobre a cobrança recorrente, hoje a AbacatePay não possui essa funcionalidade
+> disponível para novas integrações. O cartão de crédito foi descontinuado para novas
+> contas, ficando ativo apenas para quem já transacionava de fato com ele em produção
+> antes da desativação. O PIX automático também está indisponível no momento e sem
+> previsão de retorno. Por conta disso, atualmente não temos uma forma de pagamento
+> recorrente automatizada para novas lojas na nossa plataforma."
+
+Não é configuração pendente nem questão de verificar a conta: **a funcionalidade não
+existe para contas novas.** Cartão foi descontinuado; PIX Automático está indisponível
+sem previsão.
+
+O que a AbacatePay ainda faz nesta loja: **cobrança avulsa** (PIX e boleto), comprovado
+pelos testes abaixo.
+
+### Quanto do código depende do fornecedor
+
+Pequeno, e de propósito — o fornecedor foi isolado desde o início:
+
+| Acoplado à AbacatePay (trocar) | Agnóstico (sobrevive a qualquer fornecedor) |
+|---|---|
+| `src/lib/abacatepay/` (645 linhas) | `billing_plans` / `subscriptions` / `billing_events` |
+| `routes/api/public/abacatepay-webhook.ts` | `has_active_subscription()` / `can_access_paid_features()` |
+| `scripts/abacatepay-setup.ts` | `ProtectedRoute` + guards de paywall |
+| 4 colunas `abacate_*` (renomeáveis) | `useSubscription`, `<Paywall>`, seção de planos, todo o funil |
+| 3 frases de copy em `/assinatura` | máquina de status, períodos, idempotência |
+
+Trocar de fornecedor é reescrever o client e o handler de webhook — não a arquitetura.
+
+## Evidência: o que a loja aceita e o que recusa
 
 **Assinatura não é capacidade padrão da loja AbacatePay.** Testado em 2026-08-31 na loja
 `store_Ywj6PCcNKfyrqK35AUfnSuFc` (sandbox), `POST /subscriptions/create` devolve 400 para
