@@ -143,6 +143,11 @@ Valida a chave, mostra o status de aprovação da conta e cadastra o webhook em
 **O endpoint precisa ser HTTPS público.** Para dev, use um túnel
 (`cloudflared tunnel --url http://localhost:8080`) e ponha a URL em `APP_BASE_URL`.
 
+⚠️ **Use o domínio canônico, `https://www.rumvia.com.br`.** O apex (`rumvia.com.br`)
+devolve **308** para o `www` na Vercel, e webhook é POST — cliente que não segue redirect
+falha, e quem segue pode perder o corpo. Registrado em produção:
+`5f5bfa12-2ff0-4aac-959a-eb9400389063`.
+
 ---
 
 ## Testar

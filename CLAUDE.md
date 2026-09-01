@@ -223,8 +223,10 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
   aspas simples. No `.env` só funciona com aspas DUPLAS e `\$` escapado. Sem isso a chave
   chega vazia e o erro parece "chave inválida". Detalhe em `docs/PAGAMENTOS.md`.
 
-- **Adicionar variável de ambiente no Netlify não reinicia as functions.** É preciso um
-  novo deploy (Deploys → Trigger deploy) para a variável passar a valer.
+- **A hospedagem é a Vercel** (migrada do Netlify em 2026-09-01) e o domínio canônico é
+  `https://www.rumvia.com.br` — o apex faz **308** para o `www`. Toda URL registrada em
+  terceiro (webhook de gateway, callback de OAuth) tem que usar o `www`: webhook é POST, e
+  cliente que não segue redirect simplesmente falha.
 
 - **Anonymous sign-in precisa estar habilitado no painel do Supabase**
   (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
