@@ -42,7 +42,7 @@ Sem domínio verificado, a Resend opera em **modo sandbox**: só entrega para o 
 dono da conta Resend. Serve para testar, não para produção.
 
 O DNS de `rumvia.com.br` é gerenciado no **GoDaddy** (nameservers `ns47`/`ns48.domaincontrol.com`),
-mesmo o site estando no Netlify. Os registros de e-mail vão no GoDaddy, não no Netlify.
+mesmo o site estando na Vercel. Os registros de e-mail vão no GoDaddy, não na hospedagem.
 
 Três registros, obtidos em `GET https://api.resend.com/domains/{id}`:
 
