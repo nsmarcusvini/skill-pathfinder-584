@@ -1,12 +1,15 @@
 # Plano — migrar cobrança de AbacatePay para Asaas
 
-> **Status: planejado, não executado.** Nada deste documento foi implementado.
-> Escrito em 2026-09-01.
+> **Status: EXECUTADO em 2026-09-01.** O plano foi seguido; o runbook do estado
+> final vive em `docs/PAGAMENTOS.md`. Este arquivo fica como registro da decisão.
+>
+> Dois riscos aqui listados foram resolvidos na implementação: `endDate` é opcional
+> (confirmado no sandbox) e não há catálogo de produtos a criar no Asaas.
 
 ## Por que migrar
 
 A AbacatePay **não faz cobrança recorrente para contas novas** (resposta do suporte em
-2026-09-01, transcrita em `docs/ABACATEPAY.md`): cartão foi descontinuado para contas
+2026-09-01, transcrita em `docs/PAGAMENTOS.md`): cartão foi descontinuado para contas
 novas e PIX Automático está indisponível sem previsão. Não é configuração pendente — a
 funcionalidade não existe para nós.
 
@@ -134,7 +137,7 @@ a resposta HTTP 200 rápida e o processamento idempotente, que já é o desenho 
 9. Ajustar `billing.functions.ts` (3 pontos de chamada) e as 3 frases de copy em
    `/assinatura`
 10. **Deletar** `src/lib/abacatepay/`, a rota e o script antigos
-11. Atualizar `docs/ABACATEPAY.md` → `docs/PAGAMENTOS.md`, CLAUDE.md e PROGRESS.md
+11. Renomear `docs/ABACATEPAY.md` para `docs/PAGAMENTOS.md` e atualizar CLAUDE.md e PROGRESS.md
 
 ### Testar (sandbox)
 

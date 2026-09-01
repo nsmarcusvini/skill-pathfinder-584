@@ -122,14 +122,14 @@ src/
       certificacoes.tsx        # ❌ esqueleto (Prompt 12)
       cursos.tsx               # ❌ esqueleto (Prompt 12)
       conta.tsx                # ✅ pronto
-      assinatura.tsx           # ✅ pronto (AbacatePay, R$ 24,90/mês)
+      assinatura.tsx           # ✅ pronto (Asaas, R$ 24,90/mês)
       admin.*.tsx              # ⚠️ parcial (falta trilhas e saúde)
     api/public/                # Endpoints de servidor (o que seria Edge Function)
       ingest-jobs.ts
       extract-jd-skills.ts
       refresh-market-views.ts
       ingest-webhook.ts
-      abacatepay-webhook.ts    # eventos de pagamento (secret + HMAC)
+      asaas-webhook.ts         # eventos de pagamento (header asaas-access-token)
   lib/
     skill-matcher.ts           # ⚠️ MATCHER ÚNICO — não duplicar em outro lugar
     gap.functions.ts           # ⚠️ FÓRMULA ÚNICA de aderência
@@ -143,7 +143,7 @@ src/
     design-tokens.ts
     billing.functions.ts       # assinatura: overview, checkout, cancelamento
     plan-copy.ts               # ⚠️ texto do plano — landing e /assinatura leem daqui
-    abacatepay/                # client REST v2 + processamento de webhook
+    asaas/                     # client REST v3 + processamento de webhook
   hooks/
     use-auth.tsx               # ⚠️ anonymous sign-in + conversão — não regredir
     use-market.tsx             # trilha + segmento globais
@@ -192,12 +192,13 @@ supabase/
 - [ ] **Prompt 13** — Admin de trilhas + painel de saúde
 - [ ] **Prompt 14** — Expurgo de anônimos + notificações + LGPD (export/delete) +
       responsividade + smoke test
-- [x] **Prompt 8C** — AbacatePay: assinatura Pro R$ 24,90/mês + paywall obrigatório
-      (2026-08-31). Substituiu o Stripe do plano original. **O produto é pago:** só a
+- [x] **Prompt 8C** — Assinatura Pro R$ 24,90/mês + paywall obrigatório (2026-08-31),
+      migrada da AbacatePay para o **Asaas** em 2026-09-01 (a AbacatePay não faz
+      cobrança recorrente para contas novas). **O produto é pago:** só a
       prévia do CV (`/`, `/analise`) roda sem conta; `_conta/*` e `/onboarding` exigem
       assinatura ativa. Exceções: `/assinatura` (é onde se paga) e `/conta` (LGPD —
       exportar/excluir não pode ser trancado). Admin entra sem pagar
-      (`can_access_paid_features`). Runbook em `docs/ABACATEPAY.md`.
+      (`can_access_paid_features`). Runbook em `docs/PAGAMENTOS.md`.
 
 Detalhes completos de cada um vivem em `docs/roadmap/`.
 
@@ -214,9 +215,16 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
 - **`use-market.tsx` deriva segmento de `profile.target_region`.** Se o onboarding
   não estiver gravando esse campo, tudo cai em `br` por default. Verificar em
   `src/routes/onboarding.tsx` antes de mexer em Ferramentas.
-- **AbacatePay recusa endpoint de webhook em localhost.** Precisa de HTTPS público em
+- **Gateway de pagamento recusa webhook em localhost.** Precisa de HTTPS público em
   `APP_BASE_URL`. Para testar em dev, exponha o app com um túnel (cloudflared/ngrok) antes
-  de rodar `bun run scripts/abacatepay-setup.ts`.
+  de rodar `bun run scripts/asaas-setup.ts`.
+
+- **A `ASAAS_API_KEY` começa com `$` e o bun a expande como variável** — mesmo entre
+  aspas simples. No `.env` só funciona com aspas DUPLAS e `\$` escapado. Sem isso a chave
+  chega vazia e o erro parece "chave inválida". Detalhe em `docs/PAGAMENTOS.md`.
+
+- **Adicionar variável de ambiente no Netlify não reinicia as functions.** É preciso um
+  novo deploy (Deploys → Trigger deploy) para a variável passar a valer.
 
 - **Anonymous sign-in precisa estar habilitado no painel do Supabase**
   (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
