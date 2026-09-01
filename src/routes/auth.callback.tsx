@@ -26,17 +26,24 @@ export const Route = createFileRoute("/auth/callback")({
 
 function AuthCallbackPage() {
   const navigate = useNavigate();
-  const { isOnboarded, isAuthenticated, loading } = useAuth();
-  const [mode, setMode] = React.useState<"processando" | "recuperacao">("processando");
+  const { isOnboarded, isAuthenticated, loading, signOut } = useAuth();
+  const [mode, setMode] = React.useState<"processando" | "recuperacao" | "confirmado">(
+    "processando",
+  );
+  const redirecionadoRef = React.useRef(false);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const isRecovery =
-      params.get("tipo") === "recuperacao" ||
-      params.get("type") === "recovery" ||
-      hash.get("type") === "recovery";
+    const tipo = params.get("type") ?? hash.get("type");
+    const isRecovery = params.get("tipo") === "recuperacao" || tipo === "recovery";
+    // signup: confirmação de cadastro via signUp() sem sessão anônima prévia.
+    // email_change: caminho principal — convertAnonymousAccount() dispara
+    // "Change Email Address" no GoTrue, não "Confirm signup" (ver comentário
+    // em supabase/templates/confirm-signup.html).
+    const isConfirmacaoDeCadastro = tipo === "signup" || tipo === "email_change";
     if (isRecovery) setMode("recuperacao");
+    else if (isConfirmacaoDeCadastro) setMode("confirmado");
   }, []);
 
   React.useEffect(() => {
@@ -45,6 +52,19 @@ function AuthCallbackPage() {
       void navigate({ to: isOnboarded ? "/dashboard" : "/onboarding", replace: true });
     }
   }, [mode, loading, isAuthenticated, isOnboarded, navigate]);
+
+  // Confirmar o e-mail de criação de conta não deve logar a pessoa direto no
+  // painel (que hoje é área paga, regra 12) — manda para o login e exige a
+  // senha de novo, mesmo que o link do GoTrue já tenha criado uma sessão.
+  React.useEffect(() => {
+    if (mode !== "confirmado" || loading || redirecionadoRef.current) return;
+    redirecionadoRef.current = true;
+    void (async () => {
+      if (isAuthenticated) await signOut();
+      toast.success("E-mail confirmado. Faça login para continuar.");
+      void navigate({ to: "/login", replace: true });
+    })();
+  }, [mode, loading, isAuthenticated, signOut, navigate]);
 
   const form = useForm<NewPasswordValues>({
     resolver: zodResolver(newPasswordSchema),

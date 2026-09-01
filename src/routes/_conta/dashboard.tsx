@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -29,6 +29,14 @@ import { MetricCard } from "@/components/rumvia/metric-card";
 import { EmptyState, LoadingState } from "@/components/rumvia/states";
 import { SkillBadge } from "@/components/rumvia/skill-badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -359,20 +367,22 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
   const naoPossui = item.userLevel === 0;
   const { trackId } = useMarket();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const runAddToPlan = useServerFn(addSkillToStudyPlan);
+
+  // A adição em si já acontece no clique (onSuccess), sempre — o diálogo só
+  // pergunta o próximo passo, nunca condiciona se a skill entra no plano.
+  const [irAoPlanoAberto, setIrAoPlanoAberto] = React.useState(false);
 
   const addToPlan = useMutation({
     mutationFn: () =>
       runAddToPlan({
         data: { trackId: trackId as string, skillId: item.skillId, skillName: item.name },
       }),
-    onSuccess: ({ added }) => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["study_plans"] });
       void queryClient.invalidateQueries({ queryKey: ["study_items"] });
-      toast[added ? "success" : "info"](
-        added ? `${item.name} adicionada ao plano de estudos` : `${item.name} já está no plano`,
-        { description: "Confira e organize os itens na aba Progresso." },
-      );
+      setIrAoPlanoAberto(true);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -413,6 +423,31 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
           Adicionar ao plano de estudos
         </Button>
       </div>
+
+      <Dialog open={irAoPlanoAberto} onOpenChange={setIrAoPlanoAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{item.name} adicionada ao plano de estudos</DialogTitle>
+            <DialogDescription>
+              Quer ir até o plano agora para organizar os itens, ou prefere continuar por
+              aqui?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIrAoPlanoAberto(false)}>
+              Continuar aqui
+            </Button>
+            <Button
+              onClick={() => {
+                setIrAoPlanoAberto(false);
+                void navigate({ to: "/progresso" });
+              }}
+            >
+              Ir para o plano
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

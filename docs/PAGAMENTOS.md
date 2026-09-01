@@ -102,6 +102,17 @@ ASAAS_API_KEY="\$aact_hmlg_..."
 Testado: o bun expande `$` como variável **mesmo entre aspas simples**, e a chave chega
 vazia — falha silenciosa que parece "chave inválida".
 
+**Na hospedagem (Vercel/Netlify) é o oposto:** cole o valor **CRU**, começando com
+`$aact_`, **sem aspas e sem a barra de escape**. Copiar do `.env` (onde está como
+`"\$aact_..."`) leva a chave escapada para o painel e a API devolve
+`401 — A chave de API fornecida é inválida`, mensagem que não diz nada sobre o
+caractere a mais. Aconteceu de verdade em 2026-09-01.
+
+Por isso `client.server.ts` tem `normalizeKey()`: remove aspas em volta, barra
+invertida inicial e espaços, e repõe o `$` se faltar — **avisando no log**, para
+destravar sem esconder o erro de configuração. Verificado com as cinco variantes
+(correta, sem `$`, com `\`, com aspas, com espaços): todas autenticam.
+
 ### Preço é dado, não código
 
 `billing_plans` guarda preço, ciclo e métodos. Mudar de R$ 24,90 é `UPDATE billing_plans`

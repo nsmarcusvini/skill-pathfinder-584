@@ -997,6 +997,15 @@ export const reviewSalaryObservation = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // mv_salary_stats só enxerga status='aprovada'. Sem o refresh aqui, aprovar
+    // (ou reverter) uma contribuição em /admin/salarios não aparece em /salarios
+    // até alguém clicar "Recalcular estatísticas" — mesmo sintoma que
+    // createSalaryObservation já teve e corrigiu; faltava replicar aqui.
+    const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
+    if (refreshError) {
+      throw new Error(`Salvo, mas a estatística não recalculou: ${refreshError.message}`);
+    }
     return { ok: true };
   });
 
@@ -1041,6 +1050,14 @@ export const updateSalaryObservation = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // A linha corrigida pode já estar 'aprovada' (é o caso mais comum de uso
+    // desta função) — sem o refresh, o valor errado continua na mediana até
+    // alguém clicar "Recalcular estatísticas" manualmente.
+    const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
+    if (refreshError) {
+      throw new Error(`Salvo, mas a estatística não recalculou: ${refreshError.message}`);
+    }
     return { ok: true };
   });
 
@@ -1052,10 +1069,22 @@ export const deleteSalaryObservation = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("salary_observations").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // Mesma razão das duas funções acima: excluir uma observação aprovada não
+    // tira o valor da mediana em /salarios sem este refresh.
+    const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
+    if (refreshError) {
+      throw new Error(`Excluído, mas a estatística não recalculou: ${refreshError.message}`);
+    }
     return { ok: true };
   });
 
-/** Recalcula mv_salary_stats. Chame após aprovar ou corrigir em lote. */
+/**
+ * Recalcula mv_salary_stats à mão. As quatro funções acima (create/review/
+ * update/delete de salary_observations) já chamam refresh_market_views
+ * sozinhas — este botão é rede de segurança para o caso de alguém editar a
+ * tabela direto no banco, não o único jeito de a view ficar em dia.
+ */
 export const refreshSalaryStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, never>) => input)

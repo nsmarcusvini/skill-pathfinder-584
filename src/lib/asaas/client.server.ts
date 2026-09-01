@@ -21,6 +21,47 @@ const SANDBOX_URL = "https://api-sandbox.asaas.com/v3";
 const PRODUCTION_URL = "https://api.asaas.com/v3";
 const TIMEOUT_MS = 20_000;
 
+/**
+ * Limpa corrupções conhecidas da chave. Nenhuma chave válida do Asaas começa
+ * com aspas ou barra invertida, então remover isso não é ambíguo.
+ *
+ * Existe porque o `$` inicial já quebrou a integração DUAS vezes: no `.env`
+ * local (o bun expande `$` como variável, mesmo entre aspas simples) e depois
+ * na Vercel, onde o valor foi colado na forma escapada `\$aact_...` e a API
+ * respondeu "A chave de API fornecida é inválida" — mensagem que não indica
+ * em nada que o problema era um caractere a mais no começo.
+ *
+ * Avisa no log quando conserta: o objetivo é destravar, não esconder erro de
+ * configuração.
+ */
+function normalizeKey(raw: string): string {
+  let key = raw.trim();
+  const consertos: string[] = [];
+
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+    consertos.push("aspas em volta");
+  }
+  if (key.startsWith("\\")) {
+    key = key.slice(1);
+    consertos.push("barra invertida inicial");
+  }
+  // Toda chave do Asaas é `$aact_...`; sem o `$` a API devolve 401.
+  if (!key.startsWith("$") && key.startsWith("aact_")) {
+    key = "$" + key;
+    consertos.push("`$` inicial ausente");
+  }
+
+  if (consertos.length > 0) {
+    console.warn(
+      `[asaas] ASAAS_API_KEY veio malformada e foi corrigida (${consertos.join(", ")}). ` +
+        `Corrija o valor na hospedagem: deve ser o valor CRU, começando com "$aact_", ` +
+        `sem aspas e sem escape.`,
+    );
+  }
+  return key;
+}
+
 function apiKey(): string {
   const key = process.env["ASAAS_API_KEY"];
   if (!key) {
@@ -28,7 +69,7 @@ function apiKey(): string {
       "ASAAS_API_KEY ausente. Defina no .env (dev) ou nas variáveis de ambiente da hospedagem (produção).",
     );
   }
-  return key;
+  return normalizeKey(key);
 }
 
 /**
@@ -89,6 +130,14 @@ async function request<T>(
         ?.map((e) => e.description)
         .filter(Boolean)
         .join("; ") || raw.slice(0, 300);
+    if (response.status === 401) {
+      throw new AsaasError(
+        `${message || "não autorizado"} — confira ASAAS_API_KEY na hospedagem: o valor ` +
+          `deve ser o CRU, começando com "$aact_", sem aspas e sem barra de escape.`,
+        response.status,
+        path,
+      );
+    }
     throw new AsaasError(message || response.statusText, response.status, path);
   }
 

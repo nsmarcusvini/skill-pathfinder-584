@@ -6,6 +6,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export type ItemStatus = "backlog" | "em_andamento" | "concluido";
 export type ItemType = "curso" | "certificacao" | "projeto" | "leitura" | "lab" | "outro";
 export type PlanStatus = "ativo" | "pausado" | "concluido";
+export type PlanSource = "manual" | "gap_generated";
 
 export interface StudyPlan {
   id: string;
@@ -14,7 +15,30 @@ export interface StudyPlan {
   description: string | null;
   targetDate: string | null;
   status: PlanStatus;
+  source: PlanSource;
   createdAt: string;
+}
+
+function mapPlan(r: {
+  id: string;
+  track_id: string | null;
+  title: string;
+  description: string | null;
+  target_date: string | null;
+  status: string;
+  source: string;
+  created_at: string;
+}): StudyPlan {
+  return {
+    id: r.id,
+    trackId: r.track_id ?? null,
+    title: r.title,
+    description: r.description ?? null,
+    targetDate: r.target_date ?? null,
+    status: r.status as PlanStatus,
+    source: r.source as PlanSource,
+    createdAt: r.created_at,
+  };
 }
 
 export interface StudyItem {
@@ -51,19 +75,11 @@ export const getStudyPlans = createServerFn({ method: "POST" })
     const db = context.supabase;
     const { data, error } = await db
       .from("study_plans")
-      .select("id, track_id, title, description, target_date, status, created_at")
+      .select("id, track_id, title, description, target_date, status, source, created_at")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => ({
-      id: r.id,
-      trackId: r.track_id ?? null,
-      title: r.title,
-      description: r.description ?? null,
-      targetDate: r.target_date ?? null,
-      status: r.status as PlanStatus,
-      createdAt: r.created_at,
-    }));
+    return (data ?? []).map(mapPlan);
   });
 
 export const createStudyPlan = createServerFn({ method: "POST" })
@@ -84,15 +100,7 @@ export const createStudyPlan = createServerFn({ method: "POST" })
     };
     const { data: row, error } = await db.from("study_plans").insert(insert).select().single();
     if (error) throw new Error(error.message);
-    return {
-      id: row.id,
-      trackId: row.track_id ?? null,
-      title: row.title,
-      description: row.description ?? null,
-      targetDate: row.target_date ?? null,
-      status: row.status as PlanStatus,
-      createdAt: row.created_at,
-    };
+    return mapPlan(row);
   });
 
 export const updatePlanStatus = createServerFn({ method: "POST" })
@@ -271,19 +279,58 @@ export const getStudyHeatmap = createServerFn({ method: "POST" })
 
 // ─── Generate plan from gap ───────────────────────────────────────────────────
 
+type GeneratePlanMode = "criar" | "refazer" | "adicionar_novas";
+
 interface GeneratePlanInput {
   trackId: string;
   seniority: string;
   marketSegment: string;
   periodDays: number;
+  /**
+   * "criar" só é válido quando ainda não existe plano gerado pelas lacunas
+   * para essa trilha — o handler recusa e pede pra UI reconsultar. Em caso de
+   * plano já existente, a UI pergunta ao usuário "refazer" (substitui os itens
+   * vindos de lacuna) ou "adicionar_novas" (só insere o que ainda não está lá).
+   */
+  mode?: GeneratePlanMode;
+}
+
+export interface GeneratePlanResult {
+  plan: StudyPlan;
+  mode: GeneratePlanMode;
+  isFirstPlan: boolean;
+  addedCount: number;
+  removedCount: number;
+}
+
+interface GapItemRow {
+  id: string;
+  skill_id: string | null;
+  skills: { canonical_name: string } | { canonical_name: string }[] | null;
+}
+
+function gapItemInsert(planId: string, userId: string, g: GapItemRow, priority: number) {
+  const skillRow = Array.isArray(g.skills) ? (g.skills[0] ?? null) : g.skills;
+  return {
+    plan_id: planId,
+    user_id: userId,
+    skill_id: g.skill_id ?? null,
+    title: `Aprender: ${skillRow?.canonical_name ?? "skill"}`,
+    type: "outro",
+    status: "backlog",
+    priority,
+    source_gap_item_id: g.id,
+    estimated_hours: 20,
+  };
 }
 
 export const generatePlanFromGap = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: GeneratePlanInput) => input)
-  .handler(async ({ data, context }): Promise<StudyPlan> => {
+  .handler(async ({ data, context }): Promise<GeneratePlanResult> => {
     const { supabase, userId } = context;
     const db = supabase;
+    const mode = data.mode ?? "criar";
 
     const { data: latestGap } = await supabase
       .from("gap_analyses")
@@ -294,7 +341,6 @@ export const generatePlanFromGap = createServerFn({ method: "POST" })
       .order("computed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-
     if (!latestGap) throw new Error("Nenhuma análise de gap encontrada.");
 
     const { data: gapItems, error: gapError } = await supabase
@@ -305,45 +351,103 @@ export const generatePlanFromGap = createServerFn({ method: "POST" })
       .order("gap_score", { ascending: false })
       .limit(10);
     if (gapError) throw new Error(gapError.message);
+    const topGaps = (gapItems ?? []) as GapItemRow[];
 
-    const { data: plan, error: planError } = await db
+    const { data: existingPlan, error: existingError } = await db
       .from("study_plans")
-      .insert({
-        user_id: userId,
-        track_id: data.trackId,
-        title: "Plano gerado pelas minhas lacunas",
-        status: "ativo",
-      })
-      .select()
-      .single();
-    if (planError) throw new Error(planError.message);
+      .select("id, track_id, title, description, target_date, status, source, created_at")
+      .eq("user_id", userId)
+      .eq("track_id", data.trackId)
+      .eq("source", "gap_generated")
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
 
-    if ((gapItems ?? []).length > 0) {
-      const items = (gapItems ?? []).map((g, i) => {
-        const skillRow = g.skills as { canonical_name: string } | null;
-        return {
-          plan_id: plan.id,
+    // Primeiro plano: ainda não existe nenhum gerado pelas lacunas para essa trilha.
+    if (!existingPlan) {
+      const { data: plan, error: planError } = await db
+        .from("study_plans")
+        .insert({
           user_id: userId,
-          skill_id: g.skill_id ?? null,
-          title: `Aprender: ${skillRow?.canonical_name ?? "skill"}`,
-          type: "outro",
-          status: "backlog",
-          priority: i,
-          source_gap_item_id: g.id,
-          estimated_hours: 20,
-        };
-      });
-      await db.from("study_items").insert(items);
+          track_id: data.trackId,
+          title: "Plano gerado pelas minhas lacunas",
+          status: "ativo",
+          source: "gap_generated",
+        })
+        .select()
+        .single();
+      if (planError) throw new Error(planError.message);
+
+      if (topGaps.length > 0) {
+        const { error: insertError } = await db
+          .from("study_items")
+          .insert(topGaps.map((g, i) => gapItemInsert(plan.id, userId, g, i)));
+        if (insertError) throw new Error(insertError.message);
+      }
+
+      return {
+        plan: mapPlan(plan),
+        mode: "criar",
+        isFirstPlan: true,
+        addedCount: topGaps.length,
+        removedCount: 0,
+      };
     }
 
+    // Já existe um plano gerado pelas lacunas para essa trilha — "criar" não é
+    // uma opção aqui, a UI precisa perguntar refazer vs. adicionar novidades.
+    if (mode === "criar") {
+      throw new Error("Já existe um plano gerado pelas suas lacunas para esta trilha.");
+    }
+
+    const { data: existingItems, error: itemsError } = await db
+      .from("study_items")
+      .select("id, skill_id, source_gap_item_id")
+      .eq("plan_id", existingPlan.id);
+    if (itemsError) throw new Error(itemsError.message);
+
+    const gapDerivedItems = (existingItems ?? []).filter((i) => i.source_gap_item_id !== null);
+
+    if (mode === "refazer") {
+      const idsToDelete = gapDerivedItems.map((i) => i.id);
+      if (idsToDelete.length > 0) {
+        const { error: delError } = await db.from("study_items").delete().in("id", idsToDelete);
+        if (delError) throw new Error(delError.message);
+      }
+      if (topGaps.length > 0) {
+        const { error: insertError } = await db
+          .from("study_items")
+          .insert(topGaps.map((g, i) => gapItemInsert(existingPlan.id, userId, g, i)));
+        if (insertError) throw new Error(insertError.message);
+      }
+      return {
+        plan: mapPlan(existingPlan),
+        mode: "refazer",
+        isFirstPlan: false,
+        addedCount: topGaps.length,
+        removedCount: idsToDelete.length,
+      };
+    }
+
+    // mode === "adicionar_novas": só insere lacunas que ainda não viraram item.
+    const existingSkillIds = new Set(
+      gapDerivedItems.map((i) => i.skill_id).filter((id): id is string => Boolean(id)),
+    );
+    const newGaps = topGaps.filter((g) => g.skill_id && !existingSkillIds.has(g.skill_id));
+    if (newGaps.length > 0) {
+      const startPriority = (existingItems ?? []).length;
+      const { error: insertError } = await db
+        .from("study_items")
+        .insert(
+          newGaps.map((g, i) => gapItemInsert(existingPlan.id, userId, g, startPriority + i)),
+        );
+      if (insertError) throw new Error(insertError.message);
+    }
     return {
-      id: plan.id,
-      trackId: plan.track_id ?? null,
-      title: plan.title,
-      description: plan.description ?? null,
-      targetDate: plan.target_date ?? null,
-      status: plan.status as PlanStatus,
-      createdAt: plan.created_at,
+      plan: mapPlan(existingPlan),
+      mode: "adicionar_novas",
+      isFirstPlan: false,
+      addedCount: newGaps.length,
+      removedCount: 0,
     };
   });
 

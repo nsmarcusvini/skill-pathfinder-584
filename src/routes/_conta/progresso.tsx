@@ -38,6 +38,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { useMarket, SENIORITY_LABEL } from "@/hooks/use-market";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -349,6 +359,7 @@ function ProgressoPage() {
 
   const [viewMode, setViewMode] = React.useState<"kanban" | "lista">("kanban");
   const [selectedPlanId, setSelectedPlanId] = React.useState<string | null>(null);
+  const [showRegenerateDialog, setShowRegenerateDialog] = React.useState(false);
   const [showNewPlan, setShowNewPlan] = React.useState(false);
   const [newPlanTitle, setNewPlanTitle] = React.useState("");
   const [showNewItem, setShowNewItem] = React.useState(false);
@@ -413,19 +424,38 @@ function ProgressoPage() {
     },
   });
 
+  const gapPlan = plans.find((p) => p.source === "gap_generated" && p.trackId === trackId);
+
   const generateMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (mode: "criar" | "refazer" | "adicionar_novas") =>
       generatePlanRun({
-        data: { trackId: trackId!, seniority, marketSegment: segment, periodDays },
+        data: { trackId: trackId!, seniority, marketSegment: segment, periodDays, mode },
       }),
-    onSuccess: (plan) => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["study_plans"] });
-      qc.invalidateQueries({ queryKey: ["study_items", plan.id] });
-      setSelectedPlanId(plan.id);
-      toast.success("Plano gerado com suas 10 maiores lacunas!");
+      qc.invalidateQueries({ queryKey: ["study_items", result.plan.id] });
+      setSelectedPlanId(result.plan.id);
+      setShowRegenerateDialog(false);
+      if (result.isFirstPlan) {
+        toast.success("Este é o seu primeiro plano — gerado com suas 10 maiores lacunas!");
+      } else if (result.mode === "refazer") {
+        toast.success(`Plano refeito do zero com ${result.addedCount} lacuna(s) atuais.`);
+      } else if (result.addedCount > 0) {
+        toast.success(`${result.addedCount} novidade(s) adicionada(s) ao plano.`);
+      } else {
+        toast.info("Não há mudanças — seu plano já cobre as lacunas atuais.");
+      }
     },
     onError: () => toast.error("Análise de gap não encontrada. Acesse o Dashboard primeiro."),
   });
+
+  function handleGerarClick() {
+    if (gapPlan) {
+      setShowRegenerateDialog(true);
+      return;
+    }
+    generateMutation.mutate("criar");
+  }
 
   const createItemMutation = useMutation({
     mutationFn: () =>
@@ -574,7 +604,7 @@ function ProgressoPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => generateMutation.mutate()}
+            onClick={handleGerarClick}
             disabled={generateMutation.isPending}
           >
             <Zap size={13} className="mr-1" />
@@ -748,6 +778,47 @@ function ProgressoPage() {
           )}
         </>
       )}
+
+      {/* Plano das lacunas já existe: refazer, adicionar novidades ou cancelar */}
+      <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você já tem um plano gerado pelas lacunas</AlertDialogTitle>
+            <AlertDialogDescription>
+              O plano gerado pelas suas lacunas já existe para esta trilha. Quer refazer do zero com
+              as lacunas de hoje, ou só adicionar o que for novo (mantendo seu progresso nos itens
+              atuais)?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={generateMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="outline"
+                loading={generateMutation.isPending}
+                onClick={(e) => {
+                  e.preventDefault();
+                  generateMutation.mutate("adicionar_novas");
+                }}
+              >
+                Adicionar só as novidades
+              </Button>
+            </AlertDialogAction>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                loading={generateMutation.isPending}
+                onClick={(e) => {
+                  e.preventDefault();
+                  generateMutation.mutate("refazer");
+                }}
+              >
+                Refazer do zero
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* New plan dialog */}
       <Dialog open={showNewPlan} onOpenChange={setShowNewPlan}>

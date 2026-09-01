@@ -10,7 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 import { Info } from "lucide-react";
 
@@ -28,6 +27,7 @@ import {
   submitSalaryObservation,
   type SubmitSalaryInput,
 } from "@/lib/market.functions";
+import { CHART_AXIS, chartColor } from "@/lib/design-tokens";
 
 export const Route = createFileRoute("/_conta/salarios")({
   head: () => ({
@@ -41,8 +41,6 @@ export const Route = createFileRoute("/_conta/salarios")({
   component: SalariosPage,
 });
 
-const CHART_COLORS = ["#416180", "#7e9cb8", "#b5d9fd", "#5d5d60", "#94bce3"];
-
 function formatCurrency(value: number, currency: string): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -51,15 +49,59 @@ function formatCurrency(value: number, currency: string): string {
   }).format(value);
 }
 
-// Custom bar label: shows sample count
-function SampleLabel(props: { x?: number; y?: number; width?: number; height?: number; value?: number }) {
-  const { x = 0, y = 0, width = 0, height = 0, value = 0 } = props;
-  if (!value) return null;
-  return (
-    <text x={x + width + 4} y={y + height / 2 + 4} fontSize={11} fill="var(--color-muted-foreground, #888)">
-      n={value}
-    </text>
-  );
+function formatCurrencyCompact(value: number, currency: string): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+interface SalaryBarDatum {
+  name: string;
+  p50: number;
+  sampleSize: number;
+}
+
+// Label acima da barra: mediana em destaque + tamanho da amostra logo abaixo.
+function makeMedianLabel(currency: string, data: SalaryBarDatum[]) {
+  return function MedianLabel(props: {
+    x?: number;
+    y?: number;
+    width?: number;
+    value?: number;
+    index?: number;
+  }) {
+    const { x = 0, y = 0, width = 0, value = 0, index } = props;
+    if (!value) return <React.Fragment />;
+    const n = index !== undefined ? data[index]?.sampleSize : undefined;
+    return (
+      <g>
+        <text
+          x={x + width / 2}
+          y={y - 18}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={600}
+          fill="var(--color-neutral-800, #1d1f20)"
+        >
+          {formatCurrencyCompact(value, currency)}
+        </text>
+        {n ? (
+          <text
+            x={x + width / 2}
+            y={y - 5}
+            textAnchor="middle"
+            fontSize={10}
+            fill="var(--color-muted-foreground, #888)"
+          >
+            n={n}
+          </text>
+        ) : null}
+      </g>
+    );
+  };
 }
 
 function SalariosPage() {
@@ -97,13 +139,12 @@ function SalariosPage() {
     (a, b) => SENIORITIES.indexOf(a.seniority as Seniority) - SENIORITIES.indexOf(b.seniority as Seniority),
   );
 
-  const chartData = segmentRows.map((r) => ({
+  const chartData: SalaryBarDatum[] = segmentRows.map((r) => ({
     name: SENIORITY_LABEL[r.seniority as Seniority] ?? r.seniority,
-    base: r.p25,
-    range: r.p75 - r.p25,
     p50: r.p50,
     sampleSize: r.sampleSize,
   }));
+  const chartCurrency = segment === "br" ? "BRL" : "USD";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -168,13 +209,9 @@ function SalariosPage() {
                 </div>
                 {brSen ? (
                   <>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[["P25", brSen.p25], ["Mediana", brSen.p50], ["P75", brSen.p75]].map(([label, val]) => (
-                        <div key={label as string} className="flex flex-col">
-                          <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>{label}</span>
-                          <span className="font-semibold text-sm">{formatCurrency(val as number, "BRL")}</span>
-                        </div>
-                      ))}
+                    <div className="flex flex-col">
+                      <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>Mediana</span>
+                      <span className="font-semibold text-2xl">{formatCurrency(brSen.p50, "BRL")}</span>
                     </div>
                     <div className="text-xs mt-1" style={{ color: "var(--color-warning)" }}>
                       n={brSen.sampleSize} — amostra menor (fontes gratuitas)
@@ -192,13 +229,9 @@ function SalariosPage() {
                 </div>
                 {globalSen ? (
                   <>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[["P25", globalSen.p25], ["Mediana", globalSen.p50], ["P75", globalSen.p75]].map(([label, val]) => (
-                        <div key={label as string} className="flex flex-col">
-                          <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>{label}</span>
-                          <span className="font-semibold text-sm">{formatCurrency(val as number, "USD")}</span>
-                        </div>
-                      ))}
+                    <div className="flex flex-col">
+                      <span className="text-xs" style={{ color: "var(--color-muted-foreground, #888)" }}>Mediana</span>
+                      <span className="font-semibold text-2xl">{formatCurrency(globalSen.p50, "USD")}</span>
                     </div>
                     <div className="text-xs mt-1" style={{ color: "var(--color-muted-foreground, #888)" }}>
                       n={globalSen.sampleSize}
@@ -222,38 +255,37 @@ function SalariosPage() {
 
       {/* Faixa por senioridade — segmento ativo */}
       <Blueprint>
-        <h2 className="font-semibold text-base mb-4">{segLabel} — Faixa por Senioridade</h2>
+        <h2 className="font-semibold text-base mb-4">{segLabel} — Mediana por Senioridade</h2>
         {statsQuery.isLoading && <LoadingState />}
         {statsQuery.isSuccess && chartData.length === 0 && (
           <EmptyState title="Sem dados" description="Não há amostras salariais para esta configuração ainda." />
         )}
         {statsQuery.isSuccess && chartData.length > 0 && (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} layout="vertical" margin={{ left: 60, right: 60, top: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartData} margin={{ left: 8, right: 8, top: 32, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_AXIS.stroke} />
               <XAxis
-                type="number"
-                tickFormatter={(v) => formatCurrency(v as number, segment === "br" ? "BRL" : "USD")}
-                tick={{ fontSize: 10 }}
+                dataKey="name"
+                tick={{ fontSize: 12, fill: CHART_AXIS.tickFill }}
+                stroke={CHART_AXIS.stroke}
               />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={56} />
+              <YAxis hide domain={[0, (max: number) => max * 1.2]} />
               <Tooltip
-                formatter={(value: number, name: string) => {
-                  if (name === "base") return null;
-                  const label = name === "range" ? "P25–P75" : name;
-                  return [formatCurrency(value, segment === "br" ? "BRL" : "USD"), label];
-                }}
+                formatter={(value: number) => [formatCurrency(value, chartCurrency), "Mediana"]}
+                labelFormatter={(name: string) => name}
               />
-              {/* Transparent base up to p25 */}
-              <Bar dataKey="base" stackId="range" fill="transparent" />
-              {/* Colored range p25→p75 */}
-              <Bar dataKey="range" stackId="range" fill={CHART_COLORS[0]} label={<SampleLabel />} />
-              {/* Median reference line per bar — shown via ReferenceLine would conflict with layout=vertical */}
+              <Bar
+                dataKey="p50"
+                fill={chartColor(0)}
+                radius={0}
+                maxBarSize={72}
+                label={makeMedianLabel(chartCurrency, chartData)}
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
         <p className="text-xs mt-2" style={{ color: "var(--color-muted-foreground, #888)" }}>
-          Barras mostram faixa P25–P75. n= indica número de amostras daquele nível.
+          Cada barra é a mediana salarial do nível. n= indica quantas vagas com salário entraram na amostra.
         </p>
       </Blueprint>
 

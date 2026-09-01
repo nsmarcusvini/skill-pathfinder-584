@@ -81,7 +81,6 @@ export type Database = {
       }
       billing_plans: {
         Row: {
-          provider_plan_ref: string | null
           created_at: string
           currency: string
           cycle: string
@@ -93,12 +92,12 @@ export type Database = {
           methods: string[]
           name: string
           price_cents: number
+          provider_plan_ref: string | null
           retry_every_days: number
           trial_days: number | null
           updated_at: string
         }
         Insert: {
-          provider_plan_ref?: string | null
           created_at?: string
           currency?: string
           cycle?: string
@@ -110,12 +109,12 @@ export type Database = {
           methods?: string[]
           name: string
           price_cents: number
+          provider_plan_ref?: string | null
           retry_every_days?: number
           trial_days?: number | null
           updated_at?: string
         }
         Update: {
-          provider_plan_ref?: string | null
           created_at?: string
           currency?: string
           cycle?: string
@@ -127,6 +126,7 @@ export type Database = {
           methods?: string[]
           name?: string
           price_cents?: number
+          provider_plan_ref?: string | null
           retry_every_days?: number
           trial_days?: number | null
           updated_at?: string
@@ -1565,6 +1565,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          source: string
           status: string
           target_date: string | null
           title: string
@@ -1575,6 +1576,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          source?: string
           status?: string
           target_date?: string | null
           title: string
@@ -1585,6 +1587,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          source?: string
           status?: string
           target_date?: string | null
           title?: string
@@ -1603,10 +1606,6 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          provider: string
-          provider_checkout_id: string | null
-          provider_customer_id: string | null
-          provider_subscription_id: string | null
           amount_cents: number
           cancelled_at: string | null
           cancelled_due_to: string | null
@@ -1623,16 +1622,16 @@ export type Database = {
           metadata: Json
           method: string | null
           plan_id: string
+          provider: string
+          provider_checkout_id: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
           status: string
           trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          provider?: string
-          provider_checkout_id?: string | null
-          provider_customer_id?: string | null
-          provider_subscription_id?: string | null
           amount_cents: number
           cancelled_at?: string | null
           cancelled_due_to?: string | null
@@ -1649,16 +1648,16 @@ export type Database = {
           metadata?: Json
           method?: string | null
           plan_id: string
+          provider?: string
+          provider_checkout_id?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           status?: string
           trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          provider?: string
-          provider_checkout_id?: string | null
-          provider_customer_id?: string | null
-          provider_subscription_id?: string | null
           amount_cents?: number
           cancelled_at?: string | null
           cancelled_due_to?: string | null
@@ -1675,6 +1674,10 @@ export type Database = {
           metadata?: Json
           method?: string | null
           plan_id?: string
+          provider?: string
+          provider_checkout_id?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           status?: string
           trial_ends_at?: string | null
           updated_at?: string
@@ -2324,6 +2327,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_paid_features: { Args: { _user_id: string }; Returns: boolean }
       company_monthly: {
         Args: {
           _company_id: string
@@ -2338,6 +2342,7 @@ export type Database = {
       }
       company_ranking: {
         Args: {
+          _cities?: string[]
           _segments: string[]
           _seniorities?: string[]
           _since: string
@@ -2362,6 +2367,7 @@ export type Database = {
       }
       company_skill_demand: {
         Args: {
+          _cities?: string[]
           _company_id: string
           _segments: string[]
           _since: string
@@ -2382,7 +2388,6 @@ export type Database = {
         }[]
       }
       expire_old_jobs: { Args: never; Returns: number }
-      can_access_paid_features: { Args: { _user_id: string }; Returns: boolean }
       has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       job_locations: {
