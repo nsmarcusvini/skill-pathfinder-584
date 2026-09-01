@@ -57,7 +57,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Quanto custa e como cobram?",
-    a: "Uma assinatura mensal, cobrada no cartão de crédito e renovada automaticamente até você cancelar. O valor está na seção Planos, acima. O pagamento é processado pela AbacatePay — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
+    a: "Uma assinatura mensal, cobrada no cartão de crédito e renovada automaticamente até você cancelar. O valor está na seção Planos, acima. O pagamento é processado pelo Asaas — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
   },
   {
     q: "Como vocês analisam o currículo?",

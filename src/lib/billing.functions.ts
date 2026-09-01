@@ -1,5 +1,5 @@
 /**
- * Assinatura RUMVIA Pro via AbacatePay.
+ * Assinatura RUMVIA Pro via Asaas.
  *
  * FONTE ÚNICA do estado de pagamento: a tabela `subscriptions`, escrita só pelo
  * webhook e por estas server functions (service_role). Nenhuma tela decide se
@@ -24,7 +24,11 @@ export interface BillingPlan {
   cycle: string;
   trialDays: number | null;
   methods: string[];
-  /** false = produto ainda não criado na AbacatePay; o checkout não abre. */
+  /**
+   * O gateway está pronto para abrir checkout. No Asaas é sempre true (não há
+   * catálogo a pré-criar — o preço vai direto no checkout). A flag continua na
+   * interface porque gateways com catálogo (Stripe, AbacatePay) precisam dela.
+   */
   ready: boolean;
 }
 
@@ -88,9 +92,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
 
     const { data: planRow, error: planError } = await db
       .from("billing_plans")
-      .select(
-        "key, name, description, price_cents, currency, cycle, trial_days, methods, abacate_product_id",
-      )
+      .select("key, name, description, price_cents, currency, cycle, trial_days, methods")
       .eq("key", PLAN_KEY)
       .eq("is_active", true)
       .maybeSingle();
@@ -143,7 +145,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
             cycle: planRow.cycle,
             trialDays: planRow.trial_days ?? null,
             methods: planRow.methods ?? ["CARD"],
-            ready: Boolean(planRow.abacate_product_id),
+            ready: true,
           }
         : null,
       subscription,
@@ -165,7 +167,7 @@ export interface PublicPlan {
 
 /**
  * Preço para a landing, sem login. Devolve só campos públicos — nada de
- * abacate_product_id. A landing NUNCA escreve preço no JSX (regra 1): o número
+ * campos internos. A landing NUNCA escreve preço no JSX (regra 1): o número
  * vem de billing_plans, mesma fonte que o checkout cobra.
  */
 export const getPublicPlan = createServerFn({ method: "GET" }).handler(
@@ -204,24 +206,17 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
 
     const { data: plan, error: planError } = await supabaseAdmin
       .from("billing_plans")
-      .select(
-        "id, key, name, price_cents, cycle, methods, max_retry, retry_every_days, abacate_product_id",
-      )
+      .select("id, key, name, description, price_cents, cycle, methods")
       .eq("key", PLAN_KEY)
       .eq("is_active", true)
       .maybeSingle();
     if (planError) throw new Error(planError.message);
     if (!plan) throw new Error(`Plano "${PLAN_KEY}" não encontrado ou inativo.`);
-    if (!plan.abacate_product_id) {
-      throw new Error(
-        "Plano ainda não tem produto na AbacatePay. Rode `bun scripts/abacatepay-setup.ts`.",
-      );
-    }
 
     // Uma assinatura viva por usuário (índice único parcial garante isso).
     const { data: existing } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status, checkout_url, abacate_customer_id")
+      .select("id, status, checkout_url, provider_customer_id")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
@@ -234,62 +229,41 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       return { url: existing.checkout_url, reused: true };
     }
 
-    // Reaproveita o cliente da AbacatePay de qualquer assinatura anterior.
-    const { data: lastWithCustomer } = await supabaseAdmin
-      .from("subscriptions")
-      .select("abacate_customer_id")
-      .eq("user_id", userId)
-      .not("abacate_customer_id", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", userId)
-      .maybeSingle();
-
-    const email = (context.claims as { email?: string }).email;
-    if (!email) throw new Error("Conta sem e-mail: não é possível abrir o checkout.");
-
-    const { abacate, isDevModeKey } = await import("@/lib/abacatepay/client.server");
-
-    let customerId = lastWithCustomer?.abacate_customer_id ?? existing?.abacate_customer_id ?? null;
-    if (!customerId) {
-      const customer = await abacate.createCustomer({
-        email,
-        name: profile?.full_name ?? undefined,
-        metadata: { rumvia_user_id: userId },
-      });
-      customerId = customer.id;
-    }
-
     const base = appBaseUrl();
     const externalId = `rumvia_${userId}_${Date.now().toString(36)}`;
 
-    const checkout = await abacate.createSubscription({
-      productId: plan.abacate_product_id,
-      customerId,
-      externalId,
-      completionUrl: `${base}/assinatura?status=sucesso`,
-      returnUrl: `${base}/assinatura`,
-      methods: (plan.methods ?? ["CARD"]) as ("PIX" | "CARD")[],
-      metadata: { rumvia_user_id: userId, plan_key: plan.key },
-      retryPolicy: { maxRetry: plan.max_retry, retryEvery: plan.retry_every_days },
+    const { asaas, isSandboxKey } = await import("@/lib/asaas/client.server");
+    const { reaisFromCents } = await import("@/lib/asaas/types");
+
+    // Não pré-criamos cliente no Asaas: a página hospedada coleta nome, e-mail e
+    // CPF sozinha. Um passo a menos no funil e um dado sensível a menos sob nossa
+    // guarda — o RUMVIA nunca precisa pedir CPF.
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    const checkout = await asaas.createCheckout({
+      value: reaisFromCents(plan.price_cents),
+      name: plan.name,
+      description: plan.description ?? plan.name,
+      cycle: plan.cycle,
+      nextDueDate: hoje,
+      externalReference: externalId,
+      successUrl: `${base}/assinatura?status=sucesso`,
+      cancelUrl: `${base}/assinatura`,
+      expiredUrl: `${base}/assinatura`,
+      billingTypes: plan.methods.map((m) => (m === "CARD" ? "CREDIT_CARD" : m)),
     });
 
     const row = {
       user_id: userId,
       plan_id: plan.id,
+      provider: "asaas",
       status: "pending" as const,
       external_id: externalId,
-      abacate_customer_id: customerId,
-      abacate_bill_id: checkout.id,
-      checkout_url: checkout.url,
-      amount_cents: checkout.amount || plan.price_cents,
+      provider_checkout_id: checkout.id,
+      checkout_url: checkout.link,
+      amount_cents: plan.price_cents,
       currency: "BRL",
-      dev_mode: checkout.devMode ?? isDevModeKey(),
+      dev_mode: isSandboxKey(),
       metadata: { plan_key: plan.key },
     };
 
@@ -298,7 +272,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       : await supabaseAdmin.from("subscriptions").insert(row);
     if (writeError) throw new Error(writeError.message);
 
-    return { url: checkout.url, reused: false };
+    return { url: checkout.link, reused: false };
   });
 
 // ─── Cancelamento ────────────────────────────────────────────────────────────
@@ -312,16 +286,16 @@ export const cancelMySubscription = createServerFn({ method: "POST" })
 
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status, abacate_subscription_id")
+      .select("id, status, provider_subscription_id")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
     if (!sub) throw new Error("Nenhuma assinatura ativa para cancelar.");
 
-    if (sub.abacate_subscription_id) {
-      const { abacate } = await import("@/lib/abacatepay/client.server");
-      // Cancelamento na AbacatePay é imediato e irreversível.
-      await abacate.cancelSubscription(sub.abacate_subscription_id);
+    if (sub.provider_subscription_id) {
+      const { asaas } = await import("@/lib/asaas/client.server");
+      // Remove a assinatura no Asaas: nenhuma cobrança futura é gerada.
+      await asaas.cancelSubscription(sub.provider_subscription_id);
     }
 
     // Grava já, sem esperar o webhook subscription.cancelled — que também chega

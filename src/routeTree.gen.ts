@@ -41,7 +41,7 @@ import { Route as ContaAdminSaudeRouteImport } from './routes/_conta/admin.saude
 import { Route as ContaAdminSkillsRouteImport } from './routes/_conta/admin.skills'
 import { Route as ContaAdminTrilhasRouteImport } from './routes/_conta/admin.trilhas'
 import { Route as ContaAdminUsuariosRouteImport } from './routes/_conta/admin.usuarios'
-import { Route as ApiPublicAbacatepayWebhookRouteImport } from './routes/api/public/abacatepay-webhook'
+import { Route as ApiPublicAsaasWebhookRouteImport } from './routes/api/public/asaas-webhook'
 import { Route as ApiPublicExtractJdSkillsRouteImport } from './routes/api/public/extract-jd-skills'
 import { Route as ApiPublicIngestAsyncRouteImport } from './routes/api/public/ingest-async'
 import { Route as ApiPublicIngestJobsRouteImport } from './routes/api/public/ingest-jobs'
@@ -207,12 +207,11 @@ const ContaAdminUsuariosRoute = ContaAdminUsuariosRouteImport.update({
   path: '/usuarios',
   getParentRoute: () => ContaAdminRoute,
 } as any)
-const ApiPublicAbacatepayWebhookRoute =
-  ApiPublicAbacatepayWebhookRouteImport.update({
-    id: '/api/public/abacatepay-webhook',
-    path: '/api/public/abacatepay-webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const ApiPublicAsaasWebhookRoute = ApiPublicAsaasWebhookRouteImport.update({
+  id: '/api/public/asaas-webhook',
+  path: '/api/public/asaas-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicExtractJdSkillsRoute =
   ApiPublicExtractJdSkillsRouteImport.update({
     id: '/api/public/extract-jd-skills',
@@ -272,7 +271,7 @@ export interface FileRoutesByFullPath {
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/admin/usuarios': typeof ContaAdminUsuariosRoute
-  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
+  '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -310,7 +309,7 @@ export interface FileRoutesByTo {
   '/admin/skills': typeof ContaAdminSkillsRoute
   '/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/admin/usuarios': typeof ContaAdminUsuariosRoute
-  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
+  '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -351,7 +350,7 @@ export interface FileRoutesById {
   '/_conta/admin/skills': typeof ContaAdminSkillsRoute
   '/_conta/admin/trilhas': typeof ContaAdminTrilhasRoute
   '/_conta/admin/usuarios': typeof ContaAdminUsuariosRoute
-  '/api/public/abacatepay-webhook': typeof ApiPublicAbacatepayWebhookRoute
+  '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/api/public/extract-jd-skills': typeof ApiPublicExtractJdSkillsRoute
   '/api/public/ingest-async': typeof ApiPublicIngestAsyncRoute
   '/api/public/ingest-jobs': typeof ApiPublicIngestJobsRoute
@@ -392,7 +391,7 @@ export interface FileRouteTypes {
     | '/admin/skills'
     | '/admin/trilhas'
     | '/admin/usuarios'
-    | '/api/public/abacatepay-webhook'
+    | '/api/public/asaas-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -430,7 +429,7 @@ export interface FileRouteTypes {
     | '/admin/skills'
     | '/admin/trilhas'
     | '/admin/usuarios'
-    | '/api/public/abacatepay-webhook'
+    | '/api/public/asaas-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -470,7 +469,7 @@ export interface FileRouteTypes {
     | '/_conta/admin/skills'
     | '/_conta/admin/trilhas'
     | '/_conta/admin/usuarios'
-    | '/api/public/abacatepay-webhook'
+    | '/api/public/asaas-webhook'
     | '/api/public/extract-jd-skills'
     | '/api/public/ingest-async'
     | '/api/public/ingest-jobs'
@@ -490,7 +489,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
-  ApiPublicAbacatepayWebhookRoute: typeof ApiPublicAbacatepayWebhookRoute
+  ApiPublicAsaasWebhookRoute: typeof ApiPublicAsaasWebhookRoute
   ApiPublicExtractJdSkillsRoute: typeof ApiPublicExtractJdSkillsRoute
   ApiPublicIngestAsyncRoute: typeof ApiPublicIngestAsyncRoute
   ApiPublicIngestJobsRoute: typeof ApiPublicIngestJobsRoute
@@ -724,11 +723,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminUsuariosRouteImport
       parentRoute: typeof ContaAdminRoute
     }
-    '/api/public/abacatepay-webhook': {
-      id: '/api/public/abacatepay-webhook'
-      path: '/api/public/abacatepay-webhook'
-      fullPath: '/api/public/abacatepay-webhook'
-      preLoaderRoute: typeof ApiPublicAbacatepayWebhookRouteImport
+    '/api/public/asaas-webhook': {
+      id: '/api/public/asaas-webhook'
+      path: '/api/public/asaas-webhook'
+      fullPath: '/api/public/asaas-webhook'
+      preLoaderRoute: typeof ApiPublicAsaasWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/extract-jd-skills': {
@@ -842,7 +841,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
-  ApiPublicAbacatepayWebhookRoute: ApiPublicAbacatepayWebhookRoute,
+  ApiPublicAsaasWebhookRoute: ApiPublicAsaasWebhookRoute,
   ApiPublicExtractJdSkillsRoute: ApiPublicExtractJdSkillsRoute,
   ApiPublicIngestAsyncRoute: ApiPublicIngestAsyncRoute,
   ApiPublicIngestJobsRoute: ApiPublicIngestJobsRoute,

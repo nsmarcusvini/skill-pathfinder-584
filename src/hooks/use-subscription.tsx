@@ -52,7 +52,7 @@ export function usePublicPlan() {
   });
 }
 
-/** Abre o checkout da AbacatePay e redireciona o navegador para ele. */
+/** Abre o checkout hospedado do gateway e redireciona o navegador para ele. */
 export function useStartCheckout() {
   const run = useServerFn(startSubscriptionCheckout);
   const queryClient = useQueryClient();

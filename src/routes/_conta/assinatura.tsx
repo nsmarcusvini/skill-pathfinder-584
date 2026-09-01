@@ -160,8 +160,8 @@ function AssinaturaPage() {
             <Blueprint className="border-accent p-4">
               <h2 className="label-h6 text-neutral-700">Confirmando o pagamento…</h2>
               <p className="mt-1 text-caption text-neutral-700">
-                A AbacatePay avisa o RUMVIA assim que a cobrança é aprovada. Esta tela atualiza
-                sozinha — costuma levar poucos segundos.
+                O Asaas avisa o RUMVIA assim que a cobrança é aprovada. Esta tela atualiza sozinha —
+                costuma levar poucos segundos.
               </p>
             </Blueprint>
           ) : null}
@@ -193,7 +193,7 @@ function AssinaturaPage() {
               </ul>
 
               <p className="mt-4 text-caption text-neutral-600">
-                Pagamento processado pela AbacatePay.{" "}
+                Pagamento processado pelo Asaas.{" "}
                 {plan.methods.includes("PIX") && plan.methods.includes("CARD")
                   ? "Cartão de crédito ou PIX automático."
                   : plan.methods.includes("PIX")
@@ -205,8 +205,8 @@ function AssinaturaPage() {
 
               {!plan.ready ? (
                 <p className="mt-3 text-caption text-danger">
-                  Plano ainda não conectado à AbacatePay. Rode{" "}
-                  <code>bun scripts/abacatepay-setup.ts</code>.
+                  Plano ainda não conectado ao gateway. Rode <code>bun scripts/asaas-setup.ts</code>
+                  .
                 </p>
               ) : null}
 

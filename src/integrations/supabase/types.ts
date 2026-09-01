@@ -81,7 +81,7 @@ export type Database = {
       }
       billing_plans: {
         Row: {
-          abacate_product_id: string | null
+          provider_plan_ref: string | null
           created_at: string
           currency: string
           cycle: string
@@ -98,7 +98,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          abacate_product_id?: string | null
+          provider_plan_ref?: string | null
           created_at?: string
           currency?: string
           cycle?: string
@@ -115,7 +115,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          abacate_product_id?: string | null
+          provider_plan_ref?: string | null
           created_at?: string
           currency?: string
           cycle?: string
@@ -1603,9 +1603,10 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          abacate_bill_id: string | null
-          abacate_customer_id: string | null
-          abacate_subscription_id: string | null
+          provider: string
+          provider_checkout_id: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
           amount_cents: number
           cancelled_at: string | null
           cancelled_due_to: string | null
@@ -1628,9 +1629,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          abacate_bill_id?: string | null
-          abacate_customer_id?: string | null
-          abacate_subscription_id?: string | null
+          provider?: string
+          provider_checkout_id?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           amount_cents: number
           cancelled_at?: string | null
           cancelled_due_to?: string | null
@@ -1653,9 +1655,10 @@ export type Database = {
           user_id: string
         }
         Update: {
-          abacate_bill_id?: string | null
-          abacate_customer_id?: string | null
-          abacate_subscription_id?: string | null
+          provider?: string
+          provider_checkout_id?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           amount_cents?: number
           cancelled_at?: string | null
           cancelled_due_to?: string | null
