@@ -140,3 +140,12 @@
   **Nota obsoleta do CLAUDE.md corrigida:** dizia para atualizar a URL de duas `cron.schedule` antes de ir para produção — aqueles jobs não existem mais em `cron.job`. Os 4 crons ativos hoje são só função SQL, nenhum chama URL.
 
   **Pendente (só no painel, fora do que consigo fazer):** trocar o **Sender email** no Supabase de `onboarding@resend.dev` para um `@rumvia.com.br`. Com o domínio agora verificado, é esse último passo que tira o envio do sandbox e libera cadastro para qualquer e-mail — hoje só entrega para `eu.marcussouza@gmail.com`. Também vale revisar Authentication → Rate Limits antes de abrir para tráfego real.
+- Cadastro destravado e bloqueador de assinatura identificado (2026-08-31): com o domínio `rumvia.com.br` verificado na Resend e o Sender email trocado para `naoresponda@rumvia.com.br`, o **cadastro passou a funcionar de ponta a ponta** — conta permanente criada, `email_confirmed_at` preenchido, `is_anonymous: false`.
+
+  **Mas o checkout de assinatura não abre**, e a causa não é integração: `POST /subscriptions/create` devolve 400 para todos os métodos na loja `store_Ywj6PCcNKfyrqK35AUfnSuFc` — `["CARD"]` → "CARD is not available for this store"; `["PIX"]` e `["PIX","CARD"]` → "PIX Automático is not available for this store". Testei os três explicitamente em vez de assumir que era escolha errada de método.
+
+  **Isolei que o problema é capacidade da conta, não do nosso código:** o produto está correto (`RUMVIA Pro`, 2490, `cycle: MONTHLY`, `ACTIVE`) e **cobrança avulsa funciona na mesma loja** — `POST /transparents/create` com PIX gerou `pix_char_...` com QR code normalmente. Ou seja, a loja recebe dinheiro; o que falta é **cobrança recorrente**, que a AbacatePay libera por conta/plano. O changelog deles já dizia isso sobre PIX Automático ("mediante habilitação, entre em contato com o suporte"); na prática vale para cartão também.
+
+  **Ação pendente, fora do que resolvo em código:** pedir ao suporte da AbacatePay habilitação de cobrança recorrente (cartão e/ou PIX Automático) para a loja. Documentado com a tabela de respostas em `docs/ABACATEPAY.md`. Quando liberarem, o ajuste é só dado (`UPDATE billing_plans SET methods = ...`) porque o método nunca foi hardcoded (regra 1) — zero deploy.
+
+  Sobra um `pix_char_` PENDING de diagnóstico no sandbox; é devMode e expira sozinho.

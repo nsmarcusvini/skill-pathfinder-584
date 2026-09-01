@@ -235,13 +235,34 @@ cobrar só por um pedaço.
 
 ---
 
+## ⚠️ Bloqueador: a loja precisa ter método recorrente habilitado
+
+**Assinatura não é capacidade padrão da loja AbacatePay.** Testado em 2026-08-31 na loja
+`store_Ywj6PCcNKfyrqK35AUfnSuFc` (sandbox), `POST /subscriptions/create` devolve 400 para
+os dois métodos:
+
+| `methods` enviado | Resposta |
+|---|---|
+| `["CARD"]` | `400 CARD is not available for this store` |
+| `["PIX"]` | `400 PIX Automático is not available for this store` |
+| `["PIX","CARD"]` | `400 PIX Automático is not available for this store` |
+
+Não é erro de integração nem de configuração do plano: o produto está correto
+(`RUMVIA Pro`, 2490, `cycle: MONTHLY`, `ACTIVE`) e **cobrança avulsa funciona** — um
+`POST /transparents/create` com PIX gera QR code normalmente na mesma loja. O que falta é
+capacidade de **cobrança recorrente**, que a AbacatePay libera por conta.
+
+**Ação:** falar com o suporte da AbacatePay e pedir habilitação de cobrança recorrente
+(cartão e/ou PIX Automático) para a loja. Sem isso o checkout de assinatura não abre, em
+sandbox nem em produção.
+
+Depois de liberado, o ajuste é só dado — `UPDATE billing_plans SET methods = ...` — porque
+o método de pagamento nunca foi hardcoded (regra 1).
+
 ## Limites e decisões
 
 - **Sessão anônima não assina.** `startSubscriptionCheckout` recusa `is_anonymous` — a
   assinatura precisa sobreviver à troca de dispositivo (regra 7).
-- **Só cartão de crédito, por enquanto.** PIX em assinatura ("PIX Automático") existe, mas
-  exige habilitação no dashboard da AbacatePay. Quando liberarem, é
-  `UPDATE billing_plans SET methods = ARRAY['PIX','CARD']` — zero mudança de código.
 - **Cancelamento é imediato e irreversível.** A AbacatePay não tem carência nem reembolso
   proporcional: o acesso Pro termina na hora do clique. A tela avisa e pede confirmação
   digitada.
