@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useSubscription } from "@/hooks/use-subscription";
 import { TOUR_STEPS, type TourStep } from "@/lib/tour-steps";
 
 const STEP_WRITE_DEBOUNCE_MS = 600;
@@ -28,13 +29,22 @@ export interface UseTourReturn {
  */
 export function useTour(): UseTourReturn {
   const { user, profile, isAuthenticated, isOnboarded, loading } = useAuth();
+  const { canAccess } = useSubscription();
   const queryClient = useQueryClient();
   const userId = user?.id ?? null;
 
+  // canAccess entra na elegibilidade porque o tour roda por cima de TUDO
+  // (camada full-screen que intercepta clique). Sem essa checagem, uma
+  // assinatura vencida com tour "em_andamento" abria o overlay bloqueando o
+  // próprio botão "Assinar agora" em /assinatura — cliente pagante trancado
+  // atrás do próprio tour. canAccess é false por padrão enquanto resolve
+  // (useSubscription), então isso também evita o flash do tour antes de saber
+  // se a assinatura está ativa.
   const eligible =
     !loading &&
     isAuthenticated &&
     isOnboarded &&
+    canAccess &&
     Boolean(profile) &&
     (profile?.tour_status === "pendente" || profile?.tour_status === "em_andamento");
 

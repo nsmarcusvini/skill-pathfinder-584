@@ -32,6 +32,11 @@ export type SignUpValues = z.infer<typeof signUpSchema>;
 export const recoverSchema = z.object({ email: emailSchema });
 export type RecoverValues = z.infer<typeof recoverSchema>;
 
+export const reauthSchema = z.object({
+  password: z.string().min(1, "Informe sua senha"),
+});
+export type ReauthValues = z.infer<typeof reauthSchema>;
+
 export const newPasswordSchema = z
   .object({
     password: passwordSchema,

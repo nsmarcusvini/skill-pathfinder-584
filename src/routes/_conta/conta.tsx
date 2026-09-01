@@ -8,11 +8,13 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/rumvia/page-header";
 import { Blueprint } from "@/components/rumvia/blueprint";
 import { FieldError } from "@/components/auth/auth-layout";
+import { ReauthDialog } from "@/components/auth/reauth-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteMyAccount } from "@/lib/account.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { useReauthGate } from "@/hooks/use-reauth-gate";
 import { restartTour } from "@/hooks/use-tour";
 import {
   profileSchema,
@@ -44,6 +46,7 @@ function ContaPage() {
   const [deleting, setDeleting] = React.useState(false);
   const [restartingTour, setRestartingTour] = React.useState(false);
   const [confirmText, setConfirmText] = React.useState("");
+  const reauth = useReauthGate();
 
   async function reverTour() {
     if (!user) return;
@@ -93,13 +96,15 @@ function ContaPage() {
   }
 
   async function trocarSenha(values: NewPasswordValues) {
-    const { error } = await supabase.auth.updateUser({ password: values.password });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    senhaForm.reset();
-    toast.success("Senha alterada.");
+    reauth.request(async () => {
+      const { error } = await supabase.auth.updateUser({ password: values.password });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      senhaForm.reset();
+      toast.success("Senha alterada.");
+    });
   }
 
   async function exportarDados() {
@@ -161,17 +166,19 @@ function ContaPage() {
 
   async function excluirConta() {
     if (!user) return;
-    setDeleting(true);
-    try {
-      await deleteMyAccount();
-      await signOut();
-      toast.success("Conta excluída.");
-      void navigate({ to: "/", replace: true });
-    } catch (err) {
-      toast.error("Não foi possível excluir a conta agora: " + (err as Error).message);
-    } finally {
-      setDeleting(false);
-    }
+    reauth.request(async () => {
+      setDeleting(true);
+      try {
+        await deleteMyAccount();
+        await signOut();
+        toast.success("Conta excluída.");
+        void navigate({ to: "/", replace: true });
+      } catch (err) {
+        toast.error("Não foi possível excluir a conta agora: " + (err as Error).message);
+      } finally {
+        setDeleting(false);
+      }
+    });
   }
 
   return (
@@ -300,6 +307,12 @@ function ContaPage() {
           </Button>
         </div>
       </Blueprint>
+
+      <ReauthDialog
+        open={reauth.open}
+        onOpenChange={reauth.onOpenChange}
+        onConfirmed={reauth.onConfirmed}
+      />
     </div>
   );
 }

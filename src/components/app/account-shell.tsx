@@ -91,6 +91,7 @@ const NAV: NavItem[] = [
     label: "Assinatura",
     to: "/assinatura",
     icon: <CreditCard className="size-4" aria-hidden />,
+    tourId: "tour-nav-assinatura",
   },
   {
     label: "Conta",
