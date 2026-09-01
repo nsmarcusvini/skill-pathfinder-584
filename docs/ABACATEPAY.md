@@ -241,16 +241,22 @@ cobrar só por um pedaço.
 `store_Ywj6PCcNKfyrqK35AUfnSuFc` (sandbox), `POST /subscriptions/create` devolve 400 para
 os dois métodos:
 
-| `methods` enviado | Resposta |
-|---|---|
-| `["CARD"]` | `400 CARD is not available for this store` |
-| `["PIX"]` | `400 PIX Automático is not available for this store` |
-| `["PIX","CARD"]` | `400 PIX Automático is not available for this store` |
+| Endpoint | Produto | `methods` | Resposta |
+|---|---|---|---|
+| `/subscriptions/create` | com `cycle` | `["CARD"]` | ❌ `400 CARD is not available for this store` |
+| `/subscriptions/create` | com `cycle` | `["PIX"]` | ❌ `400 PIX Automático is not available` |
+| `/subscriptions/create` | com `cycle` | `["PIX","CARD"]` | ❌ `400 PIX Automático is not available` |
+| `/checkouts/create` | **com** `cycle` | `["PIX"]` | ❌ `400 PIX Automático is not available` |
+| `/checkouts/create` | **sem** `cycle` | `["PIX"]` | ✅ `200` — `bill_…`, `frequency: ONE_TIME` |
+| `/transparents/create` | — | PIX | ✅ `200` — QR code gerado |
 
-Não é erro de integração nem de configuração do plano: o produto está correto
-(`RUMVIA Pro`, 2490, `cycle: MONTHLY`, `ACTIVE`) e **cobrança avulsa funciona** — um
-`POST /transparents/create` com PIX gera QR code normalmente na mesma loja. O que falta é
-capacidade de **cobrança recorrente**, que a AbacatePay libera por conta.
+As duas últimas linhas são a prova: **a mesma loja cobra normalmente**, desde que a
+cobrança não seja recorrente. Basta o produto ter `cycle` definido para a AbacatePay
+exigir PIX Automático — mesmo num checkout avulso.
+
+O produto do RUMVIA está correto (`RUMVIA Pro`, 2490, `cycle: MONTHLY`, `ACTIVE`,
+`externalId: rumvia-pro_mensal`). Não falta produto nem configuração nossa: falta
+**capacidade de cobrança recorrente na conta**, que a AbacatePay libera.
 
 **Ação:** falar com o suporte da AbacatePay e pedir habilitação de cobrança recorrente
 (cartão e/ou PIX Automático) para a loja. Sem isso o checkout de assinatura não abre, em
