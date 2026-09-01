@@ -44,6 +44,9 @@ async function request<T>(
   path: string,
   body?: unknown,
   query?: Record<string, string | undefined>,
+  // /webhooks/delete devolve {success:true,error:null} sem `data` nenhum —
+  // diferente de todo o resto da API, que sempre embrulha em `data`.
+  options?: { allowEmptyData?: boolean },
 ): Promise<T> {
   const url = new URL(BASE_URL + path);
   for (const [k, v] of Object.entries(query ?? {})) {
@@ -84,6 +87,10 @@ async function request<T>(
   if (!response.ok || envelope?.success === false || envelope?.error) {
     const message = envelope?.error ?? raw.slice(0, 300) ?? response.statusText;
     throw new AbacatePayError(message, response.status, path);
+  }
+
+  if (options?.allowEmptyData) {
+    return envelope?.data as T;
   }
 
   if (!envelope || envelope.data === null || envelope.data === undefined) {
@@ -167,4 +174,15 @@ export const abacate = {
     request<AbacateWebhook>("POST", "/webhooks/create", input),
 
   listWebhooks: () => request<AbacateWebhook[]>("GET", "/webhooks/list"),
+
+  // A doc da AbacatePay diz que `id` vai no corpo — errado, testado na prática:
+  // a API só aceita `id` como query string, e a resposta não tem `data`.
+  deleteWebhook: (webhookId: string) =>
+    request<void>(
+      "POST",
+      "/webhooks/delete",
+      undefined,
+      { id: webhookId },
+      { allowEmptyData: true },
+    ),
 };

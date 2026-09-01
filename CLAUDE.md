@@ -203,9 +203,14 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
 
 ## Coisas que já sei que quebram
 
-- **Cron aponta para URL de preview Lovable.** Antes de promover para produção,
-  atualizar a URL nas duas `cron.schedule` que estão em
-  `20260826170959_*.sql` e `20260826171043_*.sql`.
+- **Domínio de produção é `rumvia.com.br`** (DNS reapontado para o Netlify em
+  2026-08-31 — antes caía numa página do GoDaddy Website Builder). `app_settings.app_base_url`
+  e `.env`'s `APP_BASE_URL` já refletem isso. A nota antiga sobre "cron aponta pra URL de
+  preview do Lovable" (`20260826170959_*` / `20260826171043_*`) está obsoleta: aqueles jobs
+  não existem mais em `cron.job` — a ingestão roda via `bun run scripts/ingest.ts` manual
+  (ver PROGRESS.md). Nenhum dos 4 crons ativos hoje (`rumvia-expire-jobs`,
+  `rumvia-notify-certs`, `rumvia-purge-anon`, `rumvia-refresh-market-views`) chama URL
+  nenhuma — são só função SQL.
 - **`use-market.tsx` deriva segmento de `profile.target_region`.** Se o onboarding
   não estiver gravando esse campo, tudo cai em `br` por default. Verificar em
   `src/routes/onboarding.tsx` antes de mexer em Ferramentas.
@@ -215,6 +220,12 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
 
 - **Anonymous sign-in precisa estar habilitado no painel do Supabase**
   (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
+
+- **SMTP quebrado derruba o cadastro inteiro.** A conversão anônimo→permanente dispara
+  e-mail de confirmação; se o SMTP falhar, `PUT /auth/v1/user` devolve 500 e ninguém cria
+  conta. Provedor é a Resend (`Username` é literalmente `resend`, não um e-mail).
+  Diagnóstico e tabela de erros em `docs/EMAIL.md` — os erros ficam em `auth_logs`,
+  não no console do navegador.
 
 ## O que fazer quando estiver em dúvida
 
