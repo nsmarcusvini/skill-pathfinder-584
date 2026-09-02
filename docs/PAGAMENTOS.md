@@ -53,16 +53,47 @@ até a liquidação puniria o usuário por um detalhe financeiro que não é pro
 
 ### Como o pagamento acha o usuário
 
-`external_id` (nosso) vai como `externalReference` no checkout e volta nos webhooks. O
-handler tenta, nesta ordem:
+> ⚠️ **O `externalReference` NÃO sobrevive ao checkout hospedado.** O valor que
+> mandamos no corpo do `POST /checkouts` fica só na sessão de checkout: a assinatura
+> (`sub_…`) e as cobranças (`pay_…`) que ela gera nascem com `externalReference: null`.
+> Verificado em 2026-09-01 com payload real de `PAYMENT_CONFIRMED`.
+> **O elo que de fato chega é o `checkoutSession`** — o uuid que o `POST /checkouts`
+> devolveu e que guardamos em `provider_checkout_id`.
+
+O handler tenta, nesta ordem:
 
 1. `externalReference` do payment ou da subscription → `external_id`
-2. `payment.subscription` (sub_…) → `provider_subscription_id`
-3. **busca a assinatura na API** para ler o `externalReference` dela
-4. `customer` → `provider_customer_id`, entre as assinaturas vivas
+2. **`checkoutSession` do payment ou da subscription → `provider_checkout_id`** ← o que funciona
+3. `payment.subscription` (sub_…) → `provider_subscription_id`
+4. **busca a assinatura na API** para ler o `externalReference` dela
+5. `customer` → `provider_customer_id`, entre as assinaturas vivas
 
-O passo 3 existe porque nem todo payload traz o `externalReference`. Sem ele o pagamento
-fica órfão e o usuário paga sem liberar acesso — vale a chamada extra à API.
+O passo 1 fica porque é o elo mais explícito e pode voltar a vir (cobrança avulsa, ou se
+o Asaas passar a propagar). O passo 3 só funciona a partir do segundo evento: o `sub_…` é
+aprendido no primeiro, junto com o `customer` e o método.
+
+Sem o passo 2 **todo pagamento fica órfão**: o dinheiro entra no Asaas, o webhook chega e é
+gravado, e a assinatura local segue `pending` para sempre — o usuário paga e continua
+bloqueado. Foi exatamente o que aconteceu no primeiro pagamento real de sandbox.
+
+`billing_events.handled` reflete se o evento **mudou alguma coisa**. Evento que chega e não
+correlaciona fica `handled=false` com o motivo em `handle_error` — antes era marcado como
+tratado e a falha passava silenciosa.
+
+### Reparar assinatura presa
+
+O webhook não é retroativo: um evento já consumido pela idempotência não volta (reenviar
+devolve `duplicate`). Para reconciliar o banco com a verdade do Asaas:
+
+```bash
+bun run scripts/asaas-reconcile.ts          # mostra o que faria
+bun run scripts/asaas-reconcile.ts --apply  # grava
+```
+
+Ele varre as assinaturas locais em `pending`/`past_due`, acha a correspondente no Asaas pelo
+`checkoutSession`, e ativa as que já têm cobrança `CONFIRMED`/`RECEIVED`. Idempotente: rodar
+duas vezes não muda nada. Serve também para webhook perdido (fila interrompida após 15
+falhas, deploy fora do ar, domínio trocado).
 
 ---
 
@@ -79,6 +110,7 @@ fica órfão e o usuário paga sem liberar acesso — vale a chamada extra à AP
 | `src/lib/asaas/webhook.server.ts` | Token, idempotência, efeito dos eventos |
 | `src/routes/api/public/asaas-webhook.ts` | Rota HTTP fina |
 | `src/lib/billing.functions.ts` | `getBillingOverview`, `startSubscriptionCheckout`, `cancelMySubscription` |
+| `scripts/asaas-reconcile.ts` | Repara assinatura presa (webhook perdido ou órfão) |
 | `src/integrations/supabase/subscription-middleware.ts` | `requireActiveSubscription` — trava server-side |
 | `src/hooks/use-subscription.tsx` | `useSubscription()`, `useStartCheckout()`, `useCancelSubscription()` |
 | `src/components/rumvia/paywall.tsx` | `<Paywall>`, `<PaywallCard>`, `formatCents()` |

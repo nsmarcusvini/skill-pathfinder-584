@@ -224,12 +224,26 @@ export const asaas = {
   getSubscription: (subscriptionId: string) =>
     request<AsaasSubscription>("GET", `/subscriptions/${subscriptionId}`),
 
+  /** Página de assinaturas, da mais recente para a mais antiga. */
+  listSubscriptions: (limit = 100, offset = 0) =>
+    request<{ data: AsaasSubscription[]; hasMore: boolean }>(
+      "GET",
+      `/subscriptions?limit=${limit}&offset=${offset}`,
+    ),
+
   /** Remove a assinatura: nenhuma cobrança futura é gerada. */
   cancelSubscription: (subscriptionId: string) =>
     request<{ deleted: boolean; id: string }>("DELETE", `/subscriptions/${subscriptionId}`),
 
   // ─── Cobranças ─────────────────────────────────────────────────────────────
   getPayment: (paymentId: string) => request<AsaasPayment>("GET", `/payments/${paymentId}`),
+
+  /** Cobranças de uma assinatura, da mais recente para a mais antiga. */
+  listPaymentsBySubscription: (subscriptionId: string, limit = 100) =>
+    request<{ data: AsaasPayment[]; hasMore: boolean }>(
+      "GET",
+      `/payments?subscription=${encodeURIComponent(subscriptionId)}&limit=${limit}`,
+    ),
 
   // ─── Clientes ──────────────────────────────────────────────────────────────
   getCustomer: (customerId: string) => request<AsaasCustomer>("GET", `/customers/${customerId}`),

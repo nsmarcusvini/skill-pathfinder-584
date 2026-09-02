@@ -74,6 +74,15 @@ export interface AsaasSubscription {
   billingType: string;
   nextDueDate: string | null;
   externalReference: string | null;
+  /**
+   * uuid da sessão de checkout que originou esta assinatura — igual ao `id` que
+   * POST /checkouts devolveu e que guardamos em `provider_checkout_id`.
+   *
+   * ⚠️ É O ÚNICO elo que sobrevive ao checkout hospedado: o `externalReference`
+   * que mandamos no corpo do /checkouts NÃO desce para a assinatura nem para as
+   * cobranças (verificado em 2026-09-01 com payload real — vinha `null` nos dois).
+   */
+  checkoutSession?: string | null;
   dateCreated?: string;
   deleted?: boolean;
 }
@@ -90,6 +99,8 @@ export interface AsaasPayment {
   billingType: string;
   dueDate: string;
   externalReference?: string | null;
+  /** Ver `AsaasSubscription.checkoutSession` — mesmo elo, e o que de fato chega. */
+  checkoutSession?: string | null;
   invoiceUrl?: string | null;
   transactionReceiptUrl?: string | null;
   confirmedDate?: string | null;

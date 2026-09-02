@@ -105,12 +105,22 @@ export async function handleAsaasWebhook(args: {
   }
 
   try {
-    const subscriptionId = await applyEvent(payload);
+    const outcome = await applyEvent(payload);
+    // `handled` reflete se o evento MUDOU alguma coisa. Marcar tudo como
+    // tratado escondia o pior modo de falha que já tivemos aqui: evento
+    // chegando, sendo gravado, e nada acontecendo por falta de correlação —
+    // o usuário pagava e continuava bloqueado, sem nenhum sinal no banco.
     await supabaseAdmin
       .from("billing_events")
-      .update({ handled: true, subscription_id: subscriptionId })
+      .update({
+        handled: outcome.applied,
+        subscription_id: outcome.subscriptionId,
+        handle_error: outcome.reason ?? null,
+      })
       .eq("event_id", payload.id);
-    return { status: 200, body: { ok: true } };
+    // 200 mesmo sem aplicar: reentrega não conserta evento órfão, e devolver
+    // erro só travaria a fila SEQUENTIALLY do Asaas.
+    return { status: 200, body: { ok: true, applied: outcome.applied } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[asaas] erro ao aplicar ${payload.event}:`, message);
@@ -135,9 +145,16 @@ const SELECT = "id, user_id, status, current_period_end, plan_id";
 /**
  * Localiza a assinatura local, do elo mais forte ao mais fraco.
  *
- * O `externalReference` que gravamos no checkout é o elo confiável. Se ele não
- * vier no payload da cobrança, buscamos a assinatura na API para lê-lo — vale a
- * chamada extra: sem o elo, o pagamento fica órfão e o usuário paga sem liberar.
+ * ⚠️ O elo que REALMENTE chega é o `checkoutSession`, não o `externalReference`.
+ * O `externalReference` que mandamos no corpo do POST /checkouts fica só na
+ * sessão de checkout: nem a assinatura nem as cobranças que ela gera o herdam.
+ * Verificado em 2026-09-01 com payload real de PAYMENT_CONFIRMED — vinha
+ * `externalReference: null` e `checkoutSession: "<uuid do nosso checkout>"`.
+ * Sem esse candidato, todo pagamento ficava órfão: o usuário pagava, o webhook
+ * chegava, e a assinatura local seguia `pending` para sempre.
+ *
+ * O `externalReference` continua na lista porque é o elo mais explícito e pode
+ * voltar a vir (cobrança avulsa, ou se o Asaas passar a propagar).
  */
 async function findSubscription(payload: AsaasWebhookPayload): Promise<SubscriptionRow | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -147,6 +164,10 @@ async function findSubscription(payload: AsaasWebhookPayload): Promise<Subscript
   const externalRef =
     payload.payment?.externalReference ?? payload.subscription?.externalReference ?? null;
   if (externalRef) candidates.push(["external_id", externalRef]);
+
+  const checkoutSession =
+    payload.payment?.checkoutSession ?? payload.subscription?.checkoutSession ?? null;
+  if (checkoutSession) candidates.push(["provider_checkout_id", checkoutSession]);
 
   const subId = payload.payment?.subscription ?? payload.subscription?.id ?? null;
   if (subId) candidates.push(["provider_subscription_id", subId]);
@@ -161,16 +182,7 @@ async function findSubscription(payload: AsaasWebhookPayload): Promise<Subscript
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) {
-      // Primeira cobrança: aprende o sub_... para os próximos eventos.
-      if (subId && column === "external_id") {
-        await supabaseAdmin
-          .from("subscriptions")
-          .update({ provider_subscription_id: subId })
-          .eq("id", (data as SubscriptionRow).id);
-      }
-      return data as SubscriptionRow;
-    }
+    if (data) return data as SubscriptionRow;
   }
 
   // O payload não trouxe externalReference: busca na API pela assinatura.
@@ -214,15 +226,29 @@ async function findSubscription(payload: AsaasWebhookPayload): Promise<Subscript
   return null;
 }
 
+interface ApplyOutcome {
+  subscriptionId: string | null;
+  /** Mudou estado local? `false` = evento chegou mas não teve efeito. */
+  applied: boolean;
+  reason?: string;
+}
+
 /** Aplica o efeito do evento. Devolve o id da assinatura local afetada. */
-async function applyEvent(payload: AsaasWebhookPayload): Promise<string | null> {
+async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
   const event = payload.event;
-  if (!event.startsWith("PAYMENT_") && !event.startsWith("SUBSCRIPTION_")) return null;
+  if (!event.startsWith("PAYMENT_") && !event.startsWith("SUBSCRIPTION_")) {
+    return { subscriptionId: null, applied: false, reason: `evento ignorado: ${event}` };
+  }
 
   const subscription = await findSubscription(payload);
   if (!subscription) {
-    console.warn(`[asaas] ${event} sem assinatura local correspondente (${payload.id})`);
-    return null;
+    const reason =
+      `${event} sem assinatura local correspondente ` +
+      `(checkoutSession=${payload.payment?.checkoutSession ?? payload.subscription?.checkoutSession ?? "-"}, ` +
+      `sub=${payload.payment?.subscription ?? payload.subscription?.id ?? "-"}, ` +
+      `customer=${payload.payment?.customer ?? payload.subscription?.customer ?? "-"})`;
+    console.warn(`[asaas] ${reason} (${payload.id})`);
+    return { subscriptionId: null, applied: false, reason };
   }
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -236,6 +262,11 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<string | null> 
   if (payment?.billingType ?? remoteSub?.billingType) {
     patch.method = (payment?.billingType ?? remoteSub?.billingType) as string;
   }
+  // Aprende o sub_... em QUALQUER evento que o traga: a primeira correlação vem
+  // pelo checkoutSession, e daí em diante os eventos de renovação e cancelamento
+  // acham a linha direto pelo id da assinatura.
+  const learnedSubId = payment?.subscription ?? remoteSub?.id ?? null;
+  if (learnedSubId) patch.provider_subscription_id = learnedSubId;
 
   switch (event) {
     // ─── dinheiro entrou ─────────────────────────────────────────────────────
@@ -313,15 +344,15 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<string | null> 
     }
 
     // SUBSCRIPTION_CREATED só confirma que o contrato nasceu; quem libera o
-    // acesso é o pagamento. Registramos o sub_... e seguimos.
+    // acesso é o pagamento. O sub_... já entrou no patch comum acima.
     case "SUBSCRIPTION_CREATED":
-    case "SUBSCRIPTION_UPDATED": {
-      if (remoteSub?.id) patch.provider_subscription_id = remoteSub.id;
+    case "SUBSCRIPTION_UPDATED":
       break;
-    }
 
+    // Evento que não tratamos: ainda assim vale gravar o que aprendemos dele
+    // (customer, método, sub_...), então cai no update comum em vez de sair.
     default:
-      return subscription.id;
+      break;
   }
 
   if (Object.keys(patch).length > 0) {
@@ -332,5 +363,5 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<string | null> 
     if (error) throw new Error(error.message);
   }
 
-  return subscription.id;
+  return { subscriptionId: subscription.id, applied: Object.keys(patch).length > 0 };
 }

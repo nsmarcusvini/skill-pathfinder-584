@@ -4,10 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
 import { CvDropzone } from "@/components/app/cv-dropzone";
-import { LandingTour } from "@/components/rumvia/landing-tour";
 import { formatCents } from "@/components/rumvia/paywall";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
 import { usePublicPlan } from "@/hooks/use-subscription";
 import { AVISO_ACESSO_PAGO, PLANO_INCLUI, PREVIA_GRATUITA } from "@/lib/plan-copy";
 import { getLandingStats } from "@/lib/public-stats.functions";
@@ -85,7 +83,6 @@ const FAQ_ITEMS = [
 
 function LandingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const loadStats = useServerFn(getLandingStats);
   const { data: stats } = useQuery({
     queryKey: ["landing-stats"],
@@ -166,7 +163,7 @@ function LandingPage() {
             </div>
 
             {/* Upload card — fundo claro para que o CvDropzone (consent text) fique legível */}
-            <div data-tour="tour-landing-upload" className="border border-divider bg-bg p-7">
+            <div className="border border-divider bg-bg p-7">
               <p className="label-h6 mb-4 text-accent-700">// Envie seu currículo</p>
               <CvDropzone
                 onUploaded={(cvId) => {
@@ -236,7 +233,7 @@ function LandingPage() {
 
       {/* ═══ HOW IT WORKS ═══ */}
       <section id="como-funciona" className="py-16">
-        <div data-tour="tour-landing-como-funciona" className="rumvia-container">
+        <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Processo</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Três passos. Resultado imediato.</h2>
           <p
@@ -268,7 +265,7 @@ function LandingPage() {
 
       {/* ═══ FEATURES ═══ */}
       <section id="funcionalidades" className="bg-surface py-16">
-        <div data-tour="tour-landing-funcionalidades" className="rumvia-container">
+        <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// O que você recebe</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">
             Tudo para saber onde está e como chegar onde quer
@@ -440,7 +437,7 @@ function LandingPage() {
 
       {/* ═══ PLANOS ═══ */}
       <section id="planos" className="py-16">
-        <div data-tour="tour-landing-planos" className="rumvia-container">
+        <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Planos e preços</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Um plano. Sem pegadinha.</h2>
           <p
@@ -540,7 +537,7 @@ function LandingPage() {
 
       {/* ═══ FAQ ═══ */}
       <section id="faq" className="border-t border-divider py-16">
-        <div data-tour="tour-landing-faq" className="rumvia-container">
+        <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Dúvidas frequentes</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Perguntas comuns</h2>
           <div className="mt-8 border-t border-divider">
@@ -701,10 +698,6 @@ function LandingPage() {
           </div>
         </div>
       </footer>
-
-      {/* Autenticado (conta paga/admin) não recebe o pitch de vendas —
-          quem já é cliente e volta pra "/" não precisa do convite. */}
-      {!isAuthenticated && <LandingTour />}
     </div>
   );
 }

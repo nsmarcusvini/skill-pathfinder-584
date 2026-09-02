@@ -95,21 +95,16 @@ function TourCardBody({
           <Button type="button" variant="outline" size="sm" onClick={tour.finish}>
             Fechar
           </Button>
-          {step.finalCta ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                tour.finish();
-                void navigate({
-                  to: step.finalCta!.to,
-                  ...(step.finalCta!.search ? { search: step.finalCta!.search } : {}),
-                } as never);
-              }}
-            >
-              {step.finalCta.label}
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              tour.finish();
+              void navigate({ to: "/cv" });
+            }}
+          >
+            Começar pelo meu CV
+          </Button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2 pt-1">
@@ -192,25 +187,8 @@ function DesktopTour({ tour }: { tour: UseTourReturn }) {
     }
     recompute();
     window.addEventListener("resize", recompute);
-    // O tour da conta ancora no menu lateral (fixo, sempre visível) — scroll
-    // nunca importava. O tour da landing ancora em seções da página inteira,
-    // que entram e saem da viewport rolando; sem isto o retângulo de destaque
-    // ficava "grudado" na posição do primeiro cálculo.
-    window.addEventListener("scroll", recompute, true);
-    return () => {
-      window.removeEventListener("resize", recompute);
-      window.removeEventListener("scroll", recompute, true);
-    };
+    return () => window.removeEventListener("resize", recompute);
   }, [anchorId, bump]);
-
-  // Traz a âncora do passo atual pra dentro da viewport. Necessário pelo
-  // mesmo motivo acima: seção de landing pode estar a rolagens de distância
-  // quando o passo muda.
-  React.useEffect(() => {
-    if (!anchorId) return;
-    const el = document.querySelector(`[data-tour="${anchorId}"]`);
-    el?.scrollIntoView({ block: "center", behavior: reducedMotion ? "auto" : "smooth" });
-  }, [anchorId, reducedMotion]);
 
   useFocusTrap(cardRef, tour.step);
 
@@ -303,12 +281,11 @@ function MobileTour({ tour }: { tour: UseTourReturn }) {
 }
 
 /**
- * Renderização do tour, desacoplada de onde o estado vem. `Tour` (pós-cadastro,
- * abaixo) e o tour da landing (`useLandingTour`, visitante anônimo) são a
- * mesma UI em cima de dois controladores diferentes — um persiste no banco,
- * o outro em localStorage.
+ * Tour guiado pós-cadastro. Monta-se no AccountShell (cobre todas as rotas
+ * /_conta) e não renderiza nada fora da janela em que está ativo.
  */
-export function TourOverlay({ tour }: { tour: UseTourReturn }) {
+export function Tour() {
+  const tour = useTour();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = React.useState(false);
 
@@ -320,13 +297,4 @@ export function TourOverlay({ tour }: { tour: UseTourReturn }) {
     isMobile ? <MobileTour tour={tour} /> : <DesktopTour tour={tour} />,
     document.body,
   );
-}
-
-/**
- * Tour guiado pós-cadastro. Monta-se no AccountShell (cobre todas as rotas
- * /_conta) e não renderiza nada fora da janela em que está ativo.
- */
-export function Tour() {
-  const tour = useTour();
-  return <TourOverlay tour={tour} />;
 }

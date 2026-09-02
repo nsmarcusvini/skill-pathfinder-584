@@ -29,13 +29,6 @@ export interface TourStep {
   title: string;
   body: string;
   icon: LucideIcon;
-  /**
-   * Só o último passo usa isso: troca o botão único "Fechar" por um segundo
-   * botão que finaliza o tour E navega. O tour da conta manda pro CV; o da
-   * landing (anônimo) manda pra /analise — por isso isto vive no dado, não
-   * hardcoded no componente do tour.
-   */
-  finalCta?: { label: string; to: string; search?: Record<string, unknown> };
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -141,6 +134,5 @@ export const TOUR_STEPS: TourStep[] = [
     title: "Pronto",
     body: "O tour acabou. O próximo passo que mais muda seu resultado é enviar o CV — é ele que alimenta todas as telas.",
     icon: PartyPopper,
-    finalCta: { label: "Começar pelo meu CV", to: "/cv" },
   },
 ];
