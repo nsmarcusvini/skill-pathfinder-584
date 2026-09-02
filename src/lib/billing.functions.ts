@@ -238,7 +238,15 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     // Não pré-criamos cliente no Asaas: a página hospedada coleta nome, e-mail e
     // CPF sozinha. Um passo a menos no funil e um dado sensível a menos sob nossa
     // guarda — o RUMVIA nunca precisa pedir CPF.
-    const hoje = new Date().toISOString().slice(0, 10);
+    // Data de Brasília, não UTC. O Asaas opera em horário de Brasília: mandar
+    // `toISOString()` faz toda compra entre 21h e meia-noite chegar lá com a
+    // data do dia seguinte, e o gateway AGENDA a primeira cobrança em vez de
+    // cobrar na hora. O cliente paga e fica sem acesso até o lote do dia
+    // seguinte rodar — só `PAYMENT_CONFIRMED` libera (webhook.server.ts).
+    // `en-CA` é o locale que formata como YYYY-MM-DD, que é o que a API espera.
+    const hoje = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date());
 
     const checkout = await asaas.createCheckout({
       value: reaisFromCents(plan.price_cents),
