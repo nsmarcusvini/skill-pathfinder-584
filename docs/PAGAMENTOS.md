@@ -237,8 +237,21 @@ feature.
 
 ## Limites e decisões
 
-- **Só cartão de crédito.** PIX Automático exige que o recebedor seja **pessoa jurídica**
-  — regra do Banco Central, não política de fornecedor. O RUMVIA é pessoa física.
+- **Só cartão de crédito na assinatura.** Testado no sandbox em 2026-09-01: o checkout
+  hospedado recusa qualquer `billingTypes` com PIX quando `chargeTypes` é `RECURRENT` —
+  *"CREDIT_CARD é o único método de pagamento permitido para operações RECURRENT"*. E o
+  PIX Automático (via separada, para recorrência de verdade) exige recebedor **pessoa
+  jurídica**, regra do Banco Central. O RUMVIA é pessoa física.
+
+- **Mas o Asaas TEM PIX avulso, e ele funciona nesta conta.** Estava bloqueado só por
+  falta de chave PIX cadastrada (`"Para gerar cobranças com Pix é necessário criar uma
+  chave Pix no Asaas"`). Com a chave criada, `chargeTypes: ["DETACHED"]` +
+  `billingTypes: ["PIX"]` devolve 200. Isso abre a possibilidade de oferecer PIX como
+  **renovação manual mensal** ao lado do cartão automático — no mesmo gateway, mesmo
+  webhook, mesmo schema. Não implementado: exige fluxo de lembrete antes do vencimento e
+  tem retenção pior que débito automático. Decisão de produto em aberto.
+  ⚠️ Em produção a chave PIX precisa ser criada de novo (sandbox e produção são contas
+  separadas).
 - **Sessão anônima não assina.** A assinatura precisa sobreviver à troca de dispositivo.
 - **`past_due` ainda conta como pagante** enquanto o Asaas retenta. Cortar no primeiro
   vencimento gera mais churn que fraude evitada.
