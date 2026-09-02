@@ -65,6 +65,20 @@ function isEmailTaken(message: string): boolean {
 }
 
 /**
+ * Origem para links de confirmação de e-mail e callback OAuth. NUNCA
+ * `window.location.origin` puro: a Vercel atribui um alias
+ * `rumvia-<hash>-eumarcussouza.vercel.app` a cada deploy, e um link de
+ * confirmação que aponte pra um desses expira junto com o deploy. Único
+ * domínio real é `https://www.rumvia.com.br` — localhost fica de fora pra
+ * não quebrar o fluxo de confirmação em dev.
+ */
+function authRedirectOrigin(): string {
+  const { hostname, origin } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") return origin;
+  return "https://www.rumvia.com.br";
+}
+
+/**
  * Aceita o erro inteiro (não só a mensagem) porque precisa do `.status` para
  * reconhecer 429 de forma confiável — o texto que o GoTrue manda varia por
  * rota ("email rate limit exceeded", "you can only request this after N
@@ -199,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${authRedirectOrigin()}/auth/callback`,
             ...(fullName ? { data: { full_name: fullName } } : {}),
             ...(captchaToken ? { captchaToken } : {}),
           },
@@ -221,13 +235,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Vincula o Google à MESMA conta anônima: o user.id é preservado.
             const { error } = await supabase.auth.linkIdentity({
               provider: "google",
-              options: { redirectTo: `${window.location.origin}/auth/callback` },
+              options: { redirectTo: `${authRedirectOrigin()}/auth/callback` },
             });
             if (error) return { error: traduzErro(error) };
             return { error: null };
           }
           const result = (await lovable.auth.signInWithOAuth("google", {
-            redirect_uri: `${window.location.origin}/auth/callback`,
+            redirect_uri: `${authRedirectOrigin()}/auth/callback`,
           })) as { error?: unknown } | undefined;
           const oauthError = result?.error;
           if (oauthError) {
@@ -254,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             password,
             ...(fullName ? { data: { full_name: fullName } } : {}),
           },
-          { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          { emailRedirectTo: `${authRedirectOrigin()}/auth/callback` },
         );
 
         if (error) {
@@ -271,7 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       async resetPassword(email) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/callback?tipo=recuperacao`,
+          redirectTo: `${authRedirectOrigin()}/auth/callback?tipo=recuperacao`,
         });
         if (error) return { error: traduzErro(error) };
         return { error: null };
