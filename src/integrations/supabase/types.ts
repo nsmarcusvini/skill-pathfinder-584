@@ -90,10 +90,12 @@ export type Database = {
           key: string
           max_retry: number
           methods: string[]
+          months: number | null
           name: string
           price_cents: number
           provider_plan_ref: string | null
           retry_every_days: number
+          sort_order: number
           trial_days: number | null
           updated_at: string
         }
@@ -111,6 +113,7 @@ export type Database = {
           price_cents: number
           provider_plan_ref?: string | null
           retry_every_days?: number
+          sort_order?: number
           trial_days?: number | null
           updated_at?: string
         }
@@ -128,6 +131,7 @@ export type Database = {
           price_cents?: number
           provider_plan_ref?: string | null
           retry_every_days?: number
+          sort_order?: number
           trial_days?: number | null
           updated_at?: string
         }

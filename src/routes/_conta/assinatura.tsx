@@ -17,16 +17,15 @@ import {
   useStartCheckout,
   useSubscription,
 } from "@/hooks/use-subscription";
-import type { MySubscription, SubscriptionStatus } from "@/lib/billing.functions";
-import { AVISO_ACESSO_PAGO, PLANO_INCLUI } from "@/lib/plan-copy";
-
-const CYCLE_LABEL: Record<string, string> = {
-  WEEKLY: "por semana",
-  MONTHLY: "por mês",
-  QUARTERLY: "por trimestre",
-  SEMIANNUALLY: "por semestre",
-  ANNUALLY: "por ano",
-};
+import type { BillingPlan, MySubscription, SubscriptionStatus } from "@/lib/billing.functions";
+import {
+  AVISO_ACESSO_PAGO,
+  PLANO_INCLUI,
+  rotuloCiclo,
+  rotuloCobranca,
+  rotuloPeriodo,
+} from "@/lib/plan-copy";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   pending: "Aguardando pagamento",
@@ -71,13 +70,21 @@ function AssinaturaPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isOnboarded } = useAuth();
-  const { plan, subscription, isPro, isAdmin, canAccess, isLoading, isError, refetch } =
+  const { plans, subscription, isPro, isAdmin, canAccess, isLoading, isError, refetch } =
     useSubscription();
   const checkout = useStartCheckout();
   const cancelar = useCancelSubscription();
   const [confirmarCancelamento, setConfirmarCancelamento] = React.useState("");
+  const [planoEscolhido, setPlanoEscolhido] = React.useState<string | null>(null);
 
-  // Volta do checkout: o webhook subscription.completed leva alguns segundos.
+  // Default = primeiro da vitrine (o de menor compromisso, hoje o mensal). Deixar
+  // o ciclo mais longo pré-marcado venderia mais e seria escolha nossa, não da
+  // pessoa; o desconto dos outros fica visível no próprio cartão.
+  // Se a assinatura já existe (pending ou reativação), o plano dela vem marcado.
+  const planoAtivo = planoEscolhido ?? subscription?.planKey ?? plans[0]?.key ?? null;
+  const plano = plans.find((p) => p.key === planoAtivo) ?? null;
+
+  // Volta do checkout: o webhook PAYMENT_CONFIRMED leva alguns segundos.
   // Repescamos o estado por ~40s antes de desistir.
   const aguardandoWebhook = statusParam === "sucesso" && !isPro;
   React.useEffect(() => {
@@ -99,9 +106,9 @@ function AssinaturaPage() {
     void navigate({ to: isOnboarded ? "/dashboard" : "/onboarding", replace: true });
   }, [voltandoDoCheckout, isPro, isOnboarded, navigate]);
 
-  async function assinar() {
+  async function assinar(planKey: string) {
     try {
-      await checkout.mutateAsync();
+      await checkout.mutateAsync(planKey);
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -117,6 +124,15 @@ function AssinaturaPage() {
     }
   }
 
+  // Checkout já aberto para ESTE plano: o link antigo ainda vale, não abrimos
+  // outro. Trocar de ciclo cai no botão normal, que gera um checkout novo.
+  const retomarCheckout =
+    subscription?.status === "pending" &&
+    subscription.checkoutUrl &&
+    subscription.planKey === planoAtivo
+      ? subscription.checkoutUrl
+      : null;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -125,7 +141,7 @@ function AssinaturaPage() {
         subtitle="Plano, cobrança e cancelamento."
       />
 
-      {isLoading ? <LoadingState rows={4} label="Carregando plano…" /> : null}
+      {isLoading ? <LoadingState rows={4} label="Carregando planos…" /> : null}
       {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
 
       {!isLoading && !isError && !canAccess ? (
@@ -168,19 +184,35 @@ function AssinaturaPage() {
 
           {subscription ? <StatusAtual subscription={subscription} /> : null}
 
-          {plan ? (
+          {plans.length > 0 && plano ? (
             <Blueprint className="p-5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="font-heading text-h4">{plan.name}</h2>
-                <p className="font-heading text-h4">
-                  {formatCents(plan.priceCents, plan.currency)}
-                  <span className="ml-1 text-caption text-neutral-700">
-                    {CYCLE_LABEL[plan.cycle] ?? "por ciclo"}
-                  </span>
+                <h2 className="font-heading text-h4">RUMVIA Pro</h2>
+                <p className="text-caption text-neutral-700">
+                  Mesmo acesso nos três ciclos. Quanto mais longo, menor o preço por mês.
                 </p>
               </div>
-              {plan.description ? (
-                <p className="mt-1 text-caption text-neutral-700">{plan.description}</p>
+
+              {/* Seletor de ciclo. Radiogroup de verdade: navegável por teclado
+                  e anunciado como escolha única pelo leitor de tela. */}
+              <div
+                className="mt-4 grid gap-px bg-divider sm:grid-cols-3"
+                role="radiogroup"
+                aria-label="Ciclo de cobrança"
+              >
+                {plans.map((p) => (
+                  <CartaoPlano
+                    key={p.key}
+                    plano={p}
+                    selecionado={p.key === planoAtivo}
+                    atual={isPro && subscription?.planKey === p.key}
+                    onSelect={() => setPlanoEscolhido(p.key)}
+                  />
+                ))}
+              </div>
+
+              {plano.description ? (
+                <p className="mt-4 text-caption text-neutral-700">{plano.description}</p>
               ) : null}
 
               <ul className="mt-4 flex flex-col gap-2">
@@ -194,16 +226,17 @@ function AssinaturaPage() {
 
               <p className="mt-4 text-caption text-neutral-600">
                 Pagamento processado pelo Asaas.{" "}
-                {plan.methods.includes("PIX") && plan.methods.includes("CARD")
+                {plano.methods.includes("PIX") && plano.methods.includes("CARD")
                   ? "Cartão de crédito ou PIX automático."
-                  : plan.methods.includes("PIX")
+                  : plano.methods.includes("PIX")
                     ? "PIX automático."
                     : "Cartão de crédito."}{" "}
-                {plan.trialDays ? `${plan.trialDays} dias grátis. ` : ""}
-                Renova automaticamente a cada ciclo até você cancelar. {AVISO_ACESSO_PAGO}
+                {plano.trialDays ? `${plano.trialDays} dias grátis. ` : ""}
+                {rotuloCobranca(plano.cycle)}, com renovação automática até você cancelar.{" "}
+                {AVISO_ACESSO_PAGO}
               </p>
 
-              {!plan.ready ? (
+              {!plano.ready ? (
                 <p className="mt-3 text-caption text-danger">
                   Plano ainda não conectado ao gateway. Rode <code>bun scripts/asaas-setup.ts</code>
                   .
@@ -211,27 +244,35 @@ function AssinaturaPage() {
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {subscription?.status === "pending" && subscription.checkoutUrl ? (
+                {retomarCheckout ? (
                   <Button asChild>
-                    <a href={subscription.checkoutUrl} target="_blank" rel="noreferrer">
+                    <a href={retomarCheckout} target="_blank" rel="noreferrer">
                       Concluir pagamento
                       <ExternalLink className="size-4" aria-hidden />
                     </a>
                   </Button>
                 ) : !isPro ? (
                   <Button
-                    onClick={() => void assinar()}
+                    onClick={() => void assinar(plano.key)}
                     loading={checkout.isPending}
-                    disabled={!plan.ready}
+                    disabled={!plano.ready}
                   >
-                    Assinar por {formatCents(plan.priceCents, plan.currency)}/mês
+                    Assinar por {formatCents(plano.priceCents, plano.currency)}{" "}
+                    {rotuloPeriodo(plano.cycle)}
                   </Button>
                 ) : null}
               </div>
+
+              {isPro ? (
+                <p className="mt-3 text-caption text-neutral-600">
+                  Para trocar de ciclo, cancele a assinatura atual e assine o novo plano. Não há
+                  troca automática — a cobrança já feita não é rateada.
+                </p>
+              ) : null}
             </Blueprint>
           ) : (
             <ErrorState
-              title="Plano indisponível"
+              title="Planos indisponíveis"
               description="Nenhum plano ativo cadastrado em billing_plans."
             />
           )}
@@ -269,12 +310,68 @@ function AssinaturaPage() {
   );
 }
 
+function CartaoPlano({
+  plano,
+  selecionado,
+  atual,
+  onSelect,
+}: {
+  plano: BillingPlan;
+  selecionado: boolean;
+  atual: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selecionado}
+      onClick={onSelect}
+      className={cn(
+        "flex flex-col items-start gap-1 bg-bg p-4 text-left transition-colors",
+        selecionado ? "ring-2 ring-accent-700 ring-inset" : "hover:bg-neutral-100",
+      )}
+    >
+      <span className="flex w-full flex-wrap items-center gap-2">
+        <span className="label-h6 text-neutral-700">{rotuloCiclo(plano.cycle)}</span>
+        {plano.discountPercent > 0 ? (
+          <span className="font-mono text-caption text-accent-700">−{plano.discountPercent}%</span>
+        ) : null}
+        {atual ? (
+          <span className="ml-auto font-mono text-caption text-neutral-500">plano atual</span>
+        ) : null}
+      </span>
+
+      {/* O número grande é o equivalente MENSAL: é o único jeito de comparar
+          ciclos diferentes sem fazer conta de cabeça. O valor cobrado de fato
+          vem logo abaixo, sem letra miúda. */}
+      <span className="num font-heading text-h4 text-accent-700">
+        {formatCents(plano.monthlyEquivalentCents, plano.currency)}
+        <span className="ml-1 text-caption text-neutral-600">/mês</span>
+      </span>
+
+      <span className="text-caption text-neutral-600">
+        {plano.months > 1
+          ? `${formatCents(plano.priceCents, plano.currency)} ${rotuloPeriodo(plano.cycle)}`
+          : rotuloCobranca(plano.cycle)}
+      </span>
+    </button>
+  );
+}
+
 function StatusAtual({ subscription }: { subscription: MySubscription }) {
   const cobrancaFalhou = subscription.status === "past_due";
   return (
     <Blueprint className={cobrancaFalhou ? "border-danger p-5" : "p-5"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="label-h6 text-neutral-700">Situação</h2>
+        <h2 className="label-h6 text-neutral-700">
+          Situação
+          {subscription.planName ? (
+            <span className="ml-2 font-normal text-caption text-neutral-600">
+              {subscription.planName}
+            </span>
+          ) : null}
+        </h2>
         <span className={cobrancaFalhou ? "label-h6 text-danger" : "label-h6"}>
           {STATUS_LABEL[subscription.status]}
           {subscription.devMode ? " · sandbox" : ""}
@@ -284,7 +381,16 @@ function StatusAtual({ subscription }: { subscription: MySubscription }) {
       <dl className="mt-3 grid gap-3 sm:grid-cols-3">
         <div>
           <dt className="text-caption text-neutral-600">Valor</dt>
-          <dd className="font-heading">{formatCents(subscription.amountCents)}</dd>
+          {/* `amount_cents` é copiado no checkout: quem assinou por um preço
+              antigo continua vendo o preço antigo, não o do catálogo de hoje. */}
+          <dd className="font-heading">
+            {formatCents(subscription.amountCents)}
+            {subscription.planCycle ? (
+              <span className="ml-1 text-caption text-neutral-600">
+                {rotuloPeriodo(subscription.planCycle)}
+              </span>
+            ) : null}
+          </dd>
         </div>
         <div>
           <dt className="text-caption text-neutral-600">

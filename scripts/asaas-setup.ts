@@ -92,26 +92,44 @@ if (conta.personType === "FISICA") {
   );
 }
 
-// ─── 2. plano ────────────────────────────────────────────────────────────────
-const { data: plan, error: planError } = await supabaseAdmin
+// ─── 2. planos ───────────────────────────────────────────────────────────────
+// O catálogo tem N ciclos ativos (mensal, trimestral, anual). Não há produto a
+// criar no Asaas — o preço vai direto no checkout —, então aqui só conferimos
+// que existe algo vendável e que o ciclo está no vocabulário que a API aceita.
+const CICLOS_ASAAS = ["MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUALLY", "YEARLY"];
+
+const { data: plans, error: planError } = await supabaseAdmin
   .from("billing_plans")
-  .select("id, key, name, price_cents, cycle, methods, is_active")
-  .eq("key", "pro_mensal")
-  .maybeSingle();
+  .select("id, key, name, price_cents, cycle, months, methods, is_active")
+  .eq("is_active", true)
+  .order("sort_order");
 
 if (planError) {
   console.error(`Erro lendo billing_plans: ${planError.message}`);
   process.exit(1);
 }
-if (!plan) {
-  console.error('Plano "pro_mensal" não existe. Rode as migrations primeiro.');
+if (!plans || plans.length === 0) {
+  console.error("Nenhum plano ativo em billing_plans. Rode as migrations primeiro.");
   process.exit(1);
 }
 
-console.log(
-  `\n✓ plano: ${plan.name} — R$ ${(plan.price_cents / 100).toFixed(2)} / ${plan.cycle} ` +
-    `(métodos: ${plan.methods.join(", ")})`,
-);
+console.log(`\n✓ ${plans.length} plano(s) ativo(s):`);
+for (const plan of plans) {
+  const meses = plan.months ?? 1;
+  const porMes = plan.price_cents / 100 / meses;
+  console.log(
+    `    ${plan.key} — R$ ${(plan.price_cents / 100).toFixed(2)} / ${plan.cycle} ` +
+      `(R$ ${porMes.toFixed(2)}/mês · métodos: ${plan.methods.join(", ")})`,
+  );
+  // Ciclo fora do vocabulário do Asaas só aparece quando alguém tenta assinar,
+  // e o erro que volta de lá não diz qual plano está errado.
+  if (!CICLOS_ASAAS.includes(plan.cycle)) {
+    console.error(
+      `  ✗ ciclo "${plan.cycle}" não é aceito pelo Asaas (esperado: ${CICLOS_ASAAS.join(", ")}). ` +
+        `O checkout deste plano vai falhar.`,
+    );
+  }
+}
 
 // ─── 3. webhook ──────────────────────────────────────────────────────────────
 const webhooks = await asaas.listWebhooks();

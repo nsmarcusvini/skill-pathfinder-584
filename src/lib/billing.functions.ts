@@ -4,13 +4,15 @@
  * FONTE ÚNICA do estado de pagamento: a tabela `subscriptions`, escrita só pelo
  * webhook e por estas server functions (service_role). Nenhuma tela decide se
  * alguém é pagante — todas perguntam para `getBillingOverview` / `useSubscription`.
+ *
+ * CATÁLOGO: `billing_plans` tem N planos ativos (mensal, trimestral, anual). Não
+ * existe plano "padrão" no código — a vitrine mostra o que estiver ativo, na
+ * ordem de `sort_order`, e o checkout cobra o `planKey` que a pessoa escolheu.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-export const PLAN_KEY = "pro_mensal";
 
 export type SubscriptionStatus =
   "pending" | "active" | "past_due" | "cancelled" | "refunded" | "expired";
@@ -19,9 +21,23 @@ export interface BillingPlan {
   key: string;
   name: string;
   description: string | null;
+  /** Cobrado de uma vez, pelo ciclo inteiro. */
   priceCents: number;
   currency: string;
+  /** Vocabulário do Asaas: MONTHLY | QUARTERLY | YEARLY | … */
   cycle: string;
+  /** Meses cobertos por uma cobrança. Coluna gerada a partir do ciclo. */
+  months: number;
+  /** `priceCents / months` — o número que permite comparar ciclos diferentes. */
+  monthlyEquivalentCents: number;
+  /**
+   * Quanto este ciclo economiza por mês contra o ciclo mais caro por mês (na
+   * prática, o mensal). Derivado do preço, nunca gravado: guardar o número
+   * pronto criaria uma segunda verdade que envelhece sozinha no dia em que
+   * alguém mexer só no preço. `0` no plano de referência.
+   */
+  discountPercent: number;
+  sortOrder: number;
   trialDays: number | null;
   methods: string[];
   /**
@@ -46,10 +62,15 @@ export interface MySubscription {
   checkoutUrl: string | null;
   devMode: boolean;
   createdAt: string;
+  /** Plano contratado. Pode divergir do catálogo atual — preço antigo é honrado. */
+  planKey: string | null;
+  planName: string | null;
+  planCycle: string | null;
 }
 
 export interface BillingOverview {
-  plan: BillingPlan | null;
+  /** Catálogo ativo, na ordem de exibição. Vazio = nada para vender. */
+  plans: BillingPlan[];
   subscription: MySubscription | null;
   /** "Essa pessoa PAGA?" — assinatura ativa (ou em retentativa). */
   isPro: boolean;
@@ -62,6 +83,58 @@ export interface BillingOverview {
 }
 
 const LIVE_STATUSES: string[] = ["pending", "active", "past_due"];
+
+const PLAN_COLUMNS =
+  "key, name, description, price_cents, currency, cycle, months, sort_order, trial_days, methods";
+
+interface PlanRow {
+  key: string;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  currency: string;
+  cycle: string;
+  months: number | null;
+  sort_order: number | null;
+  trial_days: number | null;
+  methods: string[] | null;
+}
+
+/**
+ * Enriquece as linhas de `billing_plans` com equivalente mensal e desconto.
+ *
+ * A referência do desconto é o MAIOR equivalente mensal do catálogo, não uma
+ * chave fixa: se um dia o mensal sair de cena, a conta continua certa sozinha.
+ */
+function toPlans(rows: PlanRow[]): BillingPlan[] {
+  const enriched = rows.map((row) => {
+    // `months` é coluna gerada e nunca é nula para os ciclos permitidos; o
+    // fallback existe só para não dividir por zero se o CHECK for afrouxado.
+    const months = row.months && row.months > 0 ? row.months : 1;
+    return { row, months, monthlyEquivalentCents: Math.round(row.price_cents / months) };
+  });
+
+  const referencia = enriched.reduce((maior, p) => Math.max(maior, p.monthlyEquivalentCents), 0);
+
+  return enriched
+    .map(({ row, months, monthlyEquivalentCents }) => ({
+      key: row.key,
+      name: row.name,
+      description: row.description ?? null,
+      priceCents: row.price_cents,
+      currency: row.currency,
+      cycle: row.cycle,
+      months,
+      monthlyEquivalentCents,
+      discountPercent:
+        referencia > 0 ? Math.round((1 - monthlyEquivalentCents / referencia) * 100) : 0,
+      sortOrder: row.sort_order ?? 0,
+      trialDays: row.trial_days ?? null,
+      methods: row.methods ?? ["CARD"],
+      ready: true,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.priceCents - b.priceCents);
+}
 
 /** Base pública do app, para completionUrl/returnUrl do checkout. */
 function appBaseUrl(): string {
@@ -90,24 +163,29 @@ export const getBillingOverview = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
 
-    const { data: planRow, error: planError } = await db
+    const { data: planRows, error: planError } = await db
       .from("billing_plans")
-      .select("key, name, description, price_cents, currency, cycle, trial_days, methods")
-      .eq("key", PLAN_KEY)
-      .eq("is_active", true)
-      .maybeSingle();
+      .select(PLAN_COLUMNS)
+      .eq("is_active", true);
     if (planError) throw new Error(planError.message);
 
-    // RLS já limita a linha ao próprio usuário.
+    // RLS já limita a linha ao próprio usuário. O join traz o plano contratado,
+    // que pode ser diferente de qualquer um do catálogo atual.
     const { data: subRow, error: subError } = await db
       .from("subscriptions")
       .select(
-        "status, amount_cents, method, current_period_end, trial_ends_at, last_payment_at, last_receipt_url, cancelled_at, cancelled_due_to, checkout_url, dev_mode, created_at",
+        "status, amount_cents, method, current_period_end, trial_ends_at, last_payment_at, last_receipt_url, cancelled_at, cancelled_due_to, checkout_url, dev_mode, created_at, billing_plans(key, name, cycle)",
       )
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (subError) throw new Error(subError.message);
+
+    const subPlan = (subRow?.billing_plans ?? null) as {
+      key: string;
+      name: string;
+      cycle: string;
+    } | null;
 
     const subscription: MySubscription | null = subRow
       ? {
@@ -123,6 +201,9 @@ export const getBillingOverview = createServerFn({ method: "POST" })
           checkoutUrl: subRow.status === "pending" ? (subRow.checkout_url ?? null) : null,
           devMode: subRow.dev_mode,
           createdAt: subRow.created_at,
+          planKey: subPlan?.key ?? null,
+          planName: subPlan?.name ?? null,
+          planCycle: subPlan?.cycle ?? null,
         }
       : null;
 
@@ -135,19 +216,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
     const isAdmin = profileRow?.is_admin === true;
 
     return {
-      plan: planRow
-        ? {
-            key: planRow.key,
-            name: planRow.name,
-            description: planRow.description ?? null,
-            priceCents: planRow.price_cents,
-            currency: planRow.currency,
-            cycle: planRow.cycle,
-            trialDays: planRow.trial_days ?? null,
-            methods: planRow.methods ?? ["CARD"],
-            ready: true,
-          }
-        : null,
+      plans: toPlans((planRows ?? []) as PlanRow[]),
       subscription,
       isPro,
       isAdmin,
@@ -155,47 +224,64 @@ export const getBillingOverview = createServerFn({ method: "POST" })
     };
   });
 
-// ─── Plano público (landing) ─────────────────────────────────────────────────
+// ─── Catálogo público (landing) ──────────────────────────────────────────────
 
 export interface PublicPlan {
+  key: string;
   name: string;
   priceCents: number;
   currency: string;
   cycle: string;
+  months: number;
+  monthlyEquivalentCents: number;
+  discountPercent: number;
   trialDays: number | null;
 }
 
 /**
- * Preço para a landing, sem login. Devolve só campos públicos — nada de
- * campos internos. A landing NUNCA escreve preço no JSX (regra 1): o número
- * vem de billing_plans, mesma fonte que o checkout cobra.
+ * Catálogo para a landing, sem login. Devolve só campos públicos — nada de
+ * campo interno. A landing NUNCA escreve preço no JSX (regra 1): o número vem
+ * de `billing_plans`, a mesma fonte que o checkout cobra.
  */
-export const getPublicPlan = createServerFn({ method: "GET" }).handler(
-  async (): Promise<PublicPlan | null> => {
+export const getPublicPlans = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PublicPlan[]> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("billing_plans")
-      .select("name, price_cents, currency, cycle, trial_days")
-      .eq("key", PLAN_KEY)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (!data) return null;
-    return {
-      name: data.name,
-      priceCents: data.price_cents,
-      currency: data.currency,
-      cycle: data.cycle,
-      trialDays: data.trial_days ?? null,
-    };
+      .select(PLAN_COLUMNS)
+      .eq("is_active", true);
+    if (!data) return [];
+    return toPlans(data as PlanRow[]).map((p) => ({
+      key: p.key,
+      name: p.name,
+      priceCents: p.priceCents,
+      currency: p.currency,
+      cycle: p.cycle,
+      months: p.months,
+      monthlyEquivalentCents: p.monthlyEquivalentCents,
+      discountPercent: p.discountPercent,
+      trialDays: p.trialDays,
+    }));
   },
 );
 
 // ─── Checkout ────────────────────────────────────────────────────────────────
 
+export interface StartCheckoutInput {
+  /** `billing_plans.key` escolhido na vitrine. */
+  planKey: string;
+}
+
 export const startSubscriptionCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: Record<string, never>) => input)
-  .handler(async ({ context }): Promise<{ url: string; reused: boolean }> => {
+  .inputValidator((input: StartCheckoutInput): StartCheckoutInput => {
+    const planKey = typeof input?.planKey === "string" ? input.planKey.trim() : "";
+    // Quem valida de verdade é o banco (existe? está ativo?). Aqui só garantimos
+    // que veio algo: a lista de chaves é dado, não constante de código.
+    if (!planKey) throw new Error("Escolha um plano antes de continuar.");
+    return { planKey };
+  })
+  .handler(async ({ context, data }): Promise<{ url: string; reused: boolean }> => {
     // Sessão anônima não paga: a assinatura precisa sobreviver ao dispositivo.
     if (isAnonymous(context.claims as Record<string, unknown>)) {
       throw new Error("Crie uma conta permanente antes de assinar.");
@@ -207,16 +293,16 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     const { data: plan, error: planError } = await supabaseAdmin
       .from("billing_plans")
       .select("id, key, name, description, price_cents, cycle, methods")
-      .eq("key", PLAN_KEY)
+      .eq("key", data.planKey)
       .eq("is_active", true)
       .maybeSingle();
     if (planError) throw new Error(planError.message);
-    if (!plan) throw new Error(`Plano "${PLAN_KEY}" não encontrado ou inativo.`);
+    if (!plan) throw new Error(`Plano "${data.planKey}" não encontrado ou inativo.`);
 
     // Uma assinatura viva por usuário (índice único parcial garante isso).
     const { data: existing } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status, checkout_url, provider_customer_id")
+      .select("id, status, checkout_url, plan_id")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
@@ -224,8 +310,10 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     if (existing && (existing.status === "active" || existing.status === "past_due")) {
       throw new Error("Você já tem uma assinatura ativa.");
     }
-    if (existing?.status === "pending" && existing.checkout_url) {
-      // Checkout ainda aberto: devolve o mesmo link em vez de criar outro.
+    // Checkout ainda aberto PARA O MESMO PLANO: devolve o mesmo link em vez de
+    // criar outro. Se a pessoa trocou de ciclo, reaproveitar cobraria o preço
+    // errado — o link antigo é descartado e um checkout novo é aberto.
+    if (existing?.status === "pending" && existing.checkout_url && existing.plan_id === plan.id) {
       return { url: existing.checkout_url, reused: true };
     }
 
@@ -252,6 +340,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       value: reaisFromCents(plan.price_cents),
       name: plan.name,
       description: plan.description ?? plan.name,
+      // Vai cru: `billing_plans.cycle` já está no vocabulário do Asaas.
       cycle: plan.cycle,
       nextDueDate: hoje,
       externalReference: externalId,

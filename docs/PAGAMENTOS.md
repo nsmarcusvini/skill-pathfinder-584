@@ -1,6 +1,17 @@
 # Pagamentos — assinatura RUMVIA Pro via Asaas
 
-Cobrança recorrente de **R$ 24,90/mês** pelo [Asaas](https://docs.asaas.com).
+Cobrança recorrente pelo [Asaas](https://docs.asaas.com), em três ciclos:
+
+| Plano (`billing_plans.key`) | Ciclo Asaas | Cobrado | Equivalente mensal | Desconto |
+|---|---|---|---|---|
+| `pro_mensal` | `MONTHLY` | R$ 29,90 / mês | R$ 29,90 | — |
+| `pro_trimestral` | `QUARTERLY` | R$ 80,70 / trimestre | R$ 26,90 | −10% |
+| `pro_anual` | `YEARLY` | R$ 286,80 / ano | R$ 23,90 | −20% |
+
+O acesso é **idêntico** nos três — o ciclo só muda de quanto em quanto tempo a
+cobrança sai e quanto isso barateia o mês. O desconto não está gravado em lugar
+nenhum: sai de `price_cents / months` contra o maior equivalente mensal do
+catálogo (`toPlans` em `billing.functions.ts`).
 
 > **Histórico:** o roadmap original previa Stripe (Prompt 8C). Foi implementado na
 > AbacatePay em 2026-08-31 e migrado para o Asaas em 2026-09-01, porque a AbacatePay
@@ -105,22 +116,23 @@ falhas, deploy fora do ar, domínio trocado).
 | `supabase/migrations/20260831120220_paywall_acesso_pago.sql` | `can_access_paid_features()` = pagante OU admin |
 | `supabase/migrations/20260831120415_restringe_rpcs_assinatura_a_auth_uid.sql` | As RPCs só respondem para o próprio `auth.uid()` ou `service_role` |
 | `supabase/migrations/20260901160000_billing_agnostico_de_fornecedor.sql` | `abacate_*` → `provider_*` + coluna `provider` |
+| `supabase/migrations/20260903160021_planos_mensal_trimestral_anual.sql` | três ciclos, `months` (gerada), `sort_order`, CHECK do ciclo no vocabulário do Asaas |
 | `src/lib/asaas/types.ts` | Tipos v3 + conversão centavos↔reais |
 | `src/lib/asaas/client.server.ts` | **Único** ponto que fala com a API do Asaas |
 | `src/lib/asaas/webhook.server.ts` | Token, idempotência, efeito dos eventos |
 | `src/routes/api/public/asaas-webhook.ts` | Rota HTTP fina |
-| `src/lib/billing.functions.ts` | `getBillingOverview`, `startSubscriptionCheckout`, `cancelMySubscription` |
+| `src/lib/billing.functions.ts` | `getBillingOverview`, `getPublicPlans`, `startSubscriptionCheckout(planKey)`, `cancelMySubscription` |
 | `scripts/asaas-reconcile.ts` | Repara assinatura presa (webhook perdido ou órfão) |
 | `src/integrations/supabase/subscription-middleware.ts` | `requireActiveSubscription` — trava server-side |
 | `src/hooks/use-subscription.tsx` | `useSubscription()`, `useStartCheckout()`, `useCancelSubscription()` |
 | `src/components/rumvia/paywall.tsx` | `<Paywall>`, `<PaywallCard>`, `formatCents()` |
-| `src/lib/plan-copy.ts` | Texto do plano em um lugar só |
-| `src/routes/_conta/assinatura.tsx` | Tela de plano, status, recibo e cancelamento |
+| `src/lib/plan-copy.ts` | Texto do plano e tradução dos ciclos, em um lugar só |
+| `src/routes/_conta/assinatura.tsx` | Escolha do ciclo, status, recibo e cancelamento |
 | `scripts/asaas-setup.ts` | Valida a conta e cadastra o webhook |
 
 ### Duas armadilhas de unidade e de shell
 
-**Centavos vs reais.** O banco guarda `price_cents` (2490); o Asaas quer reais (24.90).
+**Centavos vs reais.** O banco guarda `price_cents` (2990); o Asaas quer reais (29.90).
 A conversão vive só em `reaisFromCents`/`centsFromReais` (`src/lib/asaas/types.ts`).
 Nunca dividir por 100 solto — é assim que nasce cobrança de R$ 2.490,00.
 
@@ -145,11 +157,35 @@ invertida inicial e espaços, e repõe o `$` se faltar — **avisando no log**, 
 destravar sem esconder o erro de configuração. Verificado com as cinco variantes
 (correta, sem `$`, com `\`, com aspas, com espaços): todas autenticam.
 
-### Preço é dado, não código
+### Preço é dado, não código — e ciclo também
 
-`billing_plans` guarda preço, ciclo e métodos. Mudar de R$ 24,90 é `UPDATE billing_plans`
-— e no Asaas nem há catálogo a recriar, porque o preço vai direto no checkout
-(`provider_plan_ref` fica NULL de propósito).
+`billing_plans` guarda preço, ciclo e métodos, **uma linha por ciclo**. Mudar de preço
+é `UPDATE billing_plans`; criar um ciclo novo (semestral, por exemplo) é um `INSERT`
+com `sort_order`. Nos dois casos: zero deploy. No Asaas nem há catálogo a recriar,
+porque o preço vai direto no checkout (`provider_plan_ref` fica NULL de propósito).
+
+**Duas armadilhas ao mexer nisso:**
+
+1. **`cycle` vai CRU para o Asaas.** O valor de `billing_plans.cycle` é copiado tal e
+   qual para `subscription.cycle` no `POST /checkouts`. O ciclo anual lá chama-se
+   `YEARLY`, não `ANNUALLY` — o CHECK antigo da tabela aceitava `ANNUALLY`, que a API
+   recusaria. Hoje o CHECK é exatamente o vocabulário deles, restrito aos ciclos que
+   são múltiplos inteiros de mês: `MONTHLY`, `BIMONTHLY`, `QUARTERLY`, `SEMIANNUALLY`,
+   `YEARLY`. Os três em uso foram testados contra o sandbox em 2026-09-03: os três
+   devolvem 200 com o ciclo e o valor corretos.
+2. **`months` é coluna GERADA**, derivada do ciclo. Não tente escrever nela — e não
+   crie uma coluna de "desconto": ela viraria uma segunda verdade que envelhece
+   sozinha no dia em que alguém alterar só o `price_cents`.
+
+**Quem já paga não é afetado por mudança de preço.** `subscriptions.amount_cents` é
+copiado no momento do checkout, então o valor cobrado e exibido continua sendo o
+contratado. Grandfathering sem coluna nenhuma — conferido depois do reajuste de
+2026-09-03: as assinaturas antigas seguem em 2490.
+
+**Não há troca de ciclo automática.** Para migrar de mensal para anual, a pessoa
+cancela e assina de novo; a cobrança já feita não é rateada, e a tela diz isso. Se um
+checkout `pending` existir para OUTRO plano, `startSubscriptionCheckout` descarta o link
+antigo e abre um novo — reaproveitar cobraria o preço errado.
 
 ---
 

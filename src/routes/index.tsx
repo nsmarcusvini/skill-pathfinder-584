@@ -6,8 +6,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { CvDropzone } from "@/components/app/cv-dropzone";
 import { formatCents } from "@/components/rumvia/paywall";
 import { Button } from "@/components/ui/button";
-import { usePublicPlan } from "@/hooks/use-subscription";
-import { AVISO_ACESSO_PAGO, PLANO_INCLUI, PREVIA_GRATUITA } from "@/lib/plan-copy";
+import { menorMensalidade, usePublicPlans } from "@/hooks/use-subscription";
+import {
+  AVISO_ACESSO_PAGO,
+  PLANO_INCLUI,
+  PREVIA_GRATUITA,
+  rotuloCiclo,
+  rotuloCobranca,
+  rotuloPeriodo,
+} from "@/lib/plan-copy";
 import { getLandingStats } from "@/lib/public-stats.functions";
 
 export const Route = createFileRoute("/")({
@@ -53,11 +60,11 @@ const HOW_IT_WORKS = [
 const FAQ_ITEMS = [
   {
     q: "O que é gratuito e o que é pago?",
-    a: "A prévia é gratuita e não exige cadastro: score de aderência, amostra das skills em falta e das ferramentas mais pedidas. O RUMVIA completo — painel, histórico de gap, plano de estudos, salários, empresas e progresso — é assinatura mensal. Criar a conta não libera o acesso: o painel só abre depois que a assinatura for confirmada.",
+    a: "A prévia é gratuita e não exige cadastro: score de aderência, amostra das skills em falta e das ferramentas mais pedidas. O RUMVIA completo — painel, histórico de gap, plano de estudos, salários, empresas e progresso — é assinatura. Criar a conta não libera o acesso: o painel só abre depois que a assinatura for confirmada.",
   },
   {
     q: "Quanto custa e como cobram?",
-    a: "Uma assinatura mensal, cobrada no cartão de crédito e renovada automaticamente até você cancelar. O valor está na seção Planos, acima. O pagamento é processado pelo Asaas — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
+    a: "Você escolhe o ciclo: mensal, trimestral ou anual. O acesso é o mesmo nos três — quanto mais longo o ciclo, menor o preço por mês. A cobrança é no cartão de crédito e renova automaticamente até você cancelar. Os três valores estão na seção Planos, acima. O pagamento é processado pelo Asaas — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
   },
   {
     q: "Como vocês analisam o currículo?",
@@ -89,10 +96,15 @@ function LandingPage() {
     staleTime: 5 * 60 * 1000,
     queryFn: () => loadStats(),
   });
-  const { data: plan } = usePublicPlan();
+  const { data: plans } = usePublicPlans();
   // Preço nunca é escrito no JSX (regra 1) — vem de billing_plans, a mesma
-  // fonte que o checkout cobra. Sem plano carregado, o card não inventa número.
-  const preco = plan ? formatCents(plan.priceCents, plan.currency) : null;
+  // fonte que o checkout cobra. Sem catálogo carregado, o card não inventa
+  // número: some com o preço e diz por quê.
+  const planos = plans ?? [];
+  // O headline cita o MENOR preço por mês (hoje o anual) sempre com "a partir
+  // de" — a tabela logo abaixo mostra os três, então ninguém descobre o preço
+  // real só no checkout.
+  const maisBarato = menorMensalidade(planos);
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
 
   return (
@@ -158,7 +170,9 @@ function LandingPage() {
               </div>
               <p className="mt-4 font-mono text-caption" style={{ color: "rgba(242,242,243,0.4)" }}>
                 → Prévia sem cadastro · Resultado em menos de 30 segundos
-                {preco ? ` · Painel completo por ${preco}/mês` : ""}
+                {maisBarato
+                  ? ` · Painel completo a partir de ${formatCents(maisBarato.monthlyEquivalentCents, maisBarato.currency)}/mês`
+                  : ""}
               </p>
             </div>
 
@@ -439,13 +453,14 @@ function LandingPage() {
       <section id="planos" className="py-16">
         <div className="rumvia-container">
           <p className="label-h6 text-neutral-500">// Planos e preços</p>
-          <h2 className="mt-3 font-heading text-h2 uppercase">Um plano. Sem pegadinha.</h2>
+          <h2 className="mt-3 font-heading text-h2 uppercase">Um plano. Três ciclos.</h2>
           <p
             className="mt-3 text-body text-neutral-600"
             style={{ maxWidth: 620, lineHeight: 1.65 }}
           >
-            A prévia do seu currículo é gratuita e não pede cadastro. O RUMVIA completo é assinatura
-            mensal — <strong className="text-neutral-900">{AVISO_ACESSO_PAGO}</strong>
+            A prévia do seu currículo é gratuita e não pede cadastro. O RUMVIA completo é
+            assinatura: mensal, trimestral ou anual, com o mesmo acesso nos três — só muda o preço
+            por mês. <strong className="text-neutral-900">{AVISO_ACESSO_PAGO}</strong>
           </p>
 
           <div className="mt-10 grid gap-px bg-divider lg:grid-cols-2">
@@ -483,18 +498,17 @@ function LandingPage() {
             {/* Plano pago */}
             <div className="flex flex-col gap-4 bg-bg p-8 ring-2 ring-accent-700 ring-inset">
               <div>
-                <span className="label-h6 text-accent-700">
-                  {plan?.name ?? "Assinatura"} — acesso à conta
-                </span>
-                {/* Sem plano carregado não existe preço a mostrar. Um traço
+                <span className="label-h6 text-accent-700">RUMVIA Pro — acesso à conta</span>
+                {/* Sem catálogo carregado não existe preço a mostrar. Um traço
                     solto seguido de "por mês" lê como bug; a frase honesta, não. */}
-                {preco ? (
-                  <p className="mt-2 flex items-baseline gap-2">
+                {maisBarato ? (
+                  <p className="mt-2 flex flex-wrap items-baseline gap-2">
+                    <span className="text-body text-neutral-600">a partir de</span>
                     <span
                       className="num font-heading font-bold text-accent-700"
                       style={{ fontSize: 44, lineHeight: 1, letterSpacing: "-0.02em" }}
                     >
-                      {preco}
+                      {formatCents(maisBarato.monthlyEquivalentCents, maisBarato.currency)}
                     </span>
                     <span className="text-body text-neutral-600">por mês</span>
                   </p>
@@ -505,9 +519,44 @@ function LandingPage() {
                 )}
                 <p className="mt-1 font-mono text-caption text-neutral-500">
                   cartão de crédito · renova sozinho · cancele quando quiser
-                  {plan?.trialDays ? ` · ${plan.trialDays} dias grátis` : ""}
+                  {maisBarato?.trialDays ? ` · ${maisBarato.trialDays} dias grátis` : ""}
                 </p>
               </div>
+
+              {/* Os três ciclos, lado a lado. O mesmo acesso em todos — o que
+                  muda é só de quanto em quanto tempo a cobrança sai e quanto
+                  isso barateia o mês. Nada de seletor: esconder dois preços
+                  atrás de uma aba é o que faz a pessoa desconfiar do terceiro. */}
+              {planos.length > 0 ? (
+                <ul className="grid gap-px border border-divider bg-divider sm:grid-cols-3">
+                  {planos.map((p) => (
+                    <li key={p.key} className="flex flex-col gap-1 bg-bg p-4">
+                      <span className="flex items-center gap-2">
+                        <span className="label-h6 text-neutral-700">{rotuloCiclo(p.cycle)}</span>
+                        {p.discountPercent > 0 ? (
+                          <span className="font-mono text-caption text-accent-700">
+                            −{p.discountPercent}%
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className="num font-heading font-bold text-accent-700"
+                        style={{ fontSize: 24, lineHeight: 1.1 }}
+                      >
+                        {formatCents(p.monthlyEquivalentCents, p.currency)}
+                        <span className="ml-1 font-sans text-caption font-normal text-neutral-600">
+                          /mês
+                        </span>
+                      </span>
+                      <span className="text-caption text-neutral-600">
+                        {p.months > 1
+                          ? `${formatCents(p.priceCents, p.currency)} ${rotuloPeriodo(p.cycle)}`
+                          : rotuloCobranca(p.cycle)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <ul className="flex flex-col gap-2">
                 {PLANO_INCLUI.map((item) => (
                   <li key={item} className="flex items-start gap-2 text-body text-neutral-700">

@@ -98,8 +98,14 @@ Cron jobs do `pg_cron` chamam URLs do próprio app via `pg_net`
     benefício de plano); mexer nessa lista é decisão de produto, não de código.
     Nenhum texto novo pode chamar a **conta** de grátis — a frase de bloqueio é
     `AVISO_ACESSO_PAGO` em `src/lib/plan-copy.ts` e é a mesma em todo o funil. Preço
-    nunca vai para JSX: vem de `billing_plans`. Esconder botão não é proteção — a
-    server function que serve dado pago usa `requireActiveSubscription`.
+    nunca vai para JSX: vem de `billing_plans`, que tem **N ciclos ativos** (hoje
+    mensal, trimestral e anual). Não existe plano padrão no código: a vitrine mostra
+    o que estiver ativo, ordenado por `sort_order`, e o checkout cobra o `planKey`
+    escolhido. Ciclo novo, preço novo ou desconto novo = `UPDATE`/`INSERT` em
+    `billing_plans`, zero deploy — o desconto exibido é **derivado**
+    (`price_cents / months` contra o maior equivalente mensal), nunca gravado.
+    Esconder botão não é proteção — a server function que serve dado pago usa
+    `requireActiveSubscription`.
 
 ## Layout do projeto
 
@@ -122,7 +128,7 @@ src/
       certificacoes.tsx        # ❌ esqueleto (Prompt 12)
       cursos.tsx               # ❌ esqueleto (Prompt 12)
       conta.tsx                # ✅ pronto
-      assinatura.tsx           # ✅ pronto (Asaas, R$ 24,90/mês)
+      assinatura.tsx           # ✅ pronto (Asaas; mensal/trimestral/anual)
       admin.*.tsx              # ⚠️ parcial (falta trilhas e saúde)
     api/public/                # Endpoints de servidor (o que seria Edge Function)
       ingest-jobs.ts
@@ -192,13 +198,15 @@ supabase/
 - [ ] **Prompt 13** — Admin de trilhas + painel de saúde
 - [ ] **Prompt 14** — Expurgo de anônimos + notificações + LGPD (export/delete) +
       responsividade + smoke test
-- [x] **Prompt 8C** — Assinatura Pro R$ 24,90/mês + paywall obrigatório (2026-08-31),
+- [x] **Prompt 8C** — Assinatura Pro + paywall obrigatório (2026-08-31),
       migrada da AbacatePay para o **Asaas** em 2026-09-01 (a AbacatePay não faz
       cobrança recorrente para contas novas). **O produto é pago:** só a
       prévia do CV (`/`, `/analise`) roda sem conta; `_conta/*` e `/onboarding` exigem
       assinatura ativa. Exceções: `/assinatura` (é onde se paga) e `/conta` (LGPD —
       exportar/excluir não pode ser trancado). Admin entra sem pagar
-      (`can_access_paid_features`). Runbook em `docs/PAGAMENTOS.md`.
+      (`can_access_paid_features`). Três ciclos desde 2026-09-03 — mensal R$ 29,90,
+      trimestral R$ 80,70 (−10%) e anual R$ 286,80 (−20%). Runbook em
+      `docs/PAGAMENTOS.md`.
 
 Detalhes completos de cada um vivem em `docs/roadmap/`.
 

@@ -5,10 +5,10 @@ import { Lock } from "lucide-react";
 import { Blueprint } from "./blueprint";
 import { LoadingState } from "./states";
 import { Button } from "@/components/ui/button";
-import { useSubscription } from "@/hooks/use-subscription";
+import { menorMensalidade, useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
 
-/** R$ 24,90 a partir de 2490. */
+/** R$ 29,90 a partir de 2990. */
 export function formatCents(cents: number, currency = "BRL"): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
 }
@@ -21,8 +21,11 @@ export interface PaywallProps {
 
 /** Cartão de upsell isolado — use quando quiser posicionar o convite à mão. */
 export function PaywallCard({ title, description, className }: PaywallProps) {
-  const { plan } = useSubscription();
-  const preco = plan ? formatCents(plan.priceCents, plan.currency) : "R$ 24,90";
+  const { plans } = useSubscription();
+  // Com três ciclos, o convite cita o MENOR preço por mês e diz que é "a partir
+  // de" — prometer o número do anual sem essa ressalva seria propaganda enganosa.
+  // Sem catálogo carregado, a frase some em vez de inventar valor (regra 1).
+  const maisBarato = menorMensalidade(plans);
 
   return (
     <Blueprint
@@ -35,10 +38,13 @@ export function PaywallCard({ title, description, className }: PaywallProps) {
       </span>
       <h5 className="font-heading">{title ?? "Disponível no RUMVIA Pro"}</h5>
       <p className="caption max-w-md">
-        {description ?? `Assine por ${preco} por mês e libere este recurso. Cancele quando quiser.`}
+        {description ??
+          (maisBarato
+            ? `Assine a partir de ${formatCents(maisBarato.monthlyEquivalentCents, maisBarato.currency)} por mês e libere este recurso.`
+            : "Assine o RUMVIA Pro para liberar este recurso.")}
       </p>
       <Button asChild>
-        <Link to="/assinatura">Ver o plano</Link>
+        <Link to="/assinatura">Ver os planos</Link>
       </Button>
     </Blueprint>
   );
