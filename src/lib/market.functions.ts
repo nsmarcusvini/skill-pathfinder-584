@@ -1,5 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireActiveSubscription } from "@/integrations/supabase/subscription-middleware";
+
+/**
+ * Dado de mercado é PAGO (CLAUDE.md, regra 12). Duas travas, e as duas importam:
+ *
+ * 1. `requireActiveSubscription` em toda função daqui — quem não paga não passa.
+ * 2. As leituras usam `supabaseAdmin`, não `context.supabase`. Isso existe porque
+ *    `anon`/`authenticated` perderam o SELECT nas tabelas e materialized views de
+ *    mercado (migration `20260903170000`). Materialized view NÃO suporta RLS: a
+ *    única proteção possível é o GRANT, e com ele aberto qualquer sessão anônima
+ *    lia o dataset inteiro direto pelo PostgREST, sem passar por aqui.
+ *
+ * Ou seja: a trava de pagamento é esta função. Não existe caminho paralelo.
+ * Escrita do usuário (submitSalaryObservation) continua no client dele, sob RLS.
+ */
+async function marketDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 function sinceDaysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -100,10 +119,10 @@ interface ToolRankingInput {
 }
 
 export const getToolRanking = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: ToolRankingInput) => input)
   .handler(async ({ data, context }): Promise<ToolRankingItem[]> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const rpcArgs = {
       _track_id: data.trackId,
       _segments: data.segments,
@@ -139,10 +158,10 @@ interface ToolDetailInput {
 }
 
 export const getToolDetail = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: ToolDetailInput) => input)
   .handler(async ({ data, context }): Promise<ToolDetail | null> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const [{ data: rows, error }, { data: skillRow }] = await Promise.all([
       supabase.rpc("tool_detail", {
         _track_id: data.trackId,
@@ -189,10 +208,10 @@ interface ToolMonthlyInput {
 }
 
 export const getToolMonthly = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: ToolMonthlyInput) => input)
   .handler(async ({ data, context }): Promise<ToolMonthlyRow[]> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const { data: rows, error } = await supabase.rpc("tool_monthly", {
       _track_id: data.trackId,
       _skill_ids: data.skillIds,
@@ -225,10 +244,10 @@ interface CompanyRankingInput {
 }
 
 export const getCompanyRanking = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: CompanyRankingInput) => input)
   .handler(async ({ data, context }): Promise<CompanyRankingItem[]> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const { data: rows, error } = await supabase.rpc("company_ranking", {
       _track_id: data.trackId,
       _segments: data.segments,
@@ -270,10 +289,15 @@ interface CompanyDetailInput {
 }
 
 export const getCompanyDetail = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: CompanyDetailInput) => input)
   .handler(async ({ data, context }): Promise<CompanyDetail> => {
-    const { supabase, userId } = context;
+    // Mistura dado de mercado (admin) com skills do usuário. O `user_skills`
+    // abaixo roda sem RLS, então o filtro `.eq("user_id", userId)` é o que
+    // garante o escopo — e `userId` vem do JWT já verificado pelo middleware,
+    // nunca do input.
+    const { userId } = context;
+    const supabase = await marketDb();
 
     let openJobsQuery = supabase
       .from("job_postings")
@@ -355,10 +379,10 @@ export interface SalaryStatsResult {
 }
 
 export const getSalaryStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<SalaryStatsResult> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const [{ data: rows }, { data: setting }] = await Promise.all([
       supabase
         .from("mv_salary_stats")
@@ -407,10 +431,10 @@ export interface SalarySkillImpactRow {
 }
 
 export const getSalarySkillImpact = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string; segment: string; periodDays: number }) => input)
   .handler(async ({ data, context }): Promise<SalarySkillImpactRow[]> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
 
     const [{ data: statRows }, { data: rankingRows }] = await Promise.all([
       supabase
@@ -478,7 +502,7 @@ export interface SubmitSalaryInput {
 }
 
 export const submitSalaryObservation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: SubmitSalaryInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const { supabase, userId } = context;
@@ -506,10 +530,10 @@ interface CompanyMonthlyInput {
 }
 
 export const getCompanyMonthly = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: CompanyMonthlyInput) => input)
   .handler(async ({ data, context }): Promise<CompanyMonthlyRow[]> => {
-    const { supabase } = context;
+    const supabase = await marketDb();
     const { data: rows, error } = await supabase.rpc("company_monthly", {
       _track_id: data.trackId,
       _company_id: data.companyId,

@@ -3,6 +3,26 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
+ * `market_demand` e `market_scope_stats` são SECURITY INVOKER e leem
+ * `job_postings` por dentro — e `authenticated` perdeu o SELECT nessa tabela
+ * (migration `20260903170000`, dado de mercado é pago). Por isso as duas RPCs
+ * rodam com `supabaseAdmin`.
+ *
+ * Aqui NÃO entra `requireActiveSubscription`, de propósito: computeGap alimenta
+ * a prévia grátis de `/` e `/analise`, que roda sem cadastro (regra 12). O que
+ * o visitante recebe é o número agregado — a aderência dele — nunca a lista de
+ * vagas, ferramentas, empresas ou salários que a sustenta. Essas moram em
+ * `market.functions.ts`/`jobs.functions.ts` e são pagas.
+ *
+ * Todo o resto deste arquivo continua no client do usuário, sob RLS: perfil,
+ * skills e análises são dados dele.
+ */
+async function marketDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+/**
  * compute-gap — ÚNICA fonte da fórmula de aderência do RUMVIA.
  * Nenhuma tela recalcula score por conta própria.
  *
@@ -208,7 +228,7 @@ export const computeGap = createServerFn({ method: "POST" })
         new Date(latest.computed_at).getTime() >= new Date(lastSkill.updated_at).getTime();
       const cachedStep = (latest.widening_step as WideningStep) ?? "base";
       const cfg = stepConfig(cachedStep, periodDays, seniority, marketSegment);
-      const { data: cachedStats } = await supabase.rpc("market_scope_stats", {
+      const { data: cachedStats } = await (await marketDb()).rpc("market_scope_stats", {
         _track_id: trackId,
         _seniorities: cfg.sen,
         _segments: cfg.seg,
@@ -291,14 +311,14 @@ export const computeGap = createServerFn({ method: "POST" })
 
     for (const s of steps) {
       const since = new Date(Date.now() - s.days * 24 * 60 * 60 * 1000).toISOString();
-      const { data: rows } = await supabase.rpc("market_demand", {
+      const { data: rows } = await (await marketDb()).rpc("market_demand", {
         _track_id: trackId,
         _seniorities: s.sen,
         _segments: s.seg,
         _since: since,
         _include_unranked: s.unranked,
       });
-      const { data: statRows } = await supabase.rpc("market_scope_stats", {
+      const { data: statRows } = await (await marketDb()).rpc("market_scope_stats", {
         _track_id: trackId,
         _seniorities: s.sen,
         _segments: s.seg,

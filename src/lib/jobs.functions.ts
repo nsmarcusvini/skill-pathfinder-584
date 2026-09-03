@@ -1,5 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireActiveSubscription } from "@/integrations/supabase/subscription-middleware";
+
+/**
+ * Vaga é dado de mercado, e dado de mercado é PAGO (CLAUDE.md, regra 12).
+ * Mesmo desenho de `market.functions.ts`: paywall no middleware + leitura por
+ * `supabaseAdmin`, porque `authenticated` perdeu o SELECT em `job_postings` e
+ * `job_posting_skills` na migration `20260903170000`. As leituras de
+ * `user_skills` aqui rodam sem RLS — o escopo vem do `.eq("user_id", userId)`,
+ * com `userId` saindo do JWT verificado, nunca do input.
+ */
+async function marketDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 /**
  * Listagem de vagas com cobertura de skills do usuário.
@@ -85,10 +99,11 @@ interface ListJobsInput {
 // ─── Lista ───────────────────────────────────────────────────────────────────
 
 export const listJobs = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: ListJobsInput) => input)
   .handler(async ({ data, context }): Promise<JobsPage> => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    const supabase = await marketDb();
     const limit = Math.min(data.limit ?? 25, 100);
     const offset = data.offset ?? 0;
 
@@ -212,10 +227,11 @@ export const listJobs = createServerFn({ method: "POST" })
 // ─── Detalhe ─────────────────────────────────────────────────────────────────
 
 export const getJobDetail = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { jobId: string }) => input)
   .handler(async ({ data, context }): Promise<JobDetail | null> => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    const supabase = await marketDb();
 
     const { data: job, error } = await supabase
       .from("job_postings")
@@ -315,10 +331,10 @@ export interface JobLocation {
  * cada um com parte das vagas.
  */
 export const listJobLocations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string; segment: string }) => input)
   .handler(async ({ data, context }): Promise<JobLocation[]> => {
-    const { data: rows, error } = await context.supabase.rpc("job_locations", {
+    const { data: rows, error } = await (await marketDb()).rpc("job_locations", {
       _track_id: data.trackId,
       _segments: [data.segment],
     });
