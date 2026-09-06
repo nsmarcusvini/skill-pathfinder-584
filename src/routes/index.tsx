@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { menorMensalidade, usePublicPlans } from "@/hooks/use-subscription";
 import {
   AVISO_ACESSO_PAGO,
+  AVISO_ARREPENDIMENTO,
   PLANO_INCLUI,
   PREVIA_GRATUITA,
   rotuloCiclo,
@@ -65,6 +66,10 @@ const FAQ_ITEMS = [
   {
     q: "Quanto custa e como cobram?",
     a: "Você escolhe o ciclo: mensal, trimestral ou anual. O acesso é o mesmo nos três — quanto mais longo o ciclo, menor o preço por mês. A cobrança é no cartão de crédito e renova automaticamente até você cancelar. Os três valores estão na seção Planos, acima. O pagamento é processado pelo Asaas — o RUMVIA nunca vê os dados do seu cartão. O cancelamento é feito por você mesmo em Configurações → Assinatura e vale na hora.",
+  },
+  {
+    q: "Posso desistir depois de assinar?",
+    a: `${AVISO_ARREPENDIMENTO} Depois disso, o cancelamento continua disponível a qualquer momento em Configurações → Assinatura, só que sem devolução do que já foi cobrado.`,
   },
   {
     q: "Como vocês analisam o currículo?",
@@ -578,6 +583,8 @@ function LandingPage() {
                 <p className="font-mono text-caption text-neutral-500">
                   envie o CV → veja a prévia → crie a conta → pague → painel liberado
                 </p>
+                {/* Dito antes do clique, não só no rodapé dos Termos. */}
+                <p className="text-caption text-neutral-500">{AVISO_ARREPENDIMENTO}</p>
               </div>
             </div>
           </div>
@@ -696,7 +703,7 @@ function LandingPage() {
                   title: "Legal",
                   links: [
                     { label: "Privacidade", href: "/privacidade" },
-                    { label: "Termos de uso", href: "#" },
+                    { label: "Termos de uso", href: "/termos" },
                     { label: "LGPD", href: "/privacidade" },
                   ],
                 },
@@ -732,7 +739,7 @@ function LandingPage() {
             <div className="flex gap-6">
               {[
                 { label: "Privacidade", href: "/privacidade" },
-                { label: "Termos", href: "#" },
+                { label: "Termos", href: "/termos" },
               ].map((l) => (
                 <a
                   key={l.label}

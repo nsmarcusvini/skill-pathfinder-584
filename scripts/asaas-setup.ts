@@ -129,6 +129,23 @@ for (const plan of plans) {
         `O checkout deste plano vai falhar.`,
     );
   }
+  // O checkout do RUMVIA usa chargeTypes: RECURRENT, e o Asaas recusa
+  // qualquer PIX ali — "CREDIT_CARD é o único método permitido para
+  // operações RECURRENT" (testado no sandbox, docs/PAGAMENTOS.md). Vale
+  // mesmo com CNPJ: o guard em `startSubscriptionCheckout` já bloqueia isso
+  // em runtime; aqui é o aviso em tempo de auditoria, antes de alguém tentar
+  // assinar de verdade e cair num 400 sem contexto.
+  if (plan.methods.includes("PIX")) {
+    console.error(
+      `  ✗ ${plan.key} lista PIX nos métodos, mas o checkout recorrente sempre recusa PIX ` +
+        `(chargeTypes: RECURRENT). ${
+          conta.personType === "FISICA"
+            ? "Conta também é pessoa física: PIX Automático de verdade exigiria CNPJ ativo há 6+ meses. "
+            : ""
+        }O código já bloqueia o checkout deste plano — corrija "methods" ou implemente o fluxo ` +
+        `de PIX Automático (API separada) antes de tirar o bloqueio.`,
+    );
+  }
 }
 
 // ─── 3. webhook ──────────────────────────────────────────────────────────────

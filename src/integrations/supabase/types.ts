@@ -1620,6 +1620,7 @@ export type Database = {
           current_period_start: string | null
           dev_mode: boolean
           external_id: string
+          first_activated_at: string | null
           id: string
           last_payment_at: string | null
           last_receipt_url: string | null
@@ -1629,6 +1630,7 @@ export type Database = {
           provider: string
           provider_checkout_id: string | null
           provider_customer_id: string | null
+          provider_payment_id: string | null
           provider_subscription_id: string | null
           status: string
           trial_ends_at: string | null
@@ -1646,6 +1648,7 @@ export type Database = {
           current_period_start?: string | null
           dev_mode?: boolean
           external_id: string
+          first_activated_at?: string | null
           id?: string
           last_payment_at?: string | null
           last_receipt_url?: string | null
@@ -1655,6 +1658,7 @@ export type Database = {
           provider?: string
           provider_checkout_id?: string | null
           provider_customer_id?: string | null
+          provider_payment_id?: string | null
           provider_subscription_id?: string | null
           status?: string
           trial_ends_at?: string | null
@@ -1672,6 +1676,7 @@ export type Database = {
           current_period_start?: string | null
           dev_mode?: boolean
           external_id?: string
+          first_activated_at?: string | null
           id?: string
           last_payment_at?: string | null
           last_receipt_url?: string | null
@@ -1681,6 +1686,7 @@ export type Database = {
           provider?: string
           provider_checkout_id?: string | null
           provider_customer_id?: string | null
+          provider_payment_id?: string | null
           provider_subscription_id?: string | null
           status?: string
           trial_ends_at?: string | null
@@ -1696,6 +1702,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      terms_acceptances: {
+        Row: {
+          accepted_at: string
+          id: string
+          user_id: string
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          id?: string
+          user_id: string
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          id?: string
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
       }
       track_role_variants: {
         Row: {

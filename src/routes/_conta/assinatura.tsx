@@ -20,6 +20,7 @@ import {
 import type { BillingPlan, MySubscription, SubscriptionStatus } from "@/lib/billing.functions";
 import {
   AVISO_ACESSO_PAGO,
+  AVISO_ARREPENDIMENTO,
   PLANO_INCLUI,
   rotuloCiclo,
   rotuloCobranca,
@@ -116,13 +117,23 @@ function AssinaturaPage() {
 
   async function cancelarAssinatura() {
     try {
-      await cancelar.mutateAsync();
+      const resultado = await cancelar.mutateAsync();
       setConfirmarCancelamento("");
-      toast.success("Assinatura cancelada. O acesso Pro termina agora.");
+      toast.success(
+        resultado.refunded
+          ? "Assinatura cancelada e valor estornado. O reembolso aparece no seu cartão em alguns dias."
+          : "Assinatura cancelada. O acesso Pro termina agora.",
+      );
     } catch (err) {
       toast.error((err as Error).message);
     }
   }
+
+  // Dentro dos 7 dias do CDC art. 49, cancelar também devolve o dinheiro —
+  // texto e efeito nascem juntos (docs/roadmap/conformidade-cobranca.md).
+  const dentroDoPrazoArrependimento =
+    subscription?.withdrawalDeadline != null &&
+    Date.now() <= new Date(subscription.withdrawalDeadline).getTime();
 
   // Checkout já aberto para ESTE plano: o link antigo ainda vale, não abrimos
   // outro. Trocar de ciclo cai no botão normal, que gera um checkout novo.
@@ -236,6 +247,13 @@ function AssinaturaPage() {
                 {AVISO_ACESSO_PAGO}
               </p>
 
+              {/* Dito antes do clique em "Assinar", não só depois: quem está
+                  prestes a pagar precisa ver isso agora, não descobrir só na
+                  hora de cancelar. */}
+              {!isPro ? (
+                <p className="mt-2 text-caption text-neutral-600">{AVISO_ARREPENDIMENTO}</p>
+              ) : null}
+
               {!plano.ready ? (
                 <p className="mt-3 text-caption text-danger">
                   Plano ainda não conectado ao gateway. Rode <code>bun scripts/asaas-setup.ts</code>
@@ -280,11 +298,20 @@ function AssinaturaPage() {
           {isPro ? (
             <Blueprint className="border-danger p-5">
               <h2 className="label-h6 text-danger">Cancelar assinatura</h2>
-              <p className="mt-1 text-caption text-neutral-700">
-                O cancelamento é <strong>imediato e irreversível</strong>: não há reembolso
-                proporcional e o acesso Pro termina na hora. Digite <strong>CANCELAR</strong> para
-                confirmar.
-              </p>
+              {dentroDoPrazoArrependimento ? (
+                <p className="mt-1 text-caption text-neutral-700">
+                  Você ainda está dentro do prazo de <strong>arrependimento (CDC art. 49)</strong>:
+                  cancelar agora <strong>devolve o valor pago na íntegra</strong>, sem desconto
+                  nenhum. O acesso Pro termina na hora. Digite <strong>CANCELAR</strong> para
+                  confirmar.
+                </p>
+              ) : (
+                <p className="mt-1 text-caption text-neutral-700">
+                  O cancelamento é <strong>imediato e irreversível</strong>: não há reembolso
+                  proporcional e o acesso Pro termina na hora. Digite <strong>CANCELAR</strong> para
+                  confirmar.
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Input
                   className="max-w-48"

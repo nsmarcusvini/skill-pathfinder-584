@@ -8,6 +8,7 @@ import { lovable } from "@/integrations/lovable";
 import type { Database } from "@/integrations/supabase/types";
 import { requestTurnstileToken } from "@/lib/turnstile";
 import { isAuthRateLimited, SIGNUP_COOLDOWN_MESSAGE } from "@/lib/signup-guard";
+import { TERMOS_PENDENTES_KEY } from "@/lib/legal-copy";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -154,6 +155,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const user = session?.user ?? null;
   const userId = user?.id ?? null;
+  const isAnonymousUser = Boolean(user?.is_anonymous);
+
+  // Registra o aceite dos Termos assim que existir sessão PERMANENTE — não no
+  // clique do checkbox, porque nesse momento pode não haver sessão ainda
+  // (signUp com confirmação de e-mail pendente) ou a sessão pode ainda estar
+  // marcada `is_anonymous` (convertAnonymousAccount só vira permanente depois
+  // da confirmação). O clique em /cadastro só grava a INTENÇÃO no
+  // localStorage; este efeito persiste assim que há alguém para persistir,
+  // não importa se isso leva segundos (fluxo normal) ou dias (confirmação
+  // atrasada) ou um redirect inteiro pelo Google (localStorage sobrevive).
+  React.useEffect(() => {
+    if (!user || isAnonymousUser) return;
+    let versao: string | null = null;
+    try {
+      versao = localStorage.getItem(TERMOS_PENDENTES_KEY);
+    } catch {
+      return;
+    }
+    if (!versao) return;
+    try {
+      localStorage.removeItem(TERMOS_PENDENTES_KEY);
+    } catch {
+      /* segue mesmo sem conseguir limpar — pior caso é tentar de novo */
+    }
+    void supabase
+      .from("terms_acceptances")
+      .insert({ user_id: user.id, version: versao })
+      .then(({ error }) => {
+        // 23505 = já tinha essa versão registrada (nova aba, StrictMode
+        // rodando o efeito duas vezes) — não é falha, é a idempotência
+        // fazendo o trabalho dela.
+        if (error && error.code !== "23505") {
+          console.error("Falha ao registrar aceite dos Termos de uso:", error.message);
+        }
+      });
+  }, [user, isAnonymousUser]);
 
   const profileQuery = useQuery({
     queryKey: ["profile", userId],

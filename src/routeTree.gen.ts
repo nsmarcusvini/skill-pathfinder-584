@@ -18,6 +18,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RecuperarSenhaRouteImport } from './routes/recuperar-senha'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as ContaAdminRouteImport } from './routes/_conta/admin'
 import { Route as ContaAssinaturaRouteImport } from './routes/_conta/assinatura'
 import { Route as ContaCertificacoesRouteImport } from './routes/_conta/certificacoes'
@@ -90,6 +91,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const RecuperarSenhaRoute = RecuperarSenhaRouteImport.update({
   id: '/recuperar-senha',
   path: '/recuperar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContaAdminRoute = ContaAdminRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/termos': typeof TermosRoute
   '/admin': typeof ContaAdminRouteWithChildren
   '/assinatura': typeof ContaAssinaturaRoute
   '/certificacoes': typeof ContaCertificacoesRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/termos': typeof TermosRoute
   '/assinatura': typeof ContaAssinaturaRoute
   '/certificacoes': typeof ContaCertificacoesRoute
   '/conta': typeof ContaContaRoute
@@ -328,6 +336,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/privacidade': typeof PrivacidadeRoute
   '/recuperar-senha': typeof RecuperarSenhaRoute
+  '/termos': typeof TermosRoute
   '/_conta/admin': typeof ContaAdminRouteWithChildren
   '/_conta/assinatura': typeof ContaAssinaturaRoute
   '/_conta/certificacoes': typeof ContaCertificacoesRoute
@@ -369,6 +378,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacidade'
     | '/recuperar-senha'
+    | '/termos'
     | '/admin'
     | '/assinatura'
     | '/certificacoes'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacidade'
     | '/recuperar-senha'
+    | '/termos'
     | '/assinatura'
     | '/certificacoes'
     | '/conta'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacidade'
     | '/recuperar-senha'
+    | '/termos'
     | '/_conta/admin'
     | '/_conta/assinatura'
     | '/_conta/certificacoes'
@@ -488,6 +500,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   RecuperarSenhaRoute: typeof RecuperarSenhaRoute
+  TermosRoute: typeof TermosRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   ApiPublicAsaasWebhookRoute: typeof ApiPublicAsaasWebhookRoute
   ApiPublicExtractJdSkillsRoute: typeof ApiPublicExtractJdSkillsRoute
@@ -560,6 +573,13 @@ declare module '@tanstack/react-router' {
       path: '/recuperar-senha'
       fullPath: '/recuperar-senha'
       preLoaderRoute: typeof RecuperarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_conta/admin': {
@@ -840,6 +860,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   RecuperarSenhaRoute: RecuperarSenhaRoute,
+  TermosRoute: TermosRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   ApiPublicAsaasWebhookRoute: ApiPublicAsaasWebhookRoute,
   ApiPublicExtractJdSkillsRoute: ApiPublicExtractJdSkillsRoute,

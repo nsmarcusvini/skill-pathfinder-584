@@ -108,6 +108,42 @@ falhas, deploy fora do ar, domínio trocado).
 
 ---
 
+## Direito de arrependimento (CDC art. 49)
+
+Sete dias corridos a partir da **primeira** cobrança confirmada — nunca da mais recente —
+para desistir com **devolução integral**, nunca proporcional. Implementado em
+2026-09-05 (`docs/roadmap/conformidade-cobranca.md`, item 1).
+
+```
+subscriptions.first_activated_at  ← gravado UMA VEZ, no primeiro PAYMENT_CONFIRMED/RECEIVED
+                                     (webhook.server.ts). Nunca sobrescrito em renovação —
+                                     é por isso que existe separado de current_period_start,
+                                     que É sobrescrito a cada ciclo.
+subscriptions.provider_payment_id ← pay_... aprendido em QUALQUER webhook PAYMENT_*, para
+                                     achar a cobrança a estornar sem consultar a API na hora.
+```
+
+`getBillingOverview` devolve `subscription.withdrawalDeadline` (calculado no servidor —
+o front só exibe, nunca decide). `cancelMySubscription` recalcula a janela por conta
+própria a cada chamada; dentro dela, o cancelamento também chama
+`asaas.refundPayment(paymentId)` **antes** de cancelar a assinatura no Asaas, e grava
+`cancelled_due_to = 'arrependimento_cdc'` em vez de `'cancelled_by_user'`. O status final
+`refunded` é gravado pelo webhook (`PAYMENT_REFUNDED`), não pela server function — mesmo
+padrão do cancelamento comum, que também não antecipa o que o Asaas vai confirmar depois.
+
+**Estorno de cartão é imediato no Asaas.** Testado no sandbox em 2026-09-05:
+`POST /payments/{id}/refund` devolve `status: "REFUNDED"` na hora, sem espera — diferente
+de PIX, que teria fluxo próprio. Um segundo pedido de estorno na mesma cobrança devolve
+`400 — "Não é possível cancelar a venda."`; `cancelMySubscription` trata esse erro
+especificamente como sucesso (idempotência), porque o dinheiro já voltou e um duplo clique
+não pode virar erro para o usuário.
+
+Sem `provider_payment_id` gravado (dado antigo, ou correlação que não chegou ainda),
+`cancelMySubscription` cai para `asaas.listPaymentsBySubscription()` antes de desistir — o
+direito não pode depender de um campo estar preenchido.
+
+---
+
 ## O que foi criado
 
 | Arquivo | Papel |
@@ -123,6 +159,10 @@ falhas, deploy fora do ar, domínio trocado).
 | `src/routes/api/public/asaas-webhook.ts` | Rota HTTP fina |
 | `src/lib/billing.functions.ts` | `getBillingOverview`, `getPublicPlans`, `startSubscriptionCheckout(planKey)`, `cancelMySubscription` |
 | `scripts/asaas-reconcile.ts` | Repara assinatura presa (webhook perdido ou órfão) |
+| `scripts/relatorio-faturamento.ts` | Faturamento por mês a partir de `billing_events` — base numérica para o contador |
+| `src/routes/termos.tsx` | Termos de uso — versão + identificação do fornecedor (⚠️ pendente, ver `src/lib/legal-copy.ts`) |
+| `src/lib/legal-copy.ts` | Identificação do fornecedor e versão dos Termos, em um lugar só |
+| `supabase/migrations/20260905155813_conformidade_arrependimento_e_termos.sql` | `first_activated_at`, `provider_payment_id`, `terms_acceptances` |
 | `src/integrations/supabase/subscription-middleware.ts` | `requireActiveSubscription` — trava server-side |
 | `src/hooks/use-subscription.tsx` | `useSubscription()`, `useStartCheckout()`, `useCancelSubscription()` |
 | `src/components/rumvia/paywall.tsx` | `<Paywall>`, `<PaywallCard>`, `formatCents()` |

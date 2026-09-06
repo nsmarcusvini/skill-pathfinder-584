@@ -245,6 +245,21 @@ export const asaas = {
       `/payments?subscription=${encodeURIComponent(subscriptionId)}&limit=${limit}`,
     ),
 
+  /**
+   * Estorna uma cobrança — usado pelo direito de arrependimento (CDC art. 49):
+   * dentro de 7 dias da primeira cobrança, a devolução é integral, nunca
+   * proporcional. Sem `value`, o Asaas estorna o valor total da cobrança.
+   *
+   * Idempotente na prática: pedir estorno de uma cobrança já estornada
+   * devolve 400 com uma mensagem de erro do Asaas (não uma exceção de rede) —
+   * quem chama trata esse caso para não travar um cancelamento repetido.
+   */
+  refundPayment: (paymentId: string, input?: { value?: number; description?: string }) =>
+    request<AsaasPayment>("POST", `/payments/${paymentId}/refund`, {
+      ...(input?.value !== undefined ? { value: input.value } : {}),
+      description: input?.description ?? "Direito de arrependimento (CDC art. 49)",
+    }),
+
   // ─── Clientes ──────────────────────────────────────────────────────────────
   getCustomer: (customerId: string) => request<AsaasCustomer>("GET", `/customers/${customerId}`),
 

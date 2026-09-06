@@ -138,9 +138,12 @@ type SubscriptionRow = {
   status: string;
   current_period_end: string | null;
   plan_id: string;
+  first_activated_at: string | null;
+  cancelled_due_to: string | null;
 };
 
-const SELECT = "id, user_id, status, current_period_end, plan_id";
+const SELECT =
+  "id, user_id, status, current_period_end, plan_id, first_activated_at, cancelled_due_to";
 
 /**
  * Localiza a assinatura local, do elo mais forte ao mais fraco.
@@ -267,6 +270,10 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
   // acham a linha direto pelo id da assinatura.
   const learnedSubId = payment?.subscription ?? remoteSub?.id ?? null;
   if (learnedSubId) patch.provider_subscription_id = learnedSubId;
+  // Aprende o pay_... da cobrança mais recente — é o que cancelMySubscription
+  // usa para estornar sem precisar consultar a API na hora do pedido
+  // (docs/roadmap/conformidade-cobranca.md, item 1).
+  if (payment?.id) patch.provider_payment_id = payment.id;
 
   switch (event) {
     // ─── dinheiro entrou ─────────────────────────────────────────────────────
@@ -308,6 +315,10 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
       patch.cancelled_at = null;
       patch.cancelled_due_to = null;
       if (payment?.transactionReceiptUrl) patch.last_receipt_url = payment.transactionReceiptUrl;
+      // Gravado UMA VEZ — nunca sobrescrito numa renovação. É a data que conta
+      // os 7 dias do direito de arrependimento (CDC art. 49), calculada a
+      // partir do primeiro pagamento, não do ciclo atual.
+      if (!subscription.first_activated_at) patch.first_activated_at = start.toISOString();
       break;
     }
 
@@ -322,7 +333,12 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
     case "PAYMENT_REFUNDED": {
       patch.status = "refunded";
       patch.cancelled_at = new Date().toISOString();
-      patch.cancelled_due_to = "refunded";
+      // Se `cancelMySubscription` já marcou o motivo como arrependimento (o
+      // pedido de estorno partiu do usuário, dentro do prazo do CDC), esse
+      // motivo é mais específico que "refunded" genérico — não sobrescrever.
+      if (subscription.cancelled_due_to !== "arrependimento_cdc") {
+        patch.cancelled_due_to = "refunded";
+      }
       break;
     }
 

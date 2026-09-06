@@ -31,6 +31,20 @@ export const PLANO_INCLUI = [
 export const AVISO_ACESSO_PAGO = "A conta só é liberada depois que a assinatura for confirmada.";
 
 /**
+ * Direito de arrependimento (CDC art. 49): 7 dias corridos da primeira
+ * cobrança, com devolução INTEGRAL — nunca proporcional. Dito antes do
+ * clique, não só na letra miúda: landing, `/assinatura` e Termos de uso leem
+ * daqui, para as três telas nunca divergirem sobre o prazo ou o efeito.
+ */
+export const DIAS_ARREPENDIMENTO = 7;
+
+export const AVISO_ARREPENDIMENTO =
+  `Direito de arrependimento: você tem ${DIAS_ARREPENDIMENTO} dias corridos após a primeira ` +
+  "cobrança para desistir e receber o valor pago de volta, na íntegra (Código de Defesa do " +
+  "Consumidor, art. 49). Depois desse prazo, o cancelamento continua imediato, mas sem " +
+  "reembolso proporcional do que já foi cobrado.";
+
+/**
  * Ciclo do Asaas → português. Chave crua do gateway (`billing_plans.cycle`),
  * para que a tradução exista em um lugar só.
  */

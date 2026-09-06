@@ -10,11 +10,13 @@ import { GoogleButton } from "@/components/auth/google-button";
 import { LoadingState } from "@/components/rumvia/states";
 import { AVISO_ACESSO_PAGO } from "@/lib/plan-copy";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentCv, hasExtractedCv } from "@/hooks/use-current-cv";
 import { signUpSchema, type SignUpValues } from "@/lib/auth-schemas";
 import { markSignupAttempt, secondsUntilSignupAllowed } from "@/lib/signup-guard";
+import { TERMOS_PENDENTES_KEY, TERMOS_VERSAO } from "@/lib/legal-copy";
 
 export const Route = createFileRoute("/cadastro")({
   // Depende de sessão (useAuth) e de uma leitura no banco (useCurrentCv) para
@@ -34,6 +36,21 @@ export const Route = createFileRoute("/cadastro")({
   }),
   component: CadastroPage,
 });
+
+// Grava a INTENÇÃO no localStorage antes de disparar signUp/Google — a sessão
+// permanente pode só existir depois (confirmação de e-mail) ou depois de um
+// redirect inteiro pelo provedor OAuth. use-auth.tsx lê essa chave e persiste
+// o aceite assim que houver sessão permanente de verdade. Função de módulo
+// (não fecha sobre nenhum state do componente) para não entrar em nenhum
+// array de dependências.
+function marcarIntencaoDeAceite() {
+  try {
+    localStorage.setItem(TERMOS_PENDENTES_KEY, TERMOS_VERSAO);
+  } catch {
+    /* modo privado ou storage bloqueado — o checkbox já barrou quem não
+       concordou; sem registro em terms_acceptances, mas sem contradição. */
+  }
+}
 
 function CadastroPage() {
   const auth = useAuth();
@@ -69,10 +86,16 @@ function CadastroPage() {
   // validação do zod resolver rodar, um microtask): num duplo clique bem
   // rápido, o segundo clique pode chegar antes do botão desabilitar.
   const enviandoRef = React.useRef(false);
+  const [aceitaTermos, setAceitaTermos] = React.useState(false);
 
   const onSubmit = React.useCallback(
     async (values: SignUpValues) => {
       if (enviandoRef.current) return;
+
+      if (!aceitaTermos) {
+        toast.error("Você precisa concordar com os Termos de uso para criar a conta.");
+        return;
+      }
 
       // Cooldown por e-mail ANTES de qualquer chamada de rede — impede o
       // 429 em vez de só reagir a ele. Cobre também o caso de um 429
@@ -87,6 +110,7 @@ function CadastroPage() {
 
       enviandoRef.current = true;
       markSignupAttempt(values.email);
+      marcarIntencaoDeAceite();
       try {
         // Visitante anônimo: convertemos a MESMA conta, preservando o
         // user.id e tudo que já foi analisado nesta sessão.
@@ -117,7 +141,7 @@ function CadastroPage() {
         enviandoRef.current = false;
       }
     },
-    [auth, navigate],
+    [auth, navigate, aceitaTermos],
   );
 
   if (carregando || semCv) {
@@ -209,6 +233,24 @@ function CadastroPage() {
           />
           <FieldError message={form.formState.errors.passwordConfirm?.message} />
         </div>
+        <label className="flex items-start gap-2 text-caption text-neutral-700">
+          <Checkbox
+            checked={aceitaTermos}
+            onCheckedChange={(v) => setAceitaTermos(v === true)}
+            className="mt-0.5"
+          />
+          <span>
+            Li e concordo com os{" "}
+            <Link to="/termos" target="_blank" className="text-accent-700 underline">
+              Termos de uso
+            </Link>{" "}
+            e a{" "}
+            <Link to="/privacidade" target="_blank" className="text-accent-700 underline">
+              Política de Privacidade
+            </Link>
+            .
+          </span>
+        </label>
         <Button type="submit" loading={form.formState.isSubmitting}>
           Criar conta e ir para o pagamento
         </Button>
@@ -226,6 +268,11 @@ function CadastroPage() {
       <GoogleButton
         label={auth.isAnonymous ? "Vincular conta Google" : "Continuar com Google"}
         onClick={async () => {
+          if (!aceitaTermos) {
+            toast.error("Você precisa concordar com os Termos de uso para continuar.");
+            return;
+          }
+          marcarIntencaoDeAceite();
           const { error } = await auth.signInWithGoogle();
           if (error) toast.error(error);
         }}
