@@ -146,6 +146,14 @@ const SELECT =
   "id, user_id, status, current_period_end, plan_id, first_activated_at, cancelled_due_to";
 
 /**
+ * Status que contam como "assinatura viva". Espelha exatamente o WHERE do
+ * índice `uq_subscriptions_user_viva` (UNIQUE por user_id) — se um dia o índice
+ * mudar, esta lista muda junto, senão a guarda em `applyEvent` para de valer.
+ */
+const LIVE_STATUSES = ["pending", "active", "past_due"] as const;
+type LiveStatus = (typeof LIVE_STATUSES)[number];
+
+/**
  * Localiza a assinatura local, do elo mais forte ao mais fraco.
  *
  * ⚠️ O elo que REALMENTE chega é o `checkoutSession`, não o `externalReference`.
@@ -213,16 +221,26 @@ async function findSubscription(payload: AsaasWebhookPayload): Promise<Subscript
     }
   }
 
-  // Último recurso: cliente com assinatura viva.
+  // Último recurso: pelo cliente.
+  //
+  // Para dinheiro ENTRANDO, só assinatura viva: casar um pagamento solto com uma
+  // assinatura já cancelada a ressuscitaria, e o dono do dinheiro pode ser outro
+  // contrato.
+  //
+  // Para estorno e chargeback é o contrário — são eventos de ENCERRAMENTO, e a
+  // linha que eles procuram quase sempre já está fora do estado vivo (o usuário
+  // cancelou e o estorno veio depois). Filtrar por vivo aqui fazia o estorno não
+  // achar nada e o registro de `refunded`/`chargeback` se perder, justamente o
+  // que a conferência de reembolso precisa enxergar. Eles não dão acesso a
+  // ninguém, então ampliar o alcance não cria risco.
   if (customerId) {
-    const { data } = await supabaseAdmin
-      .from("subscriptions")
-      .select(SELECT)
-      .eq("provider_customer_id", customerId)
-      .in("status", ["pending", "active", "past_due"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const encerramento =
+      payload.event === "PAYMENT_REFUNDED" || payload.event === "PAYMENT_CHARGEBACK_REQUESTED";
+
+    let query = supabaseAdmin.from("subscriptions").select(SELECT).eq("provider_customer_id", customerId);
+    if (!encerramento) query = query.in("status", ["pending", "active", "past_due"]);
+
+    const { data } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (data) return data as SubscriptionRow;
   }
 
@@ -369,6 +387,55 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
     // (customer, método, sub_...), então cai no update comum em vez de sair.
     default:
       break;
+  }
+
+  // ─── Guarda: evento atrasado não ressuscita assinatura superada ─────────────
+  //
+  // `uq_subscriptions_user_viva` é UNIQUE(user_id) WHERE status IN
+  // ('pending','active','past_due') — uma assinatura viva por pessoa. Como o
+  // INSERT do checkout já respeita esse índice, dois vivos nunca nascem juntos;
+  // o que acontece é o inverso: a assinatura velha é cancelada, a pessoa assina
+  // de novo, e aí chega um evento ATRASADO da velha (OVERDUE, CONFIRMED) que
+  // tentaria devolvê-la para um status vivo. Isso estourava o índice, o update
+  // inteiro falhava e o evento morria com `handled: false` — foi o que
+  // aconteceu em 2026-09-03 ("duplicate key value violates unique constraint").
+  //
+  // A resposta certa NÃO é fechar a outra para abrir espaço: a vigente pode ser
+  // de alguém pagando agora, e derrubá-la tiraria acesso de cliente adimplente.
+  // Quem manda é a linha viva; o evento atrasado perde a parte de status e
+  // mantém o resto (customer, método, sub_..., recibo), que continua sendo
+  // informação boa.
+  if (patch.status && LIVE_STATUSES.includes(patch.status as LiveStatus)) {
+    const { data: outraViva } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, status")
+      .eq("user_id", subscription.user_id)
+      .in("status", LIVE_STATUSES as unknown as string[])
+      .neq("id", subscription.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (outraViva) {
+      const recusado = patch.status;
+      delete patch.status;
+      const reason =
+        `${event}: status "${recusado}" recusado — o usuário já tem a assinatura ` +
+        `${outraViva.id} viva (${outraViva.status}). Evento atrasado de uma ` +
+        `assinatura superada; o resto do payload foi gravado.`;
+      console.warn(`[asaas] ${reason} (${payload.id})`);
+
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabaseAdmin
+          .from("subscriptions")
+          .update(patch)
+          .eq("id", subscription.id);
+        if (error) throw new Error(error.message);
+      }
+      // `applied: false` de propósito: o efeito que o evento pedia não valeu.
+      // `handled` fica false e o motivo entra em `handle_error`, para o evento
+      // aparecer na conferência em vez de sumir como se tivesse dado certo.
+      return { subscriptionId: subscription.id, applied: false, reason };
+    }
   }
 
   if (Object.keys(patch).length > 0) {
