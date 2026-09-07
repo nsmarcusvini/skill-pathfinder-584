@@ -2,19 +2,16 @@
  * Identificação do fornecedor e versionamento dos Termos de uso, em um lugar
  * só — `termos.tsx` e o registro de aceite (`use-auth.tsx`) leem daqui.
  *
- * ⚠️ FORNECEDOR é PLACEHOLDER. O CDC exige identificação de quem vende — nome,
- * documento (CPF enquanto pessoa física) e um canal de contato — publicada
- * nos Termos. São dados pessoais reais que este código não pode inventar
- * (CLAUDE.md: "Nunca invente dado"). Preencha antes de considerar a página
- * pronta para produção; até lá, `termos.tsx` deixa isso visível como
- * pendência em vez de fingir que está preenchido.
- * Ver docs/roadmap/conformidade-cobranca.md, item 2.
+ * Pessoa física, publicado no Termos porque o CDC exige identificação de
+ * quem vende (docs/roadmap/conformidade-cobranca.md, item 2). Preenchido
+ * pelo próprio responsável em 2026-09-07, com confirmação explícita de que
+ * topa publicar o CPF.
  */
 export const FORNECEDOR = {
-  nome: null as string | null,
-  documento: null as string | null,
-  cidadeUf: null as string | null,
-  contato: null as string | null,
+  nome: "Marcus Vinicius Nascimento Souza",
+  documento: "CPF 526.985.108-38",
+  cidadeUf: "São Paulo/SP",
+  contato: "eu.marcussouza@gmail.com",
 };
 
 /**

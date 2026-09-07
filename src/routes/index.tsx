@@ -17,6 +17,7 @@ import {
   rotuloPeriodo,
 } from "@/lib/plan-copy";
 import { getLandingStats } from "@/lib/public-stats.functions";
+import { FORNECEDOR } from "@/lib/legal-copy";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -706,6 +707,13 @@ function LandingPage() {
                     { label: "Termos de uso", href: "/termos" },
                     { label: "LGPD", href: "/privacidade" },
                   ],
+                },
+                {
+                  title: "Contato",
+                  // `privacidade.tsx` promete "o e-mail de contato informado
+                  // no rodapé" para pedidos de exclusão de quem não tem
+                  // conta — este é o único lugar onde ele existe.
+                  links: [{ label: FORNECEDOR.contato, href: `mailto:${FORNECEDOR.contato}` }],
                 },
               ].map((col) => (
                 <div key={col.title} className="flex flex-col gap-2">
