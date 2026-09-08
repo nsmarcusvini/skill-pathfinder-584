@@ -351,15 +351,24 @@ feature.
   PIX Automático (via separada, para recorrência de verdade) exige recebedor **pessoa
   jurídica**, regra do Banco Central. O RUMVIA é pessoa física.
 
-- **Mas o Asaas TEM PIX avulso, e ele funciona nesta conta.** Estava bloqueado só por
-  falta de chave PIX cadastrada (`"Para gerar cobranças com Pix é necessário criar uma
-  chave Pix no Asaas"`). Com a chave criada, `chargeTypes: ["DETACHED"]` +
-  `billingTypes: ["PIX"]` devolve 200. Isso abre a possibilidade de oferecer PIX como
-  **renovação manual mensal** ao lado do cartão automático — no mesmo gateway, mesmo
-  webhook, mesmo schema. Não implementado: exige fluxo de lembrete antes do vencimento e
-  tem retenção pior que débito automático. Decisão de produto em aberto.
-  ⚠️ Em produção a chave PIX precisa ser criada de novo (sandbox e produção são contas
-  separadas).
+- **PIX avulso: IMPLEMENTADO em 2026-09-08** (era "decisão de produto em aberto" até
+  aqui). `chargeTypes: ["DETACHED"]` + `billingTypes: ["PIX"]`, no mesmo checkout
+  hospedado do cartão — então o Asaas continua coletando os dados do cliente e o RUMVIA
+  segue sem tocar em CPF. Mesmo gateway, mesmo webhook, mesmo schema.
+
+  **É pré-pago, não assinatura:** cada pagamento compra UM período e não renova. Quando
+  `current_period_end` passa, o acesso cai sozinho (quem decide é
+  `has_active_subscription`, comparando a data). O cron `rumvia-expira-avisa-pix`
+  (diário, 9h) avisa 3 dias antes e marca a linha vencida como `expired` — este é o
+  "fluxo de lembrete" que faltava, e é o que torna o pré-pago defensável apesar da
+  retenção pior.
+
+  ⚠️ **PRÉ-REQUISITO OPERACIONAL: a conta precisa de uma CHAVE PIX cadastrada.** Sem ela
+  o Asaas recusa com *"Para gerar cobranças com Pix é necessário criar uma chave Pix no
+  Asaas"*. **Sandbox e produção são contas separadas: a chave criada em homologação NÃO
+  vale em produção** — crie de novo em Asaas → PIX → Minhas chaves antes de anunciar PIX
+  aos clientes. `startSubscriptionCheckout` traduz esse erro para uma mensagem que o
+  cliente entende ("use cartão") e registra o diagnóstico real no log do servidor.
 - **Sessão anônima não assina.** A assinatura precisa sobreviver à troca de dispositivo.
 - **`past_due` ainda conta como pagante** enquanto o Asaas retenta. Cortar no primeiro
   vencimento gera mais churn que fraude evitada.
@@ -370,10 +379,23 @@ feature.
 
 ## Quando houver CNPJ (6+ meses)
 
-Habilitar PIX Automático no painel do Asaas e rodar
-`UPDATE billing_plans SET methods = ARRAY['CARD','PIX']`. O `billingTypes` do checkout
-passa a incluir PIX. **Zero mudança de arquitetura** — foi o motivo de escolher Asaas em
-vez de Stripe.
+⚠️ **Não confunda com o PIX que já existe.** `methods = ARRAY['CARD','PIX']` já está
+ligado nos três planos e é o que habilita o **PIX avulso** (pré-pago, DETACHED). Rodar
+esse UPDATE de novo não traz PIX Automático.
+
+PIX Automático é **outra API** — `/v3/pix/automatic/*`, com modelo de autorização +
+instrução de cobrança por ciclo, nada a ver com `POST /checkouts`. Habilitar exige, nesta
+ordem:
+
+1. CNPJ com 6+ meses de atividade (regra do Asaas) — e recebedor PJ é regra do Banco
+   Central para PIX Automático, não do gateway.
+2. Pedir a habilitação ao suporte do Asaas para a conta.
+3. **Implementar o fluxo novo**: `POST /v3/pix/automatic/authorizations`, as instruções
+   de pagamento por ciclo, as retentativas, e os eventos `PIX_AUTOMATIC_RECURRING_*` no
+   webhook. Isso é projeto, não ajuste de configuração.
+
+O que continua verdade é o motivo de ter escolhido o Asaas: o caminho existe. A Stripe
+fecha essa porta para sempre em conta BR.
 
 ---
 

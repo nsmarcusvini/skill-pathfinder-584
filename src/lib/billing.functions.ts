@@ -163,6 +163,22 @@ function appBaseUrl(): string {
   throw new Error("APP_BASE_URL não configurado e origem da requisição indisponível.");
 }
 
+/**
+ * Domínio que está REALMENTE servindo esta requisição — não o configurado.
+ *
+ * A guarda de "sandbox em produção" logo abaixo não pode usar `appBaseUrl()`:
+ * aquela função prioriza a variável de ambiente `APP_BASE_URL` (fixada em
+ * `rumvia.com.br` até em dev local, porque também serve para montar o link de
+ * callback do checkout). Usar `appBaseUrl()` aqui faria a guarda disparar
+ * sempre — inclusive em localhost — bloqueando o teste de checkout em
+ * sandbox que `docs/PAGAMENTOS.md` descreve como fluxo normal de dev.
+ */
+function isServingProductionDomain(): boolean {
+  const request = getRequest();
+  const host = request?.headers.get("host") ?? (request?.url ? new URL(request.url).host : "");
+  return host.includes("rumvia.com.br");
+}
+
 function isAnonymous(claims: Record<string, unknown>): boolean {
   return claims["is_anonymous"] === true || claims["is_anonymous"] === "true";
 }
@@ -360,7 +376,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     // detectado por acaso, pelo `dev_mode` de um evento de teste — esta guarda
     // existe para que da próxima vez não dependa de sorte.
     const { isSandboxKey } = await import("@/lib/asaas/client.server");
-    if (isSandboxKey() && appBaseUrl().includes("rumvia.com.br")) {
+    if (isSandboxKey() && isServingProductionDomain()) {
       throw new Error(
         "Checkout bloqueado: a ASAAS_API_KEY é de homologação (_hmlg_) e o app está " +
           "servindo o domínio de produção. Ninguém deve pagar num checkout de sandbox. " +
@@ -426,20 +442,46 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     // Asaas e cair num tipo de cobrança que não combina com o chargeType.
     const isPix = data.method === "PIX";
 
-    const checkout = await asaas.createCheckout({
-      value: reaisFromCents(plan.price_cents),
-      name: plan.name,
-      description: plan.description ?? plan.name,
-      // Vai cru: `billing_plans.cycle` já está no vocabulário do Asaas.
-      cycle: plan.cycle,
-      nextDueDate: hoje,
-      externalReference: externalId,
-      successUrl: `${base}/assinatura?status=sucesso`,
-      cancelUrl: `${base}/assinatura`,
-      expiredUrl: `${base}/assinatura`,
-      billingTypes: [isPix ? "PIX" : "CREDIT_CARD"],
-      chargeType: isPix ? "DETACHED" : "RECURRENT",
-    });
+    let checkout;
+    try {
+      checkout = await asaas.createCheckout({
+        value: reaisFromCents(plan.price_cents),
+        name: plan.name,
+        description: plan.description ?? plan.name,
+        // Vai cru: `billing_plans.cycle` já está no vocabulário do Asaas.
+        cycle: plan.cycle,
+        nextDueDate: hoje,
+        externalReference: externalId,
+        successUrl: `${base}/assinatura?status=sucesso`,
+        cancelUrl: `${base}/assinatura`,
+        expiredUrl: `${base}/assinatura`,
+        billingTypes: [isPix ? "PIX" : "CREDIT_CARD"],
+        chargeType: isPix ? "DETACHED" : "RECURRENT",
+      });
+    } catch (error) {
+      // Cobrança PIX exige uma CHAVE PIX cadastrada na conta Asaas, e sandbox e
+      // produção são contas separadas — a chave criada em homologação não vale
+      // em produção (docs/PAGAMENTOS.md). Sem ela o Asaas devolve
+      // "Para gerar cobranças com Pix é necessário criar uma chave Pix no Asaas".
+      //
+      // Essa mensagem é instrução para o DONO da conta, não para quem está
+      // tentando pagar. Sem esta tradução ela cairia crua num toast na tela do
+      // cliente, que não tem o que fazer com ela. Trocamos por algo acionável
+      // (use cartão) e deixamos o diagnóstico no log do servidor.
+      const bruto = error instanceof Error ? error.message : String(error);
+      if (isPix && bruto.toLowerCase().includes("chave pix")) {
+        console.error(
+          `[billing] checkout PIX recusado: falta chave PIX na conta Asaas ` +
+            `(${isSandboxKey() ? "sandbox" : "produção"}). Crie em Asaas → PIX → Minhas chaves. ` +
+            `Mensagem do gateway: ${bruto}`,
+        );
+        throw new Error(
+          "O pagamento por PIX está temporariamente indisponível. Use cartão de crédito " +
+            "ou tente novamente mais tarde.",
+        );
+      }
+      throw error;
+    }
 
     const row = {
       user_id: userId,
@@ -478,9 +520,7 @@ export const cancelMySubscription = createServerFn({ method: "POST" })
 
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
-      .select(
-        "id, status, provider_subscription_id, provider_payment_id, first_activated_at",
-      )
+      .select("id, status, provider_subscription_id, provider_payment_id, first_activated_at")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
