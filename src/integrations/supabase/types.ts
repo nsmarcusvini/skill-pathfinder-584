@@ -1731,6 +1731,7 @@ export type Database = {
           is_active: boolean
           key: string
           name: string
+          priority: number
           search_terms: string[]
           sort_order: number
           track_id: string
@@ -1741,6 +1742,7 @@ export type Database = {
           is_active?: boolean
           key: string
           name: string
+          priority?: number
           search_terms?: string[]
           sort_order?: number
           track_id: string
@@ -1751,6 +1753,7 @@ export type Database = {
           is_active?: boolean
           key?: string
           name?: string
+          priority?: number
           search_terms?: string[]
           sort_order?: number
           track_id?: string

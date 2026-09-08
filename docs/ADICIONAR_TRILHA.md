@@ -46,17 +46,37 @@ ON CONFLICT (track_id, key) DO NOTHING;
 ### Cuidado com os `search_terms`
 
 `classifyTrack` (em `src/lib/ingest/pipeline.server.ts`) compara cada termo com
-`title_normalized` usando **substring**, e o **termo mais longo vence**. E
-`normalizeTitle` (`src/lib/ingest/normalize.ts`) já tirou acento, passou para minúsculas
-e trocou hífen por espaço antes disso.
+`title_normalized` usando **substring**. Entre os termos que casam, vence o de maior
+`priority`; só em caso de empate vence o **termo mais longo**. E `normalizeTitle`
+(`src/lib/ingest/normalize.ts`) já tirou acento, passou para minúsculas e trocou hífen
+por espaço antes disso.
 
 Consequências práticas:
 
 - termo com hífen (`front-end`) **nunca casa** numa vaga — inclua também `front end`;
 - termo com acento nunca casa na ingestão (inclua a forma sem acento; a forma acentuada
   ainda serve para o `detectTrackAndSeniority` do parser de CV, que normaliza os dois lados);
-- termo muito curto rouba vaga de outra trilha só quando nenhum termo mais longo casar —
-  prefira termos de 8+ caracteres.
+- termo genérico e comprido **rouba** vaga de trilha específica se estiver na mesma
+  prioridade — resolva com `priority`, não encurtando o termo.
+
+### `priority`: quem ganha quando dois termos casam
+
+Antes de 2026-09-08 o desempate era só o tamanho do termo, e isso classificava errado:
+`"Senior Backend Software Engineer"` casava com `backend` (7 chars, trilha Back-End) e
+com `software engineer` (17 chars, pega-tudo do Fullstack) — o segundo vencia. Vinte
+vagas com "Backend"/"Frontend" no próprio título estavam arquivadas em Fullstack.
+
+A escala em uso hoje:
+
+| `priority` | Para quê | Exemplo |
+|---|---|---|
+| **20** | afirmação decisiva sobre o escopo do cargo | `fullstack_developer` — "Fullstack React Developer" é fullstack, não front |
+| **10** | variante específica (padrão) | `backend_developer`, `sre`, `qa_engineer` |
+| **0** | pega-tudo: só vale se nada específico casar | `web_developer`, `product_engineer` ("software engineer") |
+
+Trilha nova nasce em 10 e normalmente é isso que você quer. Mexa na prioridade só se a
+variante for genérica a ponto de atropelar outras (baixe para 0) ou se ela descrever o
+cargo inteiro e deva vencer variantes específicas (suba para 20).
 
 ---
 
@@ -160,25 +180,21 @@ duração não são conhecidos, deixe `NULL` — a UI trata, e inventar número 
 
 ## Passo 4 — Classificar as vagas já ingeridas
 
-Vagas antigas cujo título casa com as variantes novas continuam com `track_id IS NULL`
-(a ingestão só reclassifica o que revê). Dá para atribuir direto, com o mesmo critério do
-`classifyTrack` — substring em `title_normalized`, termo mais longo vence:
+Vagas antigas continuam com a classificação que tinham no dia em que foram ingeridas —
+a ingestão só reclassifica o que revê, e uma vaga que sumiu da fonte nunca mais é
+revista. Use o script:
 
-```sql
-WITH escolha AS (
-  SELECT DISTINCT ON (jp.id) jp.id AS job_id, trv.track_id, trv.id AS role_variant_id
-    FROM public.job_postings jp
-    JOIN public.track_role_variants trv ON trv.is_active
-    CROSS JOIN LATERAL unnest(trv.search_terms) AS termo
-   WHERE jp.track_id IS NULL
-     AND jp.title_normalized IS NOT NULL
-     AND position(lower(termo) IN jp.title_normalized) > 0
-   ORDER BY jp.id, length(termo) DESC
-)
-UPDATE public.job_postings jp
-   SET track_id = e.track_id, role_variant_id = e.role_variant_id
-  FROM escolha e WHERE jp.id = e.job_id;
+```bash
+bun run scripts/reclassify-tracks.ts          # mostra o que mudaria, agrupado por transição
+bun run scripts/reclassify-tracks.ts --apply  # grava
 ```
+
+Ele varre `job_postings` inteira (não só `track_id IS NULL`: uma variante nova ou uma
+prioridade ajustada também corrige vaga que já tinha trilha errada) e **importa o
+`classifyTrack` do pipeline** em vez de reimplementar a regra. Isso é deliberado — a
+versão anterior deste passo era um `UPDATE ... ORDER BY length(termo) DESC` escrito aqui
+no doc, que ficou silenciosamente errado no dia em que o desempate passou a considerar
+`priority`. Regra em dois lugares vira regra divergente (CLAUDE.md, regra 4).
 
 Se você criou skills novas, as vagas já ingeridas ainda não têm vínculo com elas.
 Reprocessar a extração sem rebuscar nas fontes:

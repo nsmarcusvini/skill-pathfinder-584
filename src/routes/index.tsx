@@ -50,7 +50,7 @@ const HOW_IT_WORKS = [
   {
     num: "02",
     title: "Escolha a trilha",
-    body: "DevOps/SRE, Data Engineer ou Full Stack. Cada trilha mapeia centenas de vagas reais — Brasil (BRL) e remoto global (USD) sempre separados.",
+    body: "DevOps/SRE, Data Engineer, Back-End, Front-End ou Full Stack — cada uma medida separadamente, mesmo quando a vaga serve a mais de uma. Brasil (BRL) e remoto global (USD) sempre separados.",
   },
   {
     num: "03",
@@ -82,7 +82,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Que trilhas estão disponíveis agora?",
-    a: "DevOps / SRE / Platform Engineer, Data Engineer e Full Stack. Novas trilhas são adicionadas como dados no banco — sem alteração de código. Backend e Frontend estão previstos para breve.",
+    a: "DevOps / SRE / Platform Engineer, Data Engineer, Back-End, Front-End e Full Stack. Back-End e Front-End são trilhas próprias, não subconjuntos de Full Stack: uma vaga de \"Senior Backend Engineer\" conta para Back-End, e o gap é calculado sobre a demanda daquela trilha específica. Naturalmente há sobreposição — a mesma empresa e a mesma faixa salarial podem aparecer em mais de uma. Novas trilhas são adicionadas como dados no banco, sem alteração de código.",
   },
   {
     q: "Meus dados ficam salvos e seguros?",
@@ -231,9 +231,10 @@ function LandingPage() {
               {
                 num: stats ? String(stats.tracks.length) : "…",
                 label: "Trilhas disponíveis",
-                hint:
-                  stats?.tracks.map((t) => t.name).join(" · ") ??
-                  "DevOps · Data Engineer · Full Stack",
+                // Enquanto carrega não enumeramos trilha nenhuma: a lista vem
+                // do banco (`career_tracks` ativas), e um fallback escrito à
+                // mão envelhece calado na primeira trilha nova.
+                hint: stats?.tracks.map((t) => t.name).join(" · ") ?? "Carregando…",
               },
             ].map((item) => (
               <div key={item.label} className="flex flex-col gap-1 px-6 py-7">

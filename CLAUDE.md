@@ -10,10 +10,17 @@ de vagas e mostra, em porcentagem, o quanto ele está aderente à trilha de carr
 escolheu. Também mostra as ferramentas mais pedidas, empresas contratando, faixa salarial,
 e recomenda plano de estudos.
 
-Trilhas ativas: `devops` (variantes: DevOps Engineer, Platform Engineer, SRE),
-`data_engineer`, `fullstack`, `frontend`, `backend` e `qa`. As três últimas entraram
-em 2026-08-27 pela migration `20260827200000_tracks_frontend_backend_qa.sql` — só
-dados, nenhuma linha de código (regra 1). Trilha nova segue `docs/ADICIONAR_TRILHA.md`.
+Trilhas **ativas**: `devops` (variantes: DevOps Engineer, Platform Engineer, SRE),
+`data_engineer`, `fullstack`, `backend` e `frontend`. `qa` existe mas está
+**desativada** (`is_active = false`) — sai de toda a interface, que filtra por
+`is_active`. Trilha nova segue `docs/ADICIONAR_TRILHA.md`.
+
+`backend` e `frontend` são trilhas próprias, **não subconjuntos de `fullstack`**:
+"Senior Backend Software Engineer" conta para Back-End. Quem decide isso é
+`track_role_variants.priority` (2026-09-08) — o desempate do classificador era só o
+tamanho do termo, e os termos genéricos e compridos do fullstack ("software engineer")
+venciam os específicos e curtos ("backend"). Sobreposição entre trilhas é esperada:
+a mesma empresa e a mesma faixa salarial aparecem em mais de uma.
 
 ## Stack real (não a que estava no system design original)
 

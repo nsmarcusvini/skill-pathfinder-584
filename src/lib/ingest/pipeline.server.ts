@@ -28,42 +28,61 @@ export interface IngestCounters {
   errors: string[];
 }
 
-interface TrackRef {
+export interface TrackRef {
   track_id: string;
   role_variant_id: string;
+  /** `track_role_variants.priority` — ver `classifyTrack`. */
+  priority: number;
   terms: string[];
 }
 
 let classifierCache: { loadedAt: number; variants: TrackRef[] } | null = null;
 
-async function loadClassifier(): Promise<TrackRef[]> {
+export async function loadClassifier(): Promise<TrackRef[]> {
   if (classifierCache && Date.now() - classifierCache.loadedAt < 5 * 60_000)
     return classifierCache.variants;
   const { data } = await supabaseAdmin
     .from("track_role_variants")
-    .select("id, track_id, search_terms")
+    .select("id, track_id, search_terms, priority")
     .eq("is_active", true);
   const variants: TrackRef[] = (data ?? []).map((v) => ({
     track_id: v.track_id,
     role_variant_id: v.id,
+    priority: v.priority ?? 10,
     terms: (v.search_terms ?? []).map((t: string) => t.toLowerCase()),
   }));
   classifierCache = { loadedAt: Date.now(), variants };
   return variants;
 }
 
-function classifyTrack(
+/**
+ * Casa o título com a variante de cargo mais adequada.
+ *
+ * ⚠️ O desempate é por PRIORIDADE, depois por tamanho do termo — nessa ordem, e
+ * a ordem importa. Só o tamanho já classificou errado 20 vagas: a trilha
+ * fullstack tem termos genéricos e compridos ("software engineer", 17 chars)
+ * que venciam os específicos e curtos ("backend", 7), mandando
+ * "Senior Backend Software Engineer" para fullstack.
+ *
+ * A prioridade vive em `track_role_variants.priority` (dado, não código —
+ * regra 1): mudar a precedência entre trilhas é UPDATE no banco, e nenhuma
+ * trilha aparece pelo nome aqui.
+ */
+export function classifyTrack(
   titleNormalized: string,
   variants: TrackRef[],
 ): { track_id: string | null; role_variant_id: string | null } {
-  let best: { ref: TrackRef; score: number } | null = null;
+  let best: { ref: TrackRef; priority: number; length: number } | null = null;
   for (const variant of variants) {
     for (const term of variant.terms) {
       if (!term) continue;
-      if (titleNormalized.includes(term)) {
-        const score = term.length;
-        if (!best || score > best.score) best = { ref: variant, score };
-      }
+      if (!titleNormalized.includes(term)) continue;
+      const candidato = { ref: variant, priority: variant.priority, length: term.length };
+      const vence =
+        !best ||
+        candidato.priority > best.priority ||
+        (candidato.priority === best.priority && candidato.length > best.length);
+      if (vence) best = candidato;
     }
   }
   return best
