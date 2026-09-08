@@ -286,19 +286,39 @@ export const getPublicPlans = createServerFn({ method: "GET" }).handler(
 
 // ─── Checkout ────────────────────────────────────────────────────────────────
 
+/**
+ * Método de pagamento escolhido na vitrine.
+ *
+ * `CARD` é assinatura de verdade: contrato RECURRENT no Asaas, renova sozinho.
+ * `PIX` é PRÉ-PAGO — cobrança avulsa (DETACHED) que compra UM período. Não
+ * renova: quando `current_period_end` passa, o acesso cai e a pessoa compra de
+ * novo. O aviso de vencimento vive no cron `rumvia-avisa-pix-vencendo`.
+ *
+ * PIX não pode ser recorrente aqui por dois motivos empilhados: o Asaas recusa
+ * PIX em cobrança RECURRENT, e PIX Automático (que seria o recorrente de
+ * verdade) exige recebedor PJ — a conta do RUMVIA é pessoa física.
+ */
+export type CheckoutMethod = "CARD" | "PIX";
+
 export interface StartCheckoutInput {
   /** `billing_plans.key` escolhido na vitrine. */
   planKey: string;
+  /** Ausente = CARD, para não quebrar chamada antiga. */
+  method?: CheckoutMethod;
 }
 
 export const startSubscriptionCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: StartCheckoutInput): StartCheckoutInput => {
+  .inputValidator((input: StartCheckoutInput): Required<StartCheckoutInput> => {
     const planKey = typeof input?.planKey === "string" ? input.planKey.trim() : "";
     // Quem valida de verdade é o banco (existe? está ativo?). Aqui só garantimos
     // que veio algo: a lista de chaves é dado, não constante de código.
     if (!planKey) throw new Error("Escolha um plano antes de continuar.");
-    return { planKey };
+    const method = input?.method ?? "CARD";
+    if (method !== "CARD" && method !== "PIX") {
+      throw new Error(`Método de pagamento inválido: ${String(method)}.`);
+    }
+    return { planKey, method };
   })
   .handler(async ({ context, data }): Promise<{ url: string; reused: boolean }> => {
     // Sessão anônima não paga: a assinatura precisa sobreviver ao dispositivo.
@@ -317,17 +337,12 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       .maybeSingle();
     if (planError) throw new Error(planError.message);
     if (!plan) throw new Error(`Plano "${data.planKey}" não encontrado ou inativo.`);
-    // O checkout usa chargeTypes: RECURRENT, e o Asaas recusa qualquer PIX
-    // nele — "CREDIT_CARD é o único método permitido para operações
-    // RECURRENT" (testado no sandbox, docs/PAGAMENTOS.md). Isso vale mesmo
-    // com CNPJ: PIX Automático de verdade é outra API, não implementada.
-    // Falhar aqui com uma mensagem clara é melhor que deixar o Asaas devolver
-    // um 400 sem contexto no meio do checkout de alguém.
-    if (plan.methods.includes("PIX")) {
+    // O método escolhido precisa estar habilitado no plano. `methods` é dado
+    // (regra 1): ligar ou desligar PIX num plano é UPDATE, não deploy.
+    if (!plan.methods.includes(data.method)) {
       throw new Error(
-        `O plano "${plan.name}" lista PIX nos métodos, mas o checkout recorrente do RUMVIA só ` +
-          `aceita cartão de crédito — o Asaas recusa PIX em cobrança RECURRENT. Corrija ` +
-          `"methods" em billing_plans ou implemente o fluxo de PIX Automático antes de ativar.`,
+        `O plano "${plan.name}" não aceita ${data.method === "PIX" ? "PIX" : "cartão"}. ` +
+          `Métodos habilitados: ${plan.methods.join(", ")}.`,
       );
     }
 
@@ -357,12 +372,26 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     // Uma assinatura viva por usuário (índice único parcial garante isso).
     const { data: existing } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status, checkout_url, plan_id")
+      .select("id, status, checkout_url, plan_id, current_period_end")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
 
-    if (existing && (existing.status === "active" || existing.status === "past_due")) {
+    // Período pré-pago (PIX) que já venceu continua `active` na tabela — nada
+    // muda o status quando a data passa, porque `has_active_subscription` olha
+    // `current_period_end` e o acesso cai sozinho. Só que, para COMPRAR DE
+    // NOVO, essa linha atrapalha: o índice de assinatura viva recusa uma
+    // segunda, e o guard abaixo diria "você já tem uma assinatura ativa" para
+    // quem está justamente tentando renovar. Vencida não bloqueia — a linha é
+    // reaproveitada pelo update no fim desta função.
+    const periodoVencido =
+      !!existing?.current_period_end && new Date(existing.current_period_end) <= new Date();
+
+    if (
+      existing &&
+      (existing.status === "active" || existing.status === "past_due") &&
+      !periodoVencido
+    ) {
       throw new Error("Você já tem uma assinatura ativa.");
     }
     // Checkout ainda aberto PARA O MESMO PLANO: devolve o mesmo link em vez de
@@ -375,7 +404,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     const base = appBaseUrl();
     const externalId = `rumvia_${userId}_${Date.now().toString(36)}`;
 
-    const { asaas, isSandboxKey } = await import("@/lib/asaas/client.server");
+    const { asaas } = await import("@/lib/asaas/client.server");
     const { reaisFromCents } = await import("@/lib/asaas/types");
 
     // Não pré-criamos cliente no Asaas: a página hospedada coleta nome, e-mail e
@@ -391,6 +420,12 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       timeZone: "America/Sao_Paulo",
     }).format(new Date());
 
+    // PIX é pré-pago: cobrança única (DETACHED), um período por compra. Cartão
+    // é contrato que renova sozinho (RECURRENT). O `billingTypes` leva só o
+    // método escolhido — mandar os dois deixaria o cliente trocar na tela do
+    // Asaas e cair num tipo de cobrança que não combina com o chargeType.
+    const isPix = data.method === "PIX";
+
     const checkout = await asaas.createCheckout({
       value: reaisFromCents(plan.price_cents),
       name: plan.name,
@@ -402,7 +437,8 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       successUrl: `${base}/assinatura?status=sucesso`,
       cancelUrl: `${base}/assinatura`,
       expiredUrl: `${base}/assinatura`,
-      billingTypes: plan.methods.map((m) => (m === "CARD" ? "CREDIT_CARD" : m)),
+      billingTypes: [isPix ? "PIX" : "CREDIT_CARD"],
+      chargeType: isPix ? "DETACHED" : "RECURRENT",
     });
 
     const row = {
@@ -416,7 +452,11 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       amount_cents: plan.price_cents,
       currency: "BRL",
       dev_mode: isSandboxKey(),
-      metadata: { plan_key: plan.key },
+      // `method` fica gravado já no pending para a tela saber que período
+      // comprado por PIX não renova sozinho — e para o cron de aviso achar
+      // essas linhas sem precisar consultar o Asaas.
+      method: isPix ? "PIX" : "CREDIT_CARD",
+      metadata: { plan_key: plan.key, prepaid: isPix },
     };
 
     const { error: writeError } = existing

@@ -72,12 +72,19 @@ export function menorMensalidade<T extends { monthlyEquivalentCents: number }>(
   );
 }
 
-/** Abre o checkout hospedado do gateway e redireciona o navegador para ele. */
+/**
+ * Abre o checkout hospedado do gateway e redireciona o navegador para ele.
+ *
+ * `method` decide o tipo de cobrança: `CARD` cria assinatura que renova
+ * sozinha; `PIX` é pré-pago e compra um único período (o Asaas recusa PIX em
+ * cobrança recorrente). Ausente = `CARD`.
+ */
 export function useStartCheckout() {
   const run = useServerFn(startSubscriptionCheckout);
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (planKey: string) => run({ data: { planKey } }),
+    mutationFn: ({ planKey, method }: { planKey: string; method?: "CARD" | "PIX" }) =>
+      run({ data: { planKey, ...(method ? { method } : {}) } }),
     onSuccess: ({ url }) => {
       void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
       window.location.href = url;

@@ -107,9 +107,9 @@ function AssinaturaPage() {
     void navigate({ to: isOnboarded ? "/dashboard" : "/onboarding", replace: true });
   }, [voltandoDoCheckout, isPro, isOnboarded, navigate]);
 
-  async function assinar(planKey: string) {
+  async function assinar(planKey: string, method: "CARD" | "PIX" = "CARD") {
     try {
-      await checkout.mutateAsync(planKey);
+      await checkout.mutateAsync({ planKey, method });
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -235,15 +235,21 @@ function AssinaturaPage() {
                 ))}
               </ul>
 
+              {/* Cartão e PIX são produtos diferentes aqui, e o texto precisa
+                  dizer isso ANTES do clique: cartão renova sozinho, PIX compra
+                  um período e acaba. Chamar PIX de "automático" ou prometer
+                  "renovação automática" para quem vai pagar por PIX seria
+                  informação falsa sobre um produto pago. */}
               <p className="mt-4 text-caption text-neutral-600">
                 Pagamento processado pelo Asaas.{" "}
-                {plano.methods.includes("PIX") && plano.methods.includes("CARD")
-                  ? "Cartão de crédito ou PIX automático."
-                  : plano.methods.includes("PIX")
-                    ? "PIX automático."
-                    : "Cartão de crédito."}{" "}
                 {plano.trialDays ? `${plano.trialDays} dias grátis. ` : ""}
-                {rotuloCobranca(plano.cycle)}, com renovação automática até você cancelar.{" "}
+                {rotuloCobranca(plano.cycle)}.{" "}
+                {plano.methods.includes("CARD")
+                  ? "No cartão de crédito, a renovação é automática até você cancelar. "
+                  : ""}
+                {plano.methods.includes("PIX")
+                  ? "No PIX, você paga um período por vez: não há renovação automática nem cobrança futura, e avisamos antes de o acesso vencer. "
+                  : ""}
                 {AVISO_ACESSO_PAGO}
               </p>
 
@@ -270,14 +276,28 @@ function AssinaturaPage() {
                     </a>
                   </Button>
                 ) : !isPro ? (
-                  <Button
-                    onClick={() => void assinar(plano.key)}
-                    loading={checkout.isPending}
-                    disabled={!plano.ready}
-                  >
-                    Assinar por {formatCents(plano.priceCents, plano.currency)}{" "}
-                    {rotuloPeriodo(plano.cycle)}
-                  </Button>
+                  <>
+                    {plano.methods.includes("CARD") ? (
+                      <Button
+                        onClick={() => void assinar(plano.key, "CARD")}
+                        loading={checkout.isPending}
+                        disabled={!plano.ready}
+                      >
+                        Assinar no cartão — {formatCents(plano.priceCents, plano.currency)}{" "}
+                        {rotuloPeriodo(plano.cycle)}
+                      </Button>
+                    ) : null}
+                    {plano.methods.includes("PIX") ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => void assinar(plano.key, "PIX")}
+                        loading={checkout.isPending}
+                        disabled={!plano.ready}
+                      >
+                        Pagar com PIX — {formatCents(plano.priceCents, plano.currency)}
+                      </Button>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
 

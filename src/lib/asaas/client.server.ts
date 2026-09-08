@@ -159,6 +159,18 @@ export interface CreateCheckoutInput {
   expiredUrl: string;
   billingTypes?: string[];
   minutesToExpire?: number;
+  /**
+   * `RECURRENT` (padrão) cria contrato que se renova sozinho — é o cartão.
+   * `DETACHED` é cobrança única, sem renovação: o caminho do PIX avulso.
+   *
+   * O Asaas recusa PIX em `RECURRENT` ("CREDIT_CARD é o único método permitido
+   * para operações RECURRENT"), e PIX Automático é outra API. Por isso PIX só
+   * existe aqui como avulso — cada ciclo é uma compra nova.
+   *
+   * O bloco `subscription` só vai em `RECURRENT`: mandá-lo em `DETACHED` faz o
+   * Asaas devolver 400.
+   */
+  chargeType?: "RECURRENT" | "DETACHED";
 }
 
 export interface CreateWebhookInput {
@@ -193,10 +205,11 @@ export const asaas = {
    * `endDate` fica de fora de propósito — assinatura sem prazo, confirmado no
    * sandbox que a API aceita.
    */
-  createCheckout: (input: CreateCheckoutInput) =>
-    request<AsaasCheckout>("POST", "/checkouts", {
+  createCheckout: (input: CreateCheckoutInput) => {
+    const chargeType = input.chargeType ?? "RECURRENT";
+    return request<AsaasCheckout>("POST", "/checkouts", {
       billingTypes: input.billingTypes ?? ["CREDIT_CARD"],
-      chargeTypes: ["RECURRENT"],
+      chargeTypes: [chargeType],
       minutesToExpire: input.minutesToExpire ?? 60,
       externalReference: input.externalReference,
       callback: {
@@ -212,11 +225,14 @@ export const asaas = {
           value: input.value,
         },
       ],
-      subscription: {
-        cycle: input.cycle,
-        nextDueDate: input.nextDueDate,
-      },
-    }),
+      // Só em RECURRENT: a spec marca `subscription` como obrigatório quando
+      // chargeTypes inclui RECURRENT, e em DETACHED ele não faz sentido — é
+      // cobrança única, não tem ciclo nem próxima data.
+      ...(chargeType === "RECURRENT"
+        ? { subscription: { cycle: input.cycle, nextDueDate: input.nextDueDate } }
+        : {}),
+    });
+  },
 
   getCheckout: (checkoutId: string) => request<AsaasCheckout>("GET", `/checkouts/${checkoutId}`),
 
