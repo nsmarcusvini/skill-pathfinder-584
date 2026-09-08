@@ -135,6 +135,13 @@ function AssinaturaPage() {
     subscription?.withdrawalDeadline != null &&
     Date.now() <= new Date(subscription.withdrawalDeadline).getTime();
 
+  /**
+   * Pré-pago já fora da janela de arrependimento: não há o que cancelar.
+   * O `method` vem gravado desde o checkout, então vale também enquanto o
+   * pagamento está pendente.
+   */
+  const pixSemCobrancaFutura = subscription?.method === "PIX" && !dentroDoPrazoArrependimento;
+
   // Checkout já aberto para ESTE plano: o link antigo ainda vale, não abrimos
   // outro. Trocar de ciclo cai no botão normal, que gera um checkout novo.
   const retomarCheckout =
@@ -315,7 +322,30 @@ function AssinaturaPage() {
             />
           )}
 
-          {isPro ? (
+          {/* Período pago por PIX é pré-pago: não existe cobrança futura para
+              interromper, então cancelar fora do prazo de arrependimento só
+              joga fora tempo já pago — o acesso acabaria sozinho no fim do
+              período, sem custo nenhum. Nesse caso o cancelamento sai da tela
+              e vira só a explicação de quando o acesso termina.
+
+              DENTRO dos 7 dias o botão CONTINUA aparecendo, inclusive no PIX:
+              ali cancelar significa estorno integral, que é direito do
+              consumidor (CDC art. 49). Esconder seria remover o único meio de
+              exercê-lo. */}
+          {isPro && pixSemCobrancaFutura ? (
+            <Blueprint className="p-5">
+              <h2 className="label-h6">Seu acesso</h2>
+              <p className="mt-1 text-caption text-neutral-700">
+                Você pagou por PIX, então{" "}
+                <strong>não há cobrança futura nem renovação automática</strong> — nada a cancelar.
+                O acesso Pro segue até{" "}
+                {subscription?.currentPeriodEnd
+                  ? new Date(subscription.currentPeriodEnd).toLocaleDateString("pt-BR")
+                  : "o fim do período pago"}
+                , e avisamos alguns dias antes para você decidir se quer continuar.
+              </p>
+            </Blueprint>
+          ) : isPro ? (
             <Blueprint className="border-danger p-5">
               <h2 className="label-h6 text-danger">Cancelar assinatura</h2>
               {dentroDoPrazoArrependimento ? (
