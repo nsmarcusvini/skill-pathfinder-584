@@ -331,6 +331,29 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       );
     }
 
+    // Chave de sandbox servindo o domínio real é o pior estado silencioso que
+    // esta integração pode ter: o cliente percorre um checkout de homologação,
+    // acha que pagou, e o dinheiro nunca existiu. Nada na tela denuncia — o
+    // selo "sandbox" só aparece DEPOIS, numa assinatura já criada.
+    //
+    // Não bloqueia dev: localhost, túnel e *.vercel.app seguem livres para
+    // testar com chave de homologação. O que fica proibido é exatamente a
+    // combinação que só pode ser engano — sandbox atendendo rumvia.com.br.
+    //
+    // Em 2026-09-08 a produção estava nesse estado (webhook já cadastrado na
+    // conta de produção, mas ASAAS_API_KEY ainda `_hmlg_` na Vercel). Foi
+    // detectado por acaso, pelo `dev_mode` de um evento de teste — esta guarda
+    // existe para que da próxima vez não dependa de sorte.
+    const { isSandboxKey } = await import("@/lib/asaas/client.server");
+    if (isSandboxKey() && appBaseUrl().includes("rumvia.com.br")) {
+      throw new Error(
+        "Checkout bloqueado: a ASAAS_API_KEY é de homologação (_hmlg_) e o app está " +
+          "servindo o domínio de produção. Ninguém deve pagar num checkout de sandbox. " +
+          "Troque a chave na Vercel pela de produção e faça um novo deploy — variável " +
+          "nova só vale no deploy seguinte.",
+      );
+    }
+
     // Uma assinatura viva por usuário (índice único parcial garante isso).
     const { data: existing } = await supabaseAdmin
       .from("subscriptions")
