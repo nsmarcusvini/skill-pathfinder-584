@@ -13,7 +13,7 @@ export function PageHeader({ title, subtitle, eyebrow, actions, className }: Pag
   return (
     <header
       className={cn(
-        "grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-b border-divider pb-4",
+        "grid grid-cols-1 items-start gap-4 border-b border-divider pb-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end",
         className,
       )}
     >
@@ -22,7 +22,9 @@ export function PageHeader({ title, subtitle, eyebrow, actions, className }: Pag
         <h1 className="truncate font-heading text-h2">{title}</h1>
         {subtitle ? <p className="mt-1 text-body text-neutral-700">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
+      ) : null}
     </header>
   );
 }

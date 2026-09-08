@@ -358,7 +358,7 @@ function VagasPage() {
                   </div>
 
                   {j.missingTop.length > 0 ? (
-                    <p className="flex flex-wrap items-center gap-1.5 text-caption text-neutral-600">
+                    <div className="flex flex-wrap items-center gap-1.5 text-caption text-neutral-600">
                       <span className="text-neutral-500">Falta:</span>
                       {j.missingTop.map((m) => (
                         <Badge key={m.skillId} variant="outline" className="font-normal">
@@ -370,7 +370,7 @@ function VagasPage() {
                           +{j.totalSkills - j.coveredSkills - j.missingTop.length}
                         </span>
                       ) : null}
-                    </p>
+                    </div>
                   ) : j.totalSkills > 0 ? (
                     <p className="text-caption text-success">Você tem todas as skills pedidas.</p>
                   ) : null}
