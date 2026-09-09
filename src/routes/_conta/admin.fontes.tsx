@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/rumvia/page-header";
@@ -10,7 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { issuePushToken, listSources, runIngestNow, toggleSource } from "@/lib/admin.functions";
+import {
+  issuePushToken,
+  listSources,
+  runFullIngest,
+  runIngestNow,
+  toggleSource,
+  type FullIngestReport,
+} from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_conta/admin/fontes")({
   component: FontesPage,
@@ -28,9 +35,12 @@ function FontesPage() {
   const toggle = useServerFn(toggleSource);
   const issueToken = useServerFn(issuePushToken);
 
+  const coletarTudo = useServerFn(runFullIngest);
+
   const [pushKey, setPushKey] = useState("");
   const [pushName, setPushName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [relatorio, setRelatorio] = useState<FullIngestReport | null>(null);
 
   const sources = useQuery({
     queryKey: ["admin", "sources"],
@@ -48,28 +58,51 @@ function FontesPage() {
       const updated = ok.reduce((acc, s) => acc + s.updated, 0);
       const failed = result.sources.filter((s) => s.status === "error");
       toast.success(`Ingestão concluída: ${created} novas, ${updated} atualizadas.`, {
-        description: failed.length > 0 ? `${failed.length} fonte(s) com erro: ${failed.map((f) => f.source_key).join(", ")}` : undefined,
+        description:
+          failed.length > 0
+            ? `${failed.length} fonte(s) com erro: ${failed.map((f) => f.source_key).join(", ")}`
+            : undefined,
       });
       void invalidate();
     },
     onError: (error: Error) => toast.error("Falha na ingestão", { description: error.message }),
   });
 
+  const coletaMutation = useMutation({
+    mutationFn: () => coletarTudo({ data: {} }),
+    onSuccess: (r) => {
+      setRelatorio(r);
+      const novas = r.colheita.criadas + r.fontes.reduce((a, s) => a + s.created, 0);
+      const disparados = r.disparos.filter((d) => d.status === "disparado").length;
+      toast.success(`Coleta concluída: ${novas} vaga(s) nova(s).`, {
+        description:
+          disparados > 0
+            ? `${disparados} lote(s) da Bright Data a caminho — clique de novo em alguns minutos para trazê-los.`
+            : undefined,
+      });
+      void invalidate();
+    },
+    onError: (error: Error) => toast.error("Falha na coleta", { description: error.message }),
+  });
+
   const toggleMutation = useMutation({
     mutationFn: (input: { id: string; is_active: boolean }) => toggle({ data: input }),
     onSuccess: invalidate,
-    onError: (error: Error) => toast.error("Não foi possível alterar a fonte", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("Não foi possível alterar a fonte", { description: error.message }),
   });
 
   const tokenMutation = useMutation({
-    mutationFn: () => issueToken({ data: { key: pushKey.trim(), name: pushName.trim() || pushKey.trim() } }),
+    mutationFn: () =>
+      issueToken({ data: { key: pushKey.trim(), name: pushName.trim() || pushKey.trim() } }),
     onSuccess: (result) => {
       setNewToken(result.token);
       setPushKey("");
       setPushName("");
       void invalidate();
     },
-    onError: (error: Error) => toast.error("Não foi possível gerar o token", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("Não foi possível gerar o token", { description: error.message }),
   });
 
   if (sources.isError) {
@@ -88,11 +121,13 @@ function FontesPage() {
         title="Fontes de vagas"
         subtitle="Adapters de pull, fontes push por webhook e execuções de ingestão."
         actions={
-          <Button onClick={() => runMutation.mutate(undefined)} loading={runMutation.isPending}>
-            Rodar agora (todas)
+          <Button onClick={() => coletaMutation.mutate()} loading={coletaMutation.isPending}>
+            Coletar tudo agora
           </Button>
         }
       />
+
+      {relatorio ? <RelatorioColeta relatorio={relatorio} /> : null}
 
       <div className="overflow-x-auto border border-divider">
         <table className="w-full border-collapse text-sm">
@@ -115,12 +150,16 @@ function FontesPage() {
                     {source.key} · {source.adapter}
                   </div>
                   {source.error_message ? (
-                    <div className="mt-1 max-w-md text-[12px] text-danger">{source.error_message}</div>
+                    <div className="mt-1 max-w-md text-[12px] text-danger">
+                      {source.error_message}
+                    </div>
                   ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant="neutral">{source.source_type}</Badge>
-                  {source.has_token ? <div className="mt-1 font-mono text-[11px] text-text-muted">token ativo</div> : null}
+                  {source.has_token ? (
+                    <div className="mt-1 font-mono text-[11px] text-text-muted">token ativo</div>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <div>{formatDate(source.last_run_at)}</div>
@@ -134,7 +173,9 @@ function FontesPage() {
                 <td className="px-3 py-2">
                   <Switch
                     checked={source.is_active}
-                    onCheckedChange={(checked) => toggleMutation.mutate({ id: source.id, is_active: checked })}
+                    onCheckedChange={(checked) =>
+                      toggleMutation.mutate({ id: source.id, is_active: checked })
+                    }
                     aria-label={`Ativar fonte ${source.key}`}
                   />
                 </td>
@@ -156,15 +197,26 @@ function FontesPage() {
       </div>
 
       <section className="flex flex-col gap-3 border border-divider bg-bg p-4">
-        <h2 className="font-display text-base uppercase tracking-wide">Nova fonte push (webhook)</h2>
+        <h2 className="font-display text-base uppercase tracking-wide">
+          Nova fonte push (webhook)
+        </h2>
         <p className="text-sm text-text-muted">
-          Gera uma chave para <code className="font-mono">POST /api/public/ingest-webhook</code> com header
-          <code className="font-mono"> x-ingest-token</code>. O coletor externo envia até 500 vagas por requisição
-          no formato NormalizedJob e cai no mesmo pipeline do pull.
+          Gera uma chave para <code className="font-mono">POST /api/public/ingest-webhook</code> com
+          header
+          <code className="font-mono"> x-ingest-token</code>. O coletor externo envia até 500 vagas
+          por requisição no formato NormalizedJob e cai no mesmo pipeline do pull.
         </p>
         <div className="flex flex-col gap-2 md:flex-row">
-          <Input value={pushKey} onChange={(e) => setPushKey(e.target.value)} placeholder="chave (ex: n8n_gupy)" />
-          <Input value={pushName} onChange={(e) => setPushName(e.target.value)} placeholder="nome exibido" />
+          <Input
+            value={pushKey}
+            onChange={(e) => setPushKey(e.target.value)}
+            placeholder="chave (ex: n8n_gupy)"
+          />
+          <Input
+            value={pushName}
+            onChange={(e) => setPushName(e.target.value)}
+            placeholder="nome exibido"
+          />
           <Button
             onClick={() => tokenMutation.mutate()}
             disabled={pushKey.trim().length < 2}
@@ -181,5 +233,89 @@ function FontesPage() {
         ) : null}
       </section>
     </div>
+  );
+}
+
+function Fase({ n, titulo, children }: { n: number; titulo: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-divider pt-2 first:border-t-0 first:pt-0">
+      <div className="font-mono text-[12px] uppercase tracking-wide text-text-muted">
+        {n}. {titulo}
+      </div>
+      <div className="mt-1 text-sm">{children}</div>
+    </div>
+  );
+}
+
+function RelatorioColeta({ relatorio: r }: { relatorio: FullIngestReport }) {
+  const ok = r.fontes.filter((s) => s.status === "success");
+  const comErro = r.fontes.filter((s) => s.status === "error");
+  const criadasPull = ok.reduce((a, s) => a + s.created, 0);
+  const atualizadasPull = ok.reduce((a, s) => a + s.updated, 0);
+  const disparados = r.disparos.filter((d) => d.status === "disparado");
+
+  return (
+    <section className="flex flex-col gap-3 border border-divider bg-bg p-4">
+      <h2 className="font-display text-base uppercase tracking-wide">Resultado da coleta</h2>
+
+      <Fase n={1} titulo="Colheita do lote anterior (Bright Data)">
+        {r.colheita.snapshots === 0 ? (
+          <span className="text-text-muted">Nenhum lote pendente.</span>
+        ) : (
+          <>
+            {r.colheita.ingeridos} de {r.colheita.snapshots} lote(s) ingerido(s) ·{" "}
+            <span className="font-mono">{r.colheita.criadas}</span> nova(s),{" "}
+            <span className="font-mono">{r.colheita.atualizadas}</span> atualizada(s)
+          </>
+        )}
+      </Fase>
+
+      <Fase n={2} titulo="Fontes gratuitas (ATS e agregadores)">
+        <span className="font-mono">{criadasPull}</span> nova(s),{" "}
+        <span className="font-mono">{atualizadasPull}</span> atualizada(s),{" "}
+        <span className="font-mono">{r.desativadas}</span> expirada(s),{" "}
+        <span className="font-mono">{r.duplicatas}</span> duplicata(s) entre fontes ·{" "}
+        <span className="font-mono">{r.skills}</span> vínculo(s) de skill
+        {comErro.length > 0 ? (
+          <div className="mt-1 text-[13px] text-danger">
+            {comErro.length} fonte(s) com erro: {comErro.map((f) => f.key).join(", ")}
+          </div>
+        ) : null}
+      </Fase>
+
+      <Fase n={3} titulo="Novo lote pedido (Bright Data)">
+        {r.brightDataErro ? (
+          <span className="text-danger">{r.brightDataErro}</span>
+        ) : disparados.length === 0 ? (
+          <span className="text-text-muted">
+            Nenhum disparo —{" "}
+            {r.aguardando > 0 ? "já há lote em andamento." : "nenhuma fonte elegível."}
+          </span>
+        ) : (
+          <>
+            {disparados.length} coleta(s) disparada(s): {disparados.map((d) => d.key).join(", ")}
+          </>
+        )}
+      </Fase>
+
+      <Fase n={4} titulo="Publicação nas telas">
+        {r.viewsAtualizadas ? (
+          "Estatísticas de mercado recalculadas."
+        ) : (
+          <span className="text-danger">
+            As views não recalcularam — os números das telas seguem os anteriores.
+          </span>
+        )}
+      </Fase>
+
+      {r.aguardando > 0 ? (
+        <p className="border border-warning bg-surface p-3 text-[13px]">
+          <span className="font-mono">{r.aguardando}</span> lote(s) da Bright Data ainda em
+          andamento. A API deles é assíncrona e leva minutos — essas vagas <strong>não</strong>{" "}
+          estão na base ainda. Clique em “Coletar tudo agora” de novo daqui a alguns minutos, ou
+          espere o cron de colheita.
+        </p>
+      ) : null}
+    </section>
   );
 }

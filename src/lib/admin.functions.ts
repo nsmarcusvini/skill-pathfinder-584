@@ -79,6 +79,100 @@ export const runIngestNow = createServerFn({ method: "POST" })
     return runIngest(data.source_keys);
   });
 
+export interface FullIngestReport {
+  colheita: { snapshots: number; ingeridos: number; criadas: number; atualizadas: number };
+  fontes: Array<{ key: string; status: string; created: number; updated: number; error?: string }>;
+  desativadas: number;
+  duplicatas: number;
+  skills: number;
+  disparos: Array<{ key: string; status: string; error?: string }>;
+  aguardando: number;
+  brightDataErro: string | null;
+  viewsAtualizadas: boolean;
+}
+
+/**
+ * Coleta completa num clique: as quatro fases, na ordem em que dependem uma da
+ * outra. É o mesmo caminho dos crons — nada aqui reimplementa pipeline (regra 4).
+ *
+ * A ordem colher-antes-de-disparar é a mesma de `/api/public/ingest-async`, e
+ * pelo mesmo motivo: o lote pedido no ciclo anterior entra agora e libera a
+ * trava de "lote em andamento", senão todo disparo seria pulado.
+ *
+ * O que este botão NÃO faz, e a tela precisa dizer: as vagas da Bright Data
+ * pedidas no passo 3 não chegam nesta resposta. A API deles é assíncrona (leva
+ * minutos), e esperar em polling estouraria o timeout da função. Elas entram na
+ * próxima colheita — outro clique aqui, ou o cron de domingo/segunda.
+ */
+export const runFullIngest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: Record<string, never>) => input)
+  .handler(async ({ context }): Promise<FullIngestReport> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { colherSnapshots, dispararColetas } = await import("@/lib/ingest/bright-data.server");
+    const { runIngest } = await import("@/lib/ingest/run.server");
+
+    // 1. Colher o que a Bright Data já deixou pronto de ciclos anteriores.
+    // Provedor externo fora do ar não pode derrubar a coleta das fontes
+    // gratuitas, que é de onde vem 81% da base — por isso as duas fases dele
+    // ficam isoladas e o erro vira relato, não exceção.
+    let brightDataErro: string | null = null;
+    let colheita = { snapshots: 0, ingeridos: 0, criadas: 0, atualizadas: 0 };
+    try {
+      const lote = await colherSnapshots();
+      colheita = {
+        snapshots: lote.snapshots.length,
+        ingeridos: lote.snapshots.filter((s) => s.status === "ingested").length,
+        criadas: lote.snapshots.reduce((a, s) => a + (s.created ?? 0), 0),
+        atualizadas: lote.snapshots.reduce((a, s) => a + (s.updated ?? 0), 0),
+      };
+    } catch (e) {
+      brightDataErro = e instanceof Error ? e.message : String(e);
+    }
+
+    // 2. Fontes síncronas: já inclui dedupe, expiração e extração de skills.
+    const pull = await runIngest();
+
+    // 3. Pedir lote novo à Bright Data (chega depois, ver doc acima).
+    let disparos: FullIngestReport["disparos"] = [];
+    try {
+      disparos = (await dispararColetas()).map((d) => ({
+        key: d.source_key,
+        status: d.status,
+        ...(d.error ? { error: d.error } : {}),
+      }));
+    } catch (e) {
+      brightDataErro = brightDataErro ?? (e instanceof Error ? e.message : String(e));
+    }
+
+    // 4. Sem isto o admin coleta e não vê nada mudar: as telas leem matview.
+    const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
+
+    const { count: aguardando } = await supabaseAdmin
+      .from("provider_snapshots")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["starting", "running", "ready"]);
+
+    return {
+      colheita,
+      fontes: pull.sources.map((s) => ({
+        key: s.source_key,
+        status: s.status,
+        created: s.created,
+        updated: s.updated,
+        ...(s.error ? { error: s.error } : {}),
+      })),
+      desativadas: pull.deactivated,
+      duplicatas: pull.dedupe?.duplicatas ?? 0,
+      skills: (pull.extraction ?? []).reduce((a, e) => a + e.skills_written, 0),
+      disparos,
+      aguardando: aguardando ?? 0,
+      brightDataErro,
+      viewsAtualizadas: !refreshError,
+    };
+  });
+
 export const toggleSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
@@ -968,7 +1062,8 @@ export const createSalaryObservation = createServerFn({ method: "POST" })
     // A tela lê a materialized view, não a tabela: sem refresh o admin salva e
     // não vê nada mudar, que é exatamente o sintoma que trouxe a gente até aqui.
     const { error: refreshError } = await supabaseAdmin.rpc("refresh_market_views");
-    if (refreshError) throw new Error(`Salvo, mas a estatística não recalculou: ${refreshError.message}`);
+    if (refreshError)
+      throw new Error(`Salvo, mas a estatística não recalculou: ${refreshError.message}`);
 
     return { ok: true };
   });
