@@ -160,9 +160,9 @@ function LandingPage() {
                 className="mt-5 text-body"
                 style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}
               >
-                Comparamos sua experiência com centenas de vagas reais — Brasil e remoto global — e
-                mostramos em porcentagem o que você domina e{" "}
-                <strong className="text-bg">o que está te custando oportunidades</strong>.
+                Saiba o que o mercado pede, onde você está, quais ferramentas estão em alta e quem
+                está contratando na sua área —{" "}
+                <strong className="text-bg">tudo na palma da sua mão</strong>.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {/* Rotulado "Analisar meu CV" — tem de abrir o envio, não o
@@ -209,6 +209,29 @@ function LandingPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ ROTA ═══ */}
+      <section className="border-t border-accent-800 bg-accent-900 py-20">
+        <div className="rumvia-container">
+          <div className="grid items-center gap-14 lg:grid-cols-[420px_1fr]">
+            <div>
+              <p className="label-h6 mb-4 text-accent-400">// Sua rota</p>
+              <h2 className="font-heading text-h2 uppercase text-bg">
+                Onde você está, onde o mercado está, e o caminho entre os dois.
+              </h2>
+              <p
+                className="mt-5 text-body"
+                style={{ color: "rgba(242,242,243,0.72)", lineHeight: 1.65 }}
+              >
+                Cada marco é uma skill que as vagas da sua trilha pedem e o seu currículo ainda não
+                mostra. O RUMVIA ordena por demanda real — você percorre na ordem que fecha o gap
+                mais rápido.
+              </p>
+            </div>
+            <RotaMap />
           </div>
         </div>
       </section>
@@ -764,5 +787,178 @@ function LandingPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+const MAPA_GRID = [
+  ...Array.from({ length: 18 }, (_, i) => `M ${(i + 1) * 40} 0 L ${(i + 1) * 40} 380`),
+  ...Array.from({ length: 8 }, (_, i) => `M 0 ${(i + 1) * 40} L 764 ${(i + 1) * 40}`),
+].join(" ");
+
+const MAPA_REGUA = [
+  ...Array.from({ length: 18 }, (_, i) => {
+    const x = (i + 1) * 40;
+    return `M ${x} 0 L ${x} ${x % 200 === 0 ? 9 : 5}`;
+  }),
+  ...Array.from({ length: 8 }, (_, i) => {
+    const y = (i + 1) * 40;
+    return `M 0 ${y} L ${y === 160 || y === 280 ? 9 : 5} ${y}`;
+  }),
+].join(" ");
+
+// Escondido abaixo de md: o viewBox tem 764px, e num telefone os rótulos de 11px cairiam para ~5px.
+function RotaMap() {
+  return (
+    <svg
+      viewBox="0 0 764 380"
+      role="img"
+      aria-label="Mapa da trajetória: do currículo atual, com 74% de aderência, até o que o mercado pede"
+      className="hidden h-auto w-full md:block"
+    >
+      <rect x={0.5} y={0.5} width={763} height={379} fill="none" stroke="var(--accent-800)" />
+
+      <g fill="none" stroke="var(--accent-700)" strokeWidth={1} opacity={0.18}>
+        <path d={MAPA_GRID} />
+      </g>
+
+      <g fill="none" stroke="var(--accent-600)" strokeWidth={1} opacity={0.16}>
+        <path d="M 60 190 L 90 140 L 150 110 L 220 120 L 260 160 L 250 200 L 180 220 L 100 215 Z" />
+        <path d="M 95 180 L 120 145 L 165 128 L 210 140 L 232 168 L 220 192 L 165 202 L 115 198 Z" />
+        <path d="M 130 172 L 148 152 L 178 148 L 200 162 L 196 180 L 160 186 Z" />
+      </g>
+
+      <g fill="none" stroke="var(--accent-600)" strokeWidth={1} opacity={0.7}>
+        <path d={MAPA_REGUA} />
+        <path d="M 6 14 L 6 6 L 14 6" opacity={1} />
+        <path d="M 750 6 L 758 6 L 758 14" opacity={1} />
+        <path d="M 6 366 L 6 374 L 14 374" opacity={1} />
+        <path d="M 758 366 L 758 374 L 750 374" opacity={1} />
+      </g>
+
+      <path
+        d="M 40 320 L 140 320 L 176 284 L 300 284 L 336 248 L 390 248"
+        fill="none"
+        stroke="var(--accent-500)"
+        strokeWidth={2}
+      />
+      <path
+        d="M 390 248 L 430 248 L 466 212 L 560 212 L 596 176 L 700 176"
+        fill="none"
+        stroke="var(--accent-500)"
+        strokeWidth={2}
+        strokeDasharray="7 7"
+        opacity={0.55}
+      />
+
+      <rect
+        x={84}
+        y={314}
+        width={12}
+        height={12}
+        fill="var(--accent-900)"
+        stroke="var(--accent-500)"
+        strokeWidth={1.5}
+      />
+      <rect x={88} y={318} width={4} height={4} fill="var(--accent-500)" />
+      <path d="M 90 314 L 90 305" fill="none" stroke="var(--accent-500)" strokeWidth={1} />
+      <text
+        x={90}
+        y={299}
+        textAnchor="middle"
+        className="font-mono"
+        fontSize={11}
+        letterSpacing={1.1}
+        fill="var(--accent-400)"
+      >
+        SEU CV
+      </text>
+
+      <rect
+        x={234}
+        y={278}
+        width={12}
+        height={12}
+        fill="var(--accent-900)"
+        stroke="var(--accent-500)"
+        strokeWidth={1.5}
+      />
+      <rect x={238} y={282} width={4} height={4} fill="var(--accent-500)" />
+
+      <path
+        d="M 370 248 L 378 248 M 402 248 L 410 248 M 390 260 L 390 268"
+        fill="none"
+        stroke="var(--rumvia-bg)"
+        strokeWidth={1}
+      />
+      <rect
+        x={382}
+        y={240}
+        width={16}
+        height={16}
+        fill="var(--accent-900)"
+        stroke="var(--rumvia-bg)"
+        strokeWidth={1.5}
+      />
+      <rect x={387} y={245} width={6} height={6} fill="var(--accent-400)" />
+      <path d="M 390 240 L 390 232" fill="none" stroke="var(--rumvia-bg)" strokeWidth={1} />
+      <text
+        x={390}
+        y={226}
+        textAnchor="middle"
+        className="font-mono"
+        fontSize={11}
+        fontWeight={500}
+        letterSpacing={1.1}
+        fill="var(--rumvia-bg)"
+      >
+        VOCÊ ESTÁ AQUI · 74%
+      </text>
+
+      <rect
+        x={504}
+        y={206}
+        width={12}
+        height={12}
+        fill="var(--accent-900)"
+        stroke="var(--accent-600)"
+        strokeWidth={1.5}
+        strokeDasharray="2 2"
+      />
+
+      <path
+        d="M 642 176 L 650 176 M 670 176 L 678 176"
+        fill="none"
+        stroke="var(--accent-600)"
+        strokeWidth={1}
+      />
+      <rect
+        x={654}
+        y={170}
+        width={12}
+        height={12}
+        fill="var(--accent-900)"
+        stroke="var(--accent-600)"
+        strokeWidth={1.5}
+        strokeDasharray="2 2"
+      />
+      <path
+        d="M 657 176 L 663 176 M 660 173 L 660 179"
+        fill="none"
+        stroke="var(--accent-500)"
+        strokeWidth={1}
+      />
+      <path d="M 660 170 L 660 161" fill="none" stroke="var(--accent-600)" strokeWidth={1} />
+      <text
+        x={660}
+        y={155}
+        textAnchor="middle"
+        className="font-mono"
+        fontSize={11}
+        letterSpacing={1.1}
+        fill="var(--accent-500)"
+      >
+        O QUE O MERCADO PEDE
+      </text>
+    </svg>
   );
 }
