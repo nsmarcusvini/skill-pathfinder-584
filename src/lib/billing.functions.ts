@@ -533,87 +533,112 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
 
 // ─── Cancelamento ────────────────────────────────────────────────────────────
 
+/**
+ * Encerra a assinatura viva do usuário: estorna se estiver no prazo do CDC,
+ * cancela no Asaas e grava o estado local.
+ *
+ * SERVER-ONLY. Vive fora de `cancelMySubscription` porque tem DOIS chamadores,
+ * e o segundo é fácil de esquecer: `deleteMyAccount`. Quem exclui a conta
+ * (direito de LGPD) também precisa parar de ser cobrado — antes disso, o
+ * usuário sumia do banco e a assinatura no Asaas continuava cobrando todo mês,
+ * com o agravante de que o registro local ia junto: o webhook da cobrança
+ * seguinte chegava, não achava a quem pertencia, e ficava `handled: false`.
+ * Ninguém percebia até o cliente reclamar da fatura.
+ *
+ * Devolve `null` quando não há assinatura viva — para quem exclui a conta isso
+ * é o caso comum, não um erro. Quem quiser tratar como erro (o botão de
+ * cancelar) decide no chamador.
+ */
+export async function encerrarAssinaturaViva(
+  userId: string,
+): Promise<{ refunded: boolean } | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const { data: sub } = await supabaseAdmin
+    .from("subscriptions")
+    .select("id, status, provider_subscription_id, provider_payment_id, first_activated_at")
+    .eq("user_id", userId)
+    .in("status", LIVE_STATUSES)
+    .maybeSingle();
+  if (!sub) return null;
+
+  // Direito de arrependimento (CDC art. 49): dentro de 7 dias corridos da
+  // PRIMEIRA cobrança confirmada, cancelar também estorna o valor cheio —
+  // nunca proporcional. Fora da janela, ou sem nenhum pagamento ainda
+  // (status pending: nada a devolver), segue o cancelamento comum.
+  const prazo = calcularPrazoArrependimento(sub.first_activated_at ?? null);
+  const dentroDoPrazo = prazo !== null && Date.now() <= new Date(prazo).getTime();
+
+  let refunded = false;
+
+  if (dentroDoPrazo) {
+    const { asaas } = await import("@/lib/asaas/client.server");
+    const { AsaasError } = await import("@/lib/asaas/types");
+
+    // provider_payment_id é aprendido no webhook a cada PAYMENT_* — é o
+    // caminho normal. Sem ele (dado antigo, ou correlação que ainda não
+    // chegou), busca na API em vez de deixar o arrependimento sem efeito:
+    // o direito não pode depender de um campo estar preenchido.
+    let paymentId = sub.provider_payment_id ?? null;
+    if (!paymentId && sub.provider_subscription_id) {
+      const { data: pagamentos } = await asaas.listPaymentsBySubscription(
+        sub.provider_subscription_id,
+        5,
+      );
+      paymentId =
+        pagamentos?.find((p) => p.status === "CONFIRMED" || p.status === "RECEIVED")?.id ?? null;
+    }
+
+    if (paymentId) {
+      try {
+        await asaas.refundPayment(paymentId);
+        refunded = true;
+      } catch (error) {
+        // "Não é possível cancelar a venda." é o que o Asaas devolve para
+        // uma cobrança já estornada (confirmado no sandbox em 2026-09-05).
+        // O dinheiro já voltou — pedir estorno de novo não pode virar erro
+        // para quem clicou cancelar duas vezes.
+        const jaEstornado =
+          error instanceof AsaasError &&
+          error.status === 400 &&
+          error.message.toLowerCase().includes("não é possível cancelar a venda");
+        if (!jaEstornado) throw error;
+        refunded = true;
+      }
+    }
+  }
+
+  if (sub.provider_subscription_id) {
+    const { asaas } = await import("@/lib/asaas/client.server");
+    // Remove a assinatura no Asaas: nenhuma cobrança futura é gerada.
+    await asaas.cancelSubscription(sub.provider_subscription_id);
+  }
+
+  // Grava já, sem esperar o webhook subscription.cancelled / PAYMENT_REFUNDED
+  // — que também chegam e só confirmam o mesmo estado (idempotente). O
+  // status final de um estorno é `refunded`, mas quem grava isso é o
+  // webhook; aqui fica `cancelled` com o motivo específico, igual ao
+  // cancelamento comum, até a confirmação chegar.
+  const { error } = await supabaseAdmin
+    .from("subscriptions")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancelled_due_to: refunded ? "arrependimento_cdc" : "cancelled_by_user",
+    })
+    .eq("id", sub.id);
+  if (error) throw new Error(error.message);
+
+  return { refunded };
+}
+
 export const cancelMySubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<{ ok: true; refunded: boolean }> => {
-    const userId = context.userId;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id, status, provider_subscription_id, provider_payment_id, first_activated_at")
-      .eq("user_id", userId)
-      .in("status", LIVE_STATUSES)
-      .maybeSingle();
-    if (!sub) throw new Error("Nenhuma assinatura ativa para cancelar.");
-
-    // Direito de arrependimento (CDC art. 49): dentro de 7 dias corridos da
-    // PRIMEIRA cobrança confirmada, cancelar também estorna o valor cheio —
-    // nunca proporcional. Fora da janela, ou sem nenhum pagamento ainda
-    // (status pending: nada a devolver), segue o cancelamento comum.
-    const prazo = calcularPrazoArrependimento(sub.first_activated_at ?? null);
-    const dentroDoPrazo = prazo !== null && Date.now() <= new Date(prazo).getTime();
-
-    let refunded = false;
-
-    if (dentroDoPrazo) {
-      const { asaas } = await import("@/lib/asaas/client.server");
-      const { AsaasError } = await import("@/lib/asaas/types");
-
-      // provider_payment_id é aprendido no webhook a cada PAYMENT_* — é o
-      // caminho normal. Sem ele (dado antigo, ou correlação que ainda não
-      // chegou), busca na API em vez de deixar o arrependimento sem efeito:
-      // o direito não pode depender de um campo estar preenchido.
-      let paymentId = sub.provider_payment_id ?? null;
-      if (!paymentId && sub.provider_subscription_id) {
-        const { data: pagamentos } = await asaas.listPaymentsBySubscription(
-          sub.provider_subscription_id,
-          5,
-        );
-        paymentId =
-          pagamentos?.find((p) => p.status === "CONFIRMED" || p.status === "RECEIVED")?.id ?? null;
-      }
-
-      if (paymentId) {
-        try {
-          await asaas.refundPayment(paymentId);
-          refunded = true;
-        } catch (error) {
-          // "Não é possível cancelar a venda." é o que o Asaas devolve para
-          // uma cobrança já estornada (confirmado no sandbox em 2026-09-05).
-          // O dinheiro já voltou — pedir estorno de novo não pode virar erro
-          // para quem clicou cancelar duas vezes.
-          const jaEstornado =
-            error instanceof AsaasError &&
-            error.status === 400 &&
-            error.message.toLowerCase().includes("não é possível cancelar a venda");
-          if (!jaEstornado) throw error;
-          refunded = true;
-        }
-      }
-    }
-
-    if (sub.provider_subscription_id) {
-      const { asaas } = await import("@/lib/asaas/client.server");
-      // Remove a assinatura no Asaas: nenhuma cobrança futura é gerada.
-      await asaas.cancelSubscription(sub.provider_subscription_id);
-    }
-
-    // Grava já, sem esperar o webhook subscription.cancelled / PAYMENT_REFUNDED
-    // — que também chegam e só confirmam o mesmo estado (idempotente). O
-    // status final de um estorno é `refunded`, mas quem grava isso é o
-    // webhook; aqui fica `cancelled` com o motivo específico, igual ao
-    // cancelamento comum, até a confirmação chegar.
-    const { error } = await supabaseAdmin
-      .from("subscriptions")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        cancelled_due_to: refunded ? "arrependimento_cdc" : "cancelled_by_user",
-      })
-      .eq("id", sub.id);
-    if (error) throw new Error(error.message);
-
-    return { ok: true, refunded };
+    const resultado = await encerrarAssinaturaViva(context.userId);
+    // Aqui a ausência É erro: a pessoa clicou em "cancelar" numa tela que só
+    // mostra o botão quando existe assinatura.
+    if (!resultado) throw new Error("Nenhuma assinatura ativa para cancelar.");
+    return { ok: true, refunded: resultado.refunded };
   });
