@@ -4,10 +4,13 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -124,6 +127,52 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Barra fina no topo enquanto o router troca de rota.
+ *
+ * Sem ela o clique parecia travado: como nenhuma rota usa `loader`, sair de uma
+ * tela e entrar na outra leva o tempo de baixar o chunk e montar — e nesse
+ * intervalo a página anterior fica parada, sem nenhum sinal de que algo está
+ * acontecendo. A reação natural do usuário é clicar de novo.
+ *
+ * Não é spinner de tela cheia de propósito: trocar o conteúdo por um esqueleto
+ * a cada navegação é mais agressivo do que o problema pede, e piora a sensação
+ * em transições rápidas (o esqueleto pisca). Uma barra fina informa sem
+ * interromper.
+ *
+ * `aria-hidden`: é decoração. Quem usa leitor de tela é avisado pela mudança de
+ * conteúdo e pelo `<title>` da rota nova, não por uma barra.
+ */
+function NavigationProgress() {
+  const routerPending = useRouterState({ select: (s) => s.status === "pending" });
+
+  // No SSR o router ainda está `pending` (resolvendo a rota inicial); quando o
+  // React hidrata no cliente já virou `idle`. Tentar igualar as classes nos
+  // dois lados deu hydration mismatch — e o React avisa que NÃO corrige
+  // atributo ("this won't be patched up"), então ficaria errado de verdade.
+  //
+  // Não renderizar nada antes de montar resolve pela raiz: o servidor não
+  // emite o elemento, o primeiro render do cliente também não, e não há o que
+  // divergir. A barra só existe depois da hidratação — que é exatamente quando
+  // ela passa a ter utilidade, porque navegação client-side só ocorre aí.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+  if (!montado) return null;
+
+  const isLoading = routerPending;
+
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 origin-left bg-accent",
+        "transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none",
+        isLoading ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0",
+      )}
+    />
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -131,6 +180,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MarketProvider>
+          <NavigationProgress />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
         </MarketProvider>

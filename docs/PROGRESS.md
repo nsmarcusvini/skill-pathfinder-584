@@ -225,3 +225,16 @@
   **`ip_hash` virou `subject`** + `subject_kind` ('ip'|'session'), pelo mesmo motivo de `abacate_*` ter virado `provider_*`: nome de coluna que mente envelhece mal. `types.ts` corrigido junto — estava desatualizado e nada acusava, porque o acesso àquela tabela não era estritamente tipado.
 
   **Índice:** existia `UNIQUE (subject, window_start)`, de quando só havia IP. Trocado por `UNIQUE (subject_kind, subject, window_start)` — sessão e IP são cotas independentes e precisam coexistir. Era constraint, não só índice, então saiu por `ALTER TABLE`. Verificado no banco: as duas cotas coexistem com o mesmo valor de sujeito, e duplicar a mesma cota continua dando `23505`.
+- Navegação e resposta: preload por intenção, cache real e feedback de clique (2026-09-09): medi antes de mexer. **TTFB do SSR está bom** (0,2–0,4s morno, 1,4s no cold start) e **a landing está enxuta** (186 KB transferidos, recharts não carrega ali, DOM pronto em 461ms) — o gargalo não era peso nem servidor. Era que **cada clique começava do zero**: baixar o chunk da rota, montar a tela, e só então disparar as consultas, sem nenhum sinal visual no meio.
+
+  **`defaultPreload: "intent"`** — o código da rota passa a ser baixado no hover/toque, antes do clique. É a maior diferença perceptível nesta app justamente porque **nenhuma das 21 rotas usa `loader`**: todas buscam dados por `useQuery` no cliente, então o clique pagava tudo em série. `defaultPreloadStaleTime` saiu de `0` (que anulava o preload de dados — chegava e já nascia obsoleto) para 30s.
+
+  **`staleTime` de 5min no QueryClient** — antes era 0, então voltar a uma tela já visitada refazia TODAS as consultas dela. As views de mercado atualizam por cron a cada 6h e o CV muda quando a pessoa envia outro; refazer a cada navegação era desperdício puro. Invalidação explícita (`BILLING_QUERY_KEY`, perfil, skills) continua valendo — `staleTime` não interfere nisso. Também desliguei `refetchOnWindowFocus`: nada aqui muda por ação de terceiros.
+
+  **Barra de progresso no topo** durante a troca de rota, para o clique não parecer travado.
+
+  **Bug que eu mesmo introduzi e o teste pegou:** a primeira versão da barra lia `router.status` direto e dava **hydration mismatch** — no SSR o router está `pending`, no cliente já está `idle`, e o React avisa que atributo divergente **não é corrigido** ("this won't be patched up"), ou seja, ficaria errado de verdade. Igualar as classes nos dois lados é frágil; a solução foi não renderizar nada antes de montar — servidor não emite o elemento, primeiro render do cliente também não, não há o que divergir. E a barra só tem utilidade depois da hidratação mesmo, porque navegação client-side só existe aí.
+
+  **Verificado no navegador:** console limpo após a correção, e a barra confirmada no ciclo completo (oculta → VISÍVEL logo após o clique → oculta ao terminar). **Não deu para verificar o preload localmente**: em dev o Vite serve tudo sem bundle (180 recursos), então não há chunk a pré-carregar — isso só se prova em produção.
+
+  **Deixado de fora de propósito:** reagrupar os 12 itens do menu lateral (decisão de design, e há outra sessão mexendo em UI) e migrar as rotas para `loader` (mudança grande — melhor medir o ganho destes três antes).
