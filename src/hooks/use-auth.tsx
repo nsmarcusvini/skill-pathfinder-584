@@ -4,7 +4,6 @@ import { useRouter } from "@tanstack/react-router";
 import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import type { Database } from "@/integrations/supabase/types";
 import { requestTurnstileToken } from "@/lib/turnstile";
 import { isAuthRateLimited, SIGNUP_COOLDOWN_MESSAGE } from "@/lib/signup-guard";
@@ -266,28 +265,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: null, needsEmailConfirmation: !data.session };
       },
 
+      /**
+       * Os dois caminhos passam pelo Supabase, nenhum por terceiro.
+       *
+       * Antes, a conta permanente ia pelo broker da Lovable
+       * (`@lovable.dev/cloud-auth-js`). Isso ficou insustentável quando o
+       * projeto saiu da Lovable: colocava um serviço externo no caminho
+       * crítico de autenticação, num arquivo auto-gerado marcado como "não
+       * modifique". Se aquele serviço mudasse ou saísse do ar, o login com
+       * Google quebrava — e o time não teria como consertar.
+       *
+       * Na prática o caminho da Lovable quase nunca rodava: `signInAnonymously`
+       * dispara no primeiro acesso, então quem clica em "Continuar com Google"
+       * já é anônimo e cai no `linkIdentity`. "Quase nunca" não é "nunca".
+       */
       async signInWithGoogle() {
         try {
+          const redirectTo = `${authRedirectOrigin()}/auth/callback`;
+
           if (isAnonymous) {
-            // Vincula o Google à MESMA conta anônima: o user.id é preservado.
+            // Vincula o Google à MESMA conta anônima: o user.id é preservado
+            // (regra 7). O CV já enviado e as análises continuam valendo — por
+            // isso é `linkIdentity`, nunca um login novo.
+            //
+            // Exige "Manual linking" ligado no Supabase; sem isso o GoTrue
+            // recusa e `traduzErro` mostra a mensagem sobre vincular o Google.
             const { error } = await supabase.auth.linkIdentity({
               provider: "google",
-              options: { redirectTo: `${authRedirectOrigin()}/auth/callback` },
+              options: { redirectTo },
             });
             if (error) return { error: traduzErro(error) };
             return { error: null };
           }
-          const result = (await lovable.auth.signInWithOAuth("google", {
-            redirect_uri: `${authRedirectOrigin()}/auth/callback`,
-          })) as { error?: unknown } | undefined;
-          const oauthError = result?.error;
-          if (oauthError) {
-            const message =
-              typeof oauthError === "string"
-                ? oauthError
-                : ((oauthError as { message?: string }).message ?? "Falha no login com Google.");
-            return { error: traduzErro({ message }) };
-          }
+
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo },
+          });
+          if (error) return { error: traduzErro(error) };
           return { error: null };
         } catch (err) {
           return { error: traduzErro({ message: (err as Error).message }) };
