@@ -16,8 +16,8 @@ export function AuthLayout({
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-12 items-center border-b border-divider px-4">
-        <Link to="/" className="label-h6 text-accent-700">
-          RUMVIA
+        <Link to="/" className="flex items-center">
+          <img src="/logo-rumvia.png" alt="RUMVIA" className="h-6 w-auto" />
         </Link>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 py-10">

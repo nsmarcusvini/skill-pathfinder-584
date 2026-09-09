@@ -63,25 +63,25 @@ export function AppShell({
               isso que faz o recolher parecer brusco mesmo com a largura já
               suave. Crossfade: nenhuma das duas pisca, uma se apaga enquanto a
               outra surge. */}
-          <span className="label-h6 relative shrink-0 text-accent-700">
-            <span
+          <span className="relative flex h-6 w-40 shrink-0 items-center">
+            <img
+              src="/logo-rumvia.png"
+              alt="RUMVIA"
               aria-hidden={collapsed}
               className={cn(
-                "block truncate transition-opacity duration-300 ease-in-out",
+                "block h-6 w-auto transition-opacity duration-300 ease-in-out",
                 collapsed ? "opacity-0" : "opacity-100",
               )}
-            >
-              RUMVIA
-            </span>
-            <span
+            />
+            <img
+              src="/logo-rumvia-icon.png"
+              alt="RUMVIA"
               aria-hidden={!collapsed}
               className={cn(
-                "absolute inset-0 transition-opacity duration-300 ease-in-out",
+                "absolute inset-y-0 left-0 h-6 w-auto transition-opacity duration-300 ease-in-out",
                 collapsed ? "opacity-100" : "opacity-0",
               )}
-            >
-              R
-            </span>
+            />
           </span>
         </div>
 
@@ -146,7 +146,7 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-divider bg-bg px-4">
-          <span className="label-h6 shrink-0 text-accent-700 md:hidden">RUMVIA</span>
+          <img src="/logo-rumvia.png" alt="RUMVIA" className="h-6 w-auto shrink-0 md:hidden" />
 
           <div data-tour="tour-topbar-filtros" className="flex min-w-0 items-center gap-3">
             {trackOptions.length > 0 ? (

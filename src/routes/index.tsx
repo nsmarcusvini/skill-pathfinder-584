@@ -118,8 +118,8 @@ function LandingPage() {
       {/* ═══ HEADER ═══ */}
       <header className="sticky top-0 z-30 flex h-12 items-center border-b border-divider bg-bg">
         <div className="rumvia-container flex w-full items-center">
-          <Link to="/" className="label-h6 mr-auto text-accent-700">
-            RUMVIA
+          <Link to="/" className="mr-auto flex items-center">
+            <img src="/logo-rumvia.png" alt="RUMVIA" className="h-6 w-auto" />
           </Link>
           <nav className="flex items-center gap-3">
             <Link to="/login" className="text-caption text-neutral-600 hover:text-accent-700">

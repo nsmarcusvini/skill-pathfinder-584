@@ -7,8 +7,8 @@ export function PublicHeader() {
 
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center border-b border-divider bg-bg px-4">
-      <Link to="/" className="label-h6 text-accent-700">
-        RUMVIA
+      <Link to="/" className="flex items-center">
+        <img src="/logo-rumvia.png" alt="RUMVIA" className="h-6 w-auto" />
       </Link>
 
       <nav className="ml-auto flex items-center gap-2">
