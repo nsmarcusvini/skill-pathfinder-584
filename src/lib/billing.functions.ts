@@ -388,7 +388,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     // Uma assinatura viva por usuário (índice único parcial garante isso).
     const { data: existing } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status, checkout_url, plan_id, current_period_end")
+      .select("id, status, checkout_url, plan_id, current_period_end, method, dev_mode")
       .eq("user_id", userId)
       .in("status", LIVE_STATUSES)
       .maybeSingle();
@@ -410,10 +410,32 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     ) {
       throw new Error("Você já tem uma assinatura ativa.");
     }
-    // Checkout ainda aberto PARA O MESMO PLANO: devolve o mesmo link em vez de
-    // criar outro. Se a pessoa trocou de ciclo, reaproveitar cobraria o preço
-    // errado — o link antigo é descartado e um checkout novo é aberto.
-    if (existing?.status === "pending" && existing.checkout_url && existing.plan_id === plan.id) {
+    // Checkout ainda aberto PARA O MESMO PLANO, MÉTODO e AMBIENTE: devolve o
+    // mesmo link em vez de criar outro.
+    //
+    // As três condições existem por motivos diferentes, e cada uma já causaria
+    // um bug próprio:
+    //
+    // - PLANO: reaproveitar depois de trocar de ciclo cobraria o preço errado.
+    // - MÉTODO: o link do Asaas nasce amarrado ao billingType. Sem esta
+    //   checagem, quem tem um checkout de cartão pendente e clica em "Pagar com
+    //   PIX" recebe de volta a tela de CARTÃO. Entrou junto com o PIX avulso e
+    //   passou despercebido até aqui.
+    // - AMBIENTE: link de sandbox não pode ser servido depois que a chave virou
+    //   de produção. Sem isso, quem trocou a ASAAS_API_KEY e testou com uma
+    //   assinatura `pending` antiga receberia o link antigo de
+    //   `sandbox.asaas.com` e concluiria que a troca de chave não funcionou —
+    //   quando na verdade o código só devolveu um checkout velho.
+    const mesmoAmbiente = existing?.dev_mode === isSandboxKey();
+    const metodoGravado = data.method === "PIX" ? "PIX" : "CREDIT_CARD";
+
+    if (
+      existing?.status === "pending" &&
+      existing.checkout_url &&
+      existing.plan_id === plan.id &&
+      existing.method === metodoGravado &&
+      mesmoAmbiente
+    ) {
       return { url: existing.checkout_url, reused: true };
     }
 
