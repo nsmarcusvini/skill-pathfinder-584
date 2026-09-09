@@ -92,6 +92,35 @@ if (conta.personType === "FISICA") {
   );
 }
 
+// ─── 1b. chaves PIX ──────────────────────────────────────────────────────────
+// Cobrança PIX exige pelo menos uma chave `ACTIVE` na conta. Criar não basta:
+// a chave nasce `AWAITING_ACTIVATION` até o registro no DICT (Banco Central)
+// concluir. O erro que o Asaas devolve nesse meio-tempo é "Para gerar cobranças
+// com Pix é necessário criar uma chave Pix no Asaas" — que não menciona status
+// e sugere criar outra chave, o que não resolve e ainda polui a conta.
+const chavesPix = await asaas.listPixKeys();
+const pixAtiva = chavesPix.find((c) => c.status === "ACTIVE");
+
+if (chavesPix.length === 0) {
+  console.warn(
+    "\n  ⚠ Nenhuma chave PIX nesta conta. O checkout PIX vai falhar.\n" +
+      "    Crie em Asaas → PIX → Minhas chaves (a aleatória/EVP ativa mais rápido).",
+  );
+} else if (!pixAtiva) {
+  console.warn(
+    `\n  ⚠ Nenhuma chave PIX ATIVA (${chavesPix.length} cadastrada(s)). O checkout PIX vai falhar.`,
+  );
+  for (const c of chavesPix) {
+    console.warn(`    ${c.type.padEnd(6)} ${c.status}`);
+  }
+  console.warn(
+    "    AWAITING_ACTIVATION é normal logo após criar — o registro no Banco Central\n" +
+      "    leva um tempo. NÃO crie outra chave: espere esta ativar.",
+  );
+} else {
+  console.log(`\n✓ chave PIX ativa: ${pixAtiva.type}`);
+}
+
 // ─── 2. planos ───────────────────────────────────────────────────────────────
 // O catálogo tem N ciclos ativos (mensal, trimestral, anual). Não há produto a
 // criar no Asaas — o preço vai direto no checkout —, então aqui só conferimos
@@ -129,21 +158,18 @@ for (const plan of plans) {
         `O checkout deste plano vai falhar.`,
     );
   }
-  // O checkout do RUMVIA usa chargeTypes: RECURRENT, e o Asaas recusa
-  // qualquer PIX ali — "CREDIT_CARD é o único método permitido para
-  // operações RECURRENT" (testado no sandbox, docs/PAGAMENTOS.md). Vale
-  // mesmo com CNPJ: o guard em `startSubscriptionCheckout` já bloqueia isso
-  // em runtime; aqui é o aviso em tempo de auditoria, antes de alguém tentar
-  // assinar de verdade e cair num 400 sem contexto.
-  if (plan.methods.includes("PIX")) {
+  // PIX aqui é AVULSO (pré-pago, chargeTypes: DETACHED), implementado em
+  // 2026-09-08 — não é mais motivo de erro. O que ele exige é chave PIX ativa,
+  // conferida uma vez lá em cima; se não houver, o aviso já foi dado e repetir
+  // por plano seria ruído.
+  //
+  // O que continua impossível é PIX em cobrança RECURRENT ("CREDIT_CARD é o
+  // único método permitido"), mas isso o código nunca tenta: `method: "PIX"`
+  // manda DETACHED. E PIX Automático é outra API, ainda não implementada.
+  if (plan.methods.includes("PIX") && !pixAtiva) {
     console.error(
-      `  ✗ ${plan.key} lista PIX nos métodos, mas o checkout recorrente sempre recusa PIX ` +
-        `(chargeTypes: RECURRENT). ${
-          conta.personType === "FISICA"
-            ? "Conta também é pessoa física: PIX Automático de verdade exigiria CNPJ ativo há 6+ meses. "
-            : ""
-        }O código já bloqueia o checkout deste plano — corrija "methods" ou implemente o fluxo ` +
-        `de PIX Automático (API separada) antes de tirar o bloqueio.`,
+      `  ✗ ${plan.key} oferece PIX, mas a conta não tem chave PIX ativa — ` +
+        `o botão "Pagar com PIX" vai falhar para o cliente.`,
     );
   }
 }

@@ -12,6 +12,7 @@ import {
   type AsaasCheckout,
   type AsaasCustomer,
   type AsaasPayment,
+  type AsaasPixKey,
   type AsaasSubscription,
   type AsaasWebhookConfig,
   type AsaasWebhookEvent,
@@ -278,6 +279,21 @@ export const asaas = {
 
   // ─── Clientes ──────────────────────────────────────────────────────────────
   getCustomer: (customerId: string) => request<AsaasCustomer>("GET", `/customers/${customerId}`),
+
+  // ─── PIX ───────────────────────────────────────────────────────────────────
+  /**
+   * Chaves PIX da conta. Cobrança PIX exige pelo menos uma com status `ACTIVE`
+   * — criar a chave NÃO basta: ela nasce `AWAITING_ACTIVATION` enquanto o
+   * registro no DICT (Banco Central) não conclui. Sem chave ativa, o checkout
+   * PIX é recusado com "Para gerar cobranças com Pix é necessário criar uma
+   * chave Pix no Asaas", que não menciona o status e manda criar outra — o que
+   * não resolve.
+   *
+   * Sandbox e produção são contas separadas: chave ativa em homologação não
+   * vale em produção.
+   */
+  listPixKeys: () =>
+    request<{ data: AsaasPixKey[] }>("GET", "/pix/addressKeys").then((r) => r.data ?? []),
 
   // ─── Webhooks ──────────────────────────────────────────────────────────────
   listWebhooks: () =>

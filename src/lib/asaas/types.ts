@@ -108,6 +108,31 @@ export interface AsaasPayment {
   clientPaymentDate?: string | null;
 }
 
+/**
+ * Chave PIX da conta.
+ *
+ * `ACTIVE` é o único status que permite gerar cobrança PIX. `AWAITING_ACTIVATION`
+ * é o estado normal logo após criar — o registro no DICT (Banco Central) leva
+ * um tempo, e chave de CPF/e-mail/telefone ainda passa por verificação de
+ * posse. Enquanto isso o checkout PIX é recusado.
+ */
+export type AsaasPixKeyStatus =
+  | "AWAITING_ACTIVATION"
+  | "ACTIVE"
+  | "AWAITING_DELETION"
+  | "AWAITING_ACCOUNT_DELETION"
+  | "DELETED"
+  | "ERROR";
+
+export interface AsaasPixKey {
+  id: string;
+  key: string;
+  /** EVP = chave aleatória. É a que ativa mais rápido: não depende de verificar posse. */
+  type: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+  status: AsaasPixKeyStatus;
+  dateCreated: string;
+}
+
 export interface AsaasWebhookConfig {
   id?: string;
   name: string;
