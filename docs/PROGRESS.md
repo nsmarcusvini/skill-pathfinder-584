@@ -216,3 +216,12 @@
   **A ordem em `deleteMyAccount` é parte da correção, não estilo:** encerrar a assinatura vem ANTES de apagar o usuário, porque o cancelamento depende do `provider_subscription_id` gravado em `subscriptions`, linha que cai em cascata junto com `auth.users`. Invertida, a ordem destrói o ponteiro antes de usá-lo — e aí não há como parar a cobrança nem descobrir qual assinatura no Asaas pertencia a quem. Está comentado no código para não ser "arrumado" depois.
 
   Achado ao apagar a conta de teste que tinha acabado de pagar R$ 29,90 de verdade: fui conferir se a exclusão cuidaria da assinatura e não cuidava. Naquele caso não houve prejuízo porque o estorno já tinha sido feito antes.
+- Limite de leitura de CV: por IP **e** por sessão, cota só na leitura que dá certo (2026-09-09): o limite era 2/hora **por IP**, fixo no código, com três problemas. **(1) IP compartilhado punia inocente** — empresa atrás de NAT, faculdade, coworking e operadora móvel (CGNAT) dividem IP público: duas pessoas testavam e a terceira via "limite atingido" sem ter enviado nada. **(2) Tentativa que falhava consumia cota** — o contador subia ANTES de tentar ler o PDF, então quem mandava arquivo ilegível não recebia nada e ainda ficava trancado uma hora, na tela que é a porta de entrada do produto. **(3) Mudar o número exigia deploy.**
+
+  Agora são duas cotas em camadas: **sessão apertada (5)** contra a mesma pessoa repetindo, **IP generosa (20)** contra automação sem travar rede compartilhada. Os números vivem em `app_settings` (`parse_rate_limit_session`, `parse_rate_limit_ip`) — ajustar é UPDATE, zero deploy, regra 1. O débito saiu para depois do parse ter sucesso.
+
+  A mensagem também mudou: dizia "tente novamente mais tarde", que manda embora quem estava a um clique de criar conta. Agora diz que criar conta remove o limite — que é exatamente o que o funil quer.
+
+  **`ip_hash` virou `subject`** + `subject_kind` ('ip'|'session'), pelo mesmo motivo de `abacate_*` ter virado `provider_*`: nome de coluna que mente envelhece mal. `types.ts` corrigido junto — estava desatualizado e nada acusava, porque o acesso àquela tabela não era estritamente tipado.
+
+  **Índice:** existia `UNIQUE (subject, window_start)`, de quando só havia IP. Trocado por `UNIQUE (subject_kind, subject, window_start)` — sessão e IP são cotas independentes e precisam coexistir. Era constraint, não só índice, então saiu por `ALTER TABLE`. Verificado no banco: as duas cotas coexistem com o mesmo valor de sujeito, e duplicar a mesma cota continua dando `23505`.

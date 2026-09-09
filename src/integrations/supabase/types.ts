@@ -1012,19 +1012,22 @@ export type Database = {
         Row: {
           count: number
           id: string
-          ip_hash: string
+          subject: string
+          subject_kind: string
           window_start: string
         }
         Insert: {
           count?: number
           id?: string
-          ip_hash: string
+          subject: string
+          subject_kind?: string
           window_start: string
         }
         Update: {
           count?: number
           id?: string
-          ip_hash?: string
+          subject?: string
+          subject_kind?: string
           window_start?: string
         }
         Relationships: []

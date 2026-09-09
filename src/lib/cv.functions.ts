@@ -4,6 +4,104 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/** Janela de cota: a hora cheia do relógio. */
+function janelaAtual(): string {
+  return new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString();
+}
+
+async function hashIp(): Promise<string> {
+  const forwarded = getRequestHeader("x-forwarded-for") ?? "";
+  const ip = forwarded.split(",")[0]?.trim() || "desconhecido";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Cota configurável em `app_settings`; o número no código é só o piso de segurança. */
+async function cota(key: string, padrao: number): Promise<number> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+  const n = Number(data?.value);
+  return Number.isFinite(n) && n > 0 ? n : padrao;
+}
+
+/**
+ * Duas cotas em camadas para o visitante anônimo.
+ *
+ * SESSÃO (apertada): impede a mesma pessoa de repetir sem parar.
+ * IP (generosa): impede automação, sem travar rede compartilhada — empresa
+ * atrás de NAT, faculdade, coworking e operadora móvel dividem um IP público,
+ * e a cota só por IP fazia a terceira pessoa de um escritório ser barrada sem
+ * nunca ter enviado nada.
+ *
+ * Devolve a mensagem de erro, ou `null` se pode seguir.
+ */
+async function limiteExcedido(userId: string): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const window_start = janelaAtual();
+
+  const [limiteSessao, limiteIp, ipHash] = await Promise.all([
+    cota("parse_rate_limit_session", 5),
+    cota("parse_rate_limit_ip", 20),
+    hashIp(),
+  ]);
+
+  const ler = async (subject_kind: string, subject: string) => {
+    const { data } = await supabaseAdmin
+      .from("parse_rate_limits")
+      .select("count")
+      .eq("subject_kind", subject_kind)
+      .eq("subject", subject)
+      .eq("window_start", window_start)
+      .maybeSingle();
+    return data?.count ?? 0;
+  };
+
+  if ((await ler("session", userId)) >= limiteSessao) {
+    // A mensagem diz o que resolve AGORA. "Tente mais tarde" mandava embora
+    // quem estava a um clique de criar conta — que é o que queremos.
+    return `Você já usou as ${limiteSessao} leituras gratuitas desta hora. Crie sua conta para continuar sem esse limite.`;
+  }
+  if ((await ler("ip", ipHash)) >= limiteIp) {
+    return "Muitas leituras vindas da sua rede nesta hora. Crie sua conta para continuar sem esse limite.";
+  }
+  return null;
+}
+
+/** Debita a cota. Chamado só depois da leitura dar certo. */
+async function debitarCota(userId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const window_start = janelaAtual();
+  const ipHash = await hashIp();
+
+  for (const [subject_kind, subject] of [
+    ["session", userId],
+    ["ip", ipHash],
+  ] as const) {
+    const { data } = await supabaseAdmin
+      .from("parse_rate_limits")
+      .select("id, count")
+      .eq("subject_kind", subject_kind)
+      .eq("subject", subject)
+      .eq("window_start", window_start)
+      .maybeSingle();
+
+    if (data) {
+      await supabaseAdmin
+        .from("parse_rate_limits")
+        .update({ count: data.count + 1 })
+        .eq("id", data.id);
+    } else {
+      await supabaseAdmin
+        .from("parse_rate_limits")
+        .insert({ subject_kind, subject, window_start, count: 1 });
+    }
+  }
+}
+
 /**
  * Leitura determinística do currículo (equivalente à função parse-cv).
  * Nesta stack o backend do app roda como server function do TanStack Start.
@@ -50,32 +148,11 @@ export const parseCv = createServerFn({ method: "POST" })
         return fail("Visitantes podem manter apenas 1 currículo. Crie sua conta para o histórico.");
       }
 
-      const forwarded = getRequestHeader("x-forwarded-for") ?? "";
-      const ip = forwarded.split(",")[0]?.trim() || "desconhecido";
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
-      const ipHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      const windowStart = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString();
-
-      const { data: limitRow } = await supabaseAdmin
-        .from("parse_rate_limits")
-        .select("id, count")
-        .eq("ip_hash", ipHash)
-        .eq("window_start", windowStart)
-        .maybeSingle();
-
-      if (limitRow && limitRow.count >= 2) {
-        return fail("Limite de 2 leituras por hora atingido. Tente novamente mais tarde.");
-      }
-      if (limitRow) {
-        await supabaseAdmin
-          .from("parse_rate_limits")
-          .update({ count: limitRow.count + 1 })
-          .eq("id", limitRow.id);
-      } else {
-        await supabaseAdmin
-          .from("parse_rate_limits")
-          .insert({ ip_hash: ipHash, window_start: windowStart, count: 1 });
-      }
+      const excedeu = await limiteExcedido(userId);
+      if (excedeu) return fail(excedeu);
+      // A cota NÃO é debitada aqui: só depois da leitura dar certo, lá embaixo.
+      // Cobrar antes fazia arquivo ilegível gastar tentativa — a pessoa não
+      // recebia nada e ainda ficava trancada.
     }
 
     await supabase.from("cvs").update({ status: "parsing", parse_error: null }).eq("id", cv.id);
@@ -153,6 +230,10 @@ export const parseCv = createServerFn({ method: "POST" })
       }
 
       await supabase.from("cvs").update({ status: "parsed", parse_error: null }).eq("id", cv.id);
+
+      // Só aqui a cota é debitada: a leitura funcionou e a pessoa recebeu o
+      // resultado. Quem mandou arquivo ilegível não pagou tentativa.
+      if (isAnonymous) await debitarCota(userId);
 
       return {
         ok: true as const,
