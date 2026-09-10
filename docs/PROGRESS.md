@@ -238,3 +238,8 @@
   **Verificado no navegador:** console limpo após a correção, e a barra confirmada no ciclo completo (oculta → VISÍVEL logo após o clique → oculta ao terminar). **Não deu para verificar o preload localmente**: em dev o Vite serve tudo sem bundle (180 recursos), então não há chunk a pré-carregar — isso só se prova em produção.
 
   **Deixado de fora de propósito:** reagrupar os 12 itens do menu lateral (decisão de design, e há outra sessão mexendo em UI) e migrar as rotas para `loader` (mudança grande — melhor medir o ganho destes três antes).
+- Logo no rodapé da landing (2026-09-09): último dos 4 lugares da marca, deixado de fora de propósito no commit 17d3473 porque o texto navy sólido do lockup ficaria ilegível sobre o fundo quase preto do rodapé (`var(--rumvia-text)`). Gerada uma segunda variante do PNG: mesmo arquivo fonte, texto/R recolorido para `var(--rumvia-bg)` (o mesmo tom que o "RUMVIA" de texto já usava ali), gradiente das barras preservado — ele já lia bem no escuro. Corte por canal azul (B<150 = navy sólido, B>=150 = gradiente): os dois grupos de cor estão bem distantes um do outro, então a borda saiu limpa, sem franja navy no antialiasing das letras. Verificado ampliado (4x) sobre o `#1d1f20` real do rodapé antes de integrar.
+
+  `public/logo-rumvia-footer.png` — gerado uma vez, sem lógica de recolorir em runtime. `routes/index.tsx` ganhou 8 linhas, isolando o `<span>RUMVIA</span>` de texto pela `<img>`.
+
+  **Nota de coordenação, mesma situação do commit anterior:** o arquivo tinha uma edição concorrente de outra sessão (troca de aspas numa resposta do FAQ) no momento deste commit. Extraído só o meu hunk do rodapé via reset para HEAD + reaplicação manual da edição — a mudança de aspas continua na working tree, não commitada.

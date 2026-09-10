@@ -699,12 +699,14 @@ function LandingPage() {
         <div className="rumvia-container">
           <div className="flex flex-wrap items-start justify-between gap-10">
             <div className="flex flex-col gap-2">
-              <span
-                className="font-heading font-bold uppercase"
-                style={{ fontSize: 20, color: "var(--rumvia-bg)", letterSpacing: "0.08em" }}
-              >
-                RUMVIA
-              </span>
+              {/* Mesmo lockup dos outros 3 lugares (commit 17d3473), mas com o
+                  texto navy sólido recolorido para var(--rumvia-bg): sobre este
+                  fundo quase preto, o navy original ficaria ilegível. Só o
+                  texto muda de cor — as barras do ícone são gradiente e já
+                  liam bem no escuro, então ficaram como estavam. Gerado uma
+                  vez (canvas, corte por canal azul) e commitado como PNG; não
+                  há lógica de recolorir em runtime. */}
+              <img src="/logo-rumvia-footer.png" alt="RUMVIA" className="h-6 w-auto" />
               <p
                 className="text-caption"
                 style={{ color: "rgba(242,242,243,0.4)", maxWidth: 260, lineHeight: 1.55 }}
