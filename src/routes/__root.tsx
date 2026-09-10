@@ -9,6 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import { cn } from "@/lib/utils";
 
@@ -186,6 +187,7 @@ function RootComponent() {
         </MarketProvider>
         <Toaster />
       </AuthProvider>
+      <Analytics />
     </QueryClientProvider>
   );
 }
