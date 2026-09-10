@@ -29,11 +29,15 @@ export const Route = createFileRoute("/onboarding")({
       { property: "og:description", content: "Configure sua trilha de carreira no RUMVIA." },
     ],
   }),
+  // O CV vem antes de tudo: é dele que saem trilha e senioridade que esta tela
+  // apenas confirma. Enviar currículo AQUI exigiria sair da página (/cv), o que
+  // desmontava o componente e devolvia o wizard ao passo 1 — o bug que existiu.
+  //
   // Pagar vem ANTES do onboarding: o produto inteiro é pago, e fazer alguém
   // preencher trilha/senioridade para só então descobrir que não entra é o
   // pior momento possível para apresentar o preço.
   component: () => (
-    <ProtectedRoute requireAccount requireSubscription>
+    <ProtectedRoute requireAccount requireCv requireSubscription>
       <OnboardingPage />
     </ProtectedRoute>
   ),
@@ -306,24 +310,6 @@ function OnboardingPage() {
     </section>
   );
 
-  const stepCv = (
-    <section className="flex flex-col gap-3">
-      <p className="text-caption text-neutral-700">
-        Envie seu currículo para extrairmos suas skills automaticamente. A leitura é por dicionário,
-        sem IA — ela não inventa, mas também não adivinha. Você pode acrescentar à mão o que faltar
-        depois.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => void navigate({ to: "/cv" })}>
-          Enviar CV
-        </Button>
-        <Button variant="ghost" onClick={finalizar} loading={saving}>
-          Pular por enquanto
-        </Button>
-      </div>
-    </section>
-  );
-
   if (inferido) {
     return (
       <div className="rumvia-container py-10">
@@ -347,13 +333,13 @@ function OnboardingPage() {
     );
   }
 
-  const passos = [stepTrilha, stepSenioridade, stepSegmento, stepCv];
-  const titulos = ["Trilha", "Senioridade", "Segmento de mercado", "Currículo"];
+  const passos = [stepTrilha, stepSenioridade, stepSegmento];
+  const titulos = ["Trilha", "Senioridade", "Segmento de mercado"];
 
   return (
     <div className="rumvia-container py-10">
       <PageHeader
-        eyebrow={`Passo ${step} de 4`}
+        eyebrow={`Passo ${step} de ${passos.length}`}
         title={titulos[step - 1] ?? ""}
         subtitle="Configuração inicial da sua análise."
       />
@@ -363,7 +349,7 @@ function OnboardingPage() {
           <Button variant="ghost" disabled={step === 1} onClick={() => setStep((s) => s - 1)}>
             Voltar
           </Button>
-          {step < 4 ? (
+          {step < passos.length ? (
             <Button onClick={() => setStep((s) => s + 1)} disabled={!trackId}>
               Continuar
             </Button>

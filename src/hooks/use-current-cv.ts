@@ -11,12 +11,15 @@ import { useAuth } from "@/hooks/use-auth";
  * cópias da mesma query divergiriam no dia em que o critério de "já
  * extraído" mudasse — e cache reuso entre as duas telas é bônus, não custo.
  */
-export function useCurrentCv() {
+export function useCurrentCv(options?: { enabled?: boolean }) {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ["analise-cv", user?.id],
-    enabled: Boolean(user),
+    // `ProtectedRoute` chama este hook em toda rota de conta, mas só precisa do
+    // dado quando o portão de CV está ligado — sem o opt-out seria uma consulta
+    // a mais em cada navegação do painel.
+    enabled: (options?.enabled ?? true) && Boolean(user),
     queryFn: async () => {
       const { data } = await supabase
         .from("cvs")
