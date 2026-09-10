@@ -155,11 +155,32 @@ export const computeGap = createServerFn({ method: "POST" })
     const supabase = context.supabase;
     const userId = context.userId;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("current_track_id, seniority, target_region, target_currency")
-      .eq("id", userId)
-      .maybeSingle();
+    // As três consultas dependem só do `userId` — nenhuma lê o resultado da
+    // outra. Em série custavam três idas ao banco (~200ms cada, medido); juntas
+    // custam uma. `lastSkill` entra aqui mesmo sendo usada só lá embaixo, no
+    // teste de cache: adiantá-la não muda resultado nenhum, e o único caso em
+    // que ela é buscada à toa é o do usuário sem trilha, que sai no `return
+    // empty` logo abaixo — raro, e uma consulta ociosa não custa correção.
+    const [{ data: profile }, { data: pref }, { data: lastSkill }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("current_track_id, seniority, target_region, target_currency")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("user_track_preferences")
+        .select("role_variant_id")
+        .eq("user_id", userId)
+        .eq("is_primary", true)
+        .maybeSingle(),
+      supabase
+        .from("user_skills")
+        .select("updated_at")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     const trackId = profile?.current_track_id ?? null;
     const seniority = data.seniority ?? profile?.seniority ?? "pleno";
@@ -168,12 +189,6 @@ export const computeGap = createServerFn({ method: "POST" })
     const currency = marketSegment === "remoto_global" ? "USD" : "BRL";
     const periodDays = data.periodDays ?? 90;
 
-    const { data: pref } = await supabase
-      .from("user_track_preferences")
-      .select("role_variant_id")
-      .eq("user_id", userId)
-      .eq("is_primary", true)
-      .maybeSingle();
     const roleVariantId = pref?.role_variant_id ?? null;
 
     const empty: GapResult = {
@@ -202,14 +217,7 @@ export const computeGap = createServerFn({ method: "POST" })
     const paramsHash = hashParams([trackId, roleVariantId, seniority, marketSegment, periodDays]);
 
     // ---- cache: 24h, invalidado por qualquer alteração em user_skills ----
-    const { data: lastSkill } = await supabase
-      .from("user_skills")
-      .select("updated_at")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    // `lastSkill` já veio no Promise.all lá em cima.
     const { data: previousRows } = await supabase
       .from("gap_analyses")
       .select("*")
@@ -309,23 +317,30 @@ export const computeGap = createServerFn({ method: "POST" })
     let demandRows: Array<{ skill_id: string; jobs: number; total_jobs: number }> = [];
     let stats = { total_jobs: 0, companies_30d: 0, salary_median: null as number | null };
 
+    const mercado = await marketDb();
+
     for (const s of steps) {
       const since = new Date(Date.now() - s.days * 24 * 60 * 60 * 1000).toISOString();
-      const { data: rows } = await (await marketDb()).rpc("market_demand", {
-        _track_id: trackId,
-        _seniorities: s.sen,
-        _segments: s.seg,
-        _since: since,
-        _include_unranked: s.unranked,
-      });
-      const { data: statRows } = await (await marketDb()).rpc("market_scope_stats", {
-        _track_id: trackId,
-        _seniorities: s.sen,
-        _segments: s.seg,
-        _since: since,
-        _include_unranked: s.unranked,
-        _salary_segment: marketSegment,
-      });
+      // As duas RPCs recebem o MESMO recorte e nenhuma lê o resultado da outra:
+      // em série cada degrau de ampliação custava duas idas ao banco, e o laço
+      // roda até quatro vezes quando a amostra é escassa.
+      const [{ data: rows }, { data: statRows }] = await Promise.all([
+        mercado.rpc("market_demand", {
+          _track_id: trackId,
+          _seniorities: s.sen,
+          _segments: s.seg,
+          _since: since,
+          _include_unranked: s.unranked,
+        }),
+        mercado.rpc("market_scope_stats", {
+          _track_id: trackId,
+          _seniorities: s.sen,
+          _segments: s.seg,
+          _since: since,
+          _include_unranked: s.unranked,
+          _salary_segment: marketSegment,
+        }),
+      ]);
       const st = statRows?.[0];
       usedStep = s.step;
       demandRows = (rows ?? []) as typeof demandRows;

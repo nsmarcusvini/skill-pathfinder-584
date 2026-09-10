@@ -9,6 +9,13 @@ export interface NavItem {
   icon?: React.ReactNode;
   /** Âncora do tour guiado (data-tour). Só o menu desktop recebe o atributo. */
   tourId?: string;
+  /**
+   * Adianta o DADO da tela por intenção, como o router já faz com o código
+   * (`defaultPreload: "intent"`). Disparado no hover, no foco por teclado e no
+   * primeiro toque. Deve ser idempotente e barato quando o cache está fresco —
+   * `prefetchQuery` já garante isso.
+   */
+  onPrefetch?: () => void;
 }
 
 export interface SelectOption {
@@ -93,6 +100,9 @@ export function AppShell({
               activeProps={{ "data-active": "true" }}
               title={item.label}
               data-tour={item.tourId}
+              onMouseEnter={item.onPrefetch}
+              onFocus={item.onPrefetch}
+              onTouchStart={item.onPrefetch}
             >
               <span className="shrink-0">{item.icon}</span>
               {/* Sempre montado; encolhe e apaga junto, no mesmo ritmo da
@@ -203,6 +213,7 @@ export function AppShell({
                 "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-accent-700 bg-surface font-semibold",
             }}
             title={item.label}
+            onTouchStart={item.onPrefetch}
           >
             <span aria-hidden>{item.icon}</span>
             <span className="truncate px-0.5">{item.label}</span>

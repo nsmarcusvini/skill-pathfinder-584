@@ -23,6 +23,7 @@ import { Blueprint } from "@/components/rumvia/blueprint";
 import { Tour } from "@/components/rumvia/tour";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { usePrefetchGap } from "@/hooks/use-gap";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useMarket, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
 
@@ -137,10 +138,17 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   const { canAccess, resolvendo } = useSubscription();
   const mostrarFaixa = !resolvendo && !canAccess && pathname !== "/assinatura";
 
-  const nav = React.useMemo(
-    () => (profile?.is_admin ? [...NAV, ADMIN_NAV] : NAV),
-    [profile?.is_admin],
-  );
+  const prefetchGap = usePrefetchGap();
+
+  // O prefetch é ligado aqui, e não no NAV: ele nasce de hooks (sessão, recorte
+  // de mercado, queryClient) e o NAV é constante de módulo. Só o Dashboard tem
+  // um por enquanto — é a tela cuja consulta domina a espera (compute-gap).
+  const nav = React.useMemo(() => {
+    const base = profile?.is_admin ? [...NAV, ADMIN_NAV] : NAV;
+    return base.map((item) =>
+      item.to === "/dashboard" ? { ...item, onPrefetch: prefetchGap } : item,
+    );
+  }, [profile?.is_admin, prefetchGap]);
 
   const trackOptions = market.tracks.map((t) => ({ value: t.id, label: t.name }));
 
