@@ -140,10 +140,16 @@ type SubscriptionRow = {
   plan_id: string;
   first_activated_at: string | null;
   cancelled_due_to: string | null;
+  provider_customer_id: string | null;
+  amount_cents: number | null;
 };
 
-const SELECT =
-  "id, user_id, status, current_period_end, plan_id, first_activated_at, cancelled_due_to";
+// Uma linha só, por mais comprida que fique: o supabase-js infere o tipo da
+// linha a partir do LITERAL da string de select. Quebrar em duas com `+` faz a
+// inferência desistir e devolver `GenericStringError`, e aí todo acesso a campo
+// vira erro de tipo. Não é estilo — é o que faz o tipo existir.
+// prettier-ignore
+const SELECT = "id, user_id, status, current_period_end, plan_id, first_activated_at, cancelled_due_to, provider_customer_id, amount_cents";
 
 /**
  * Status que contam como "assinatura viva". Espelha exatamente o WHERE do
@@ -254,6 +260,87 @@ interface ApplyOutcome {
   reason?: string;
 }
 
+/**
+ * Pagamento chegou de um cliente que está bloqueado para recontratação.
+ *
+ * O checkout já recusa quem tem o mesmo user_id ou o mesmo e-mail; o que chega
+ * aqui é quem trocou de conta. Só que, quando o webhook roda, o dinheiro JÁ
+ * entrou — não dá para recusar a venda antes. Sobram dois caminhos honestos, e
+ * qual deles vale é decisão de negócio, lida de `app_settings`:
+ *
+ *   'flag'   (default) — marca a assinatura e grita no log; o acesso continua.
+ *                        Nada acontece com o dinheiro sem alguém olhar.
+ *   'refund'           — devolve na hora e cancela. Também é honesto: a pessoa
+ *                        recebe tudo de volta em minutos e a venda simplesmente
+ *                        não aconteceu. Mas é dinheiro se movendo sozinho a
+ *                        partir de um webhook, e um falso positivo na lista
+ *                        vira estorno indevido. Só ligue depois de ver o
+ *                        'flag' acertando na prática.
+ *
+ * Devolve o patch a mesclar, ou `null` quando não há nada a fazer.
+ */
+async function tratarPagamentoDeBloqueado(
+  customerId: string,
+  userIdDaAssinatura: string,
+  paymentId: string | null,
+): Promise<SubscriptionUpdate | null> {
+  const { bloqueioPorCustomer } = await import("@/lib/resubscribe-block.server");
+  const bloqueio = await bloqueioPorCustomer(customerId);
+  if (!bloqueio) return null;
+
+  // Mesmo usuário: não é evasão. Acontece se um bloqueio for registrado no
+  // meio de um pagamento em curso — o checkout barra daqui em diante, e não há
+  // motivo para mexer numa cobrança que já estava a caminho.
+  if (bloqueio.user_id === userIdDaAssinatura) return null;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: cfg } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "resubscribe_block_action")
+    .maybeSingle();
+  const acao = typeof cfg?.value === "string" ? cfg.value : "flag";
+
+  console.error(
+    `[bloqueio] pagamento de cliente bloqueado: customer=${customerId} ` +
+      `(bloqueado como ${bloqueio.user_id} por ${bloqueio.reason} em ${bloqueio.created_at}) ` +
+      `pagou de novo como ${userIdDaAssinatura}. Ação configurada: ${acao}.`,
+  );
+
+  // Fica NA LINHA da assinatura, não só no log: log rola para fora da tela e
+  // ninguém vai reler o do mês passado. Em metadata dá para consultar.
+  const marca: SubscriptionUpdate = {
+    metadata: {
+      resubscribe_block_hit: {
+        customer_id: customerId,
+        blocked_user_id: bloqueio.user_id,
+        reason: bloqueio.reason,
+        detected_at: new Date().toISOString(),
+        action: acao,
+      },
+    },
+  };
+
+  if (acao !== "refund" || !paymentId) return marca;
+
+  try {
+    const { asaas } = await import("./client.server");
+    await asaas.refundPayment(paymentId);
+    return {
+      ...marca,
+      status: "refunded",
+      cancelled_at: new Date().toISOString(),
+      cancelled_due_to: "recontratacao_bloqueada",
+    };
+  } catch (erro) {
+    // Estorno falhou: NÃO transforma isso em erro do webhook. O pagamento é
+    // real e o resto do evento (período, recibo) precisa ser gravado do mesmo
+    // jeito — senão a pessoa fica pagante sem acesso, que é o pior dos mundos.
+    console.error(`[bloqueio] estorno automático de ${paymentId} falhou:`, erro);
+    return marca;
+  }
+}
+
 /** Aplica o efeito do evento. Devolve o id da assinatura local afetada. */
 async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
   const event = payload.event;
@@ -337,6 +424,22 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
       // os 7 dias do direito de arrependimento (CDC art. 49), calculada a
       // partir do primeiro pagamento, não do ciclo atual.
       if (!subscription.first_activated_at) patch.first_activated_at = start.toISOString();
+
+      // ─── Conta nova, mesma pessoa ─────────────────────────────────────────
+      // `startSubscriptionCheckout` recusa quem está bloqueado, mas só sabe
+      // olhar user_id e e-mail. Quem exclui a conta e cria outra com outro
+      // e-mail passa por lá — e só aqui, quando o pagamento chega, aparece o
+      // `cust_...` que o CPF gerou na página hospedada do Asaas. Este é o
+      // único ponto do sistema em que essa evasão é visível.
+      const cliente = payment?.customer ?? remoteSub?.customer ?? null;
+      if (cliente) {
+        const acao = await tratarPagamentoDeBloqueado(
+          cliente,
+          subscription.user_id,
+          payment?.id ?? null,
+        );
+        if (acao) Object.assign(patch, acao);
+      }
       break;
     }
 
@@ -365,6 +468,18 @@ async function applyEvent(payload: AsaasWebhookPayload): Promise<ApplyOutcome> {
       patch.status = "cancelled";
       patch.cancelled_at = new Date().toISOString();
       patch.cancelled_due_to = "chargeback";
+
+      // E não vende de novo. Chargeback é mais grave que arrependimento: no
+      // arrependimento a pessoa pediu para nós e devolvemos; aqui ela pediu à
+      // bandeira, o dinheiro saiu sem passar por aqui e ainda custou taxa.
+      const { registrarBloqueio } = await import("@/lib/resubscribe-block.server");
+      await registrarBloqueio({
+        userId: subscription.user_id,
+        reason: "chargeback",
+        subscriptionId: subscription.id,
+        providerCustomerId: payment?.customer ?? subscription.provider_customer_id ?? null,
+        amountCents: subscription.amount_cents ?? null,
+      });
       break;
     }
 

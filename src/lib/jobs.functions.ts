@@ -111,6 +111,11 @@ export const listJobs = createServerFn({ method: "POST" })
   .inputValidator((input: ListJobsInput) => input)
   .handler(async ({ data, context }): Promise<JobsPage> => {
     const { userId } = context;
+    // Antes das consultas, não depois: request que estourou a cota não deve
+    // custar um scan da tabela de vagas.
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(userId, "job_list");
+
     const supabase = await marketDb();
     const limit = Math.min(data.limit ?? 25, 100);
     const offset = data.offset ?? 0;
@@ -243,6 +248,11 @@ export const getJobDetail = createServerFn({ method: "POST" })
   .inputValidator((input: { jobId: string }) => input)
   .handler(async ({ data, context }): Promise<JobDetail | null> => {
     const { userId } = context;
+    // O detalhe é onde o `apply_url` é servido — o dado de maior valor de
+    // extração da base inteira. Se alguma cota importa, é esta.
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(userId, "job_detail", data.jobId);
+
     const supabase = await marketDb();
 
     const { data: job, error } = await supabase
@@ -360,4 +370,28 @@ export const listJobLocations = createServerFn({ method: "POST" })
       jobs: Number(r.vagas),
       spellings: r.grafias ?? [],
     }));
+  });
+
+// ─── Clique na vaga original ─────────────────────────────────────────────────
+
+/**
+ * Registra que o usuário saiu para o `apply_url` de uma vaga.
+ *
+ * É o evento mais probatório da trilha inteira. Abrir o detalhe pode ser
+ * curiosidade; clicar para ir até a vaga na origem é a entrega do produto
+ * acontecendo — é exatamente o que responde "o serviço foi prestado?" num
+ * Procon e "houve entrega?" numa contestação de cartão.
+ *
+ * Não é gargalo do fluxo: a tela dispara e segue para o link sem esperar. Se
+ * esta chamada falhar, a pessoa vai para a vaga do mesmo jeito — a alternativa
+ * (segurar a navegação até o log confirmar) trocaria uma prova por atrito num
+ * clique que é o momento mais importante do produto.
+ */
+export const recordApplyClick = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
+  .inputValidator((input: { jobId: string }) => input)
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(context.userId, "apply_click", data.jobId);
+    return { ok: true };
   });

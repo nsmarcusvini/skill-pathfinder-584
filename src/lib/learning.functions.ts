@@ -104,6 +104,11 @@ export const getCertsCatalog = createServerFn({ method: "POST" })
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CertCatalogItem[]> => {
     const { supabase, userId } = context;
+    // O catálogo virou dado pago em 2026-09-10 (migration 20260910130000) —
+    // então é material extraível, e entra na trilha com teto.
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(userId, "learning_catalog", data.trackId);
+
     const catalogo = await catalogDb();
 
     const [{ data: certs }, { data: userCerts }] = await Promise.all([
@@ -150,6 +155,9 @@ export const getCoursesCatalog = createServerFn({ method: "POST" })
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CourseCatalogItem[]> => {
     const { supabase, userId } = context;
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(userId, "learning_catalog", data.trackId);
+
     const catalogo = await catalogDb();
 
     const [{ data: courses }, { data: userCourses }] = await Promise.all([

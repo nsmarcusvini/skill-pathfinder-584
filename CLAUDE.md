@@ -85,6 +85,21 @@ Cron jobs do `pg_cron` chamam URLs do próprio app via `pg_net`
    ```
    Escrita em tabelas de mercado: só `service_role`.
 
+   **Ligar RLS não basta, e não conceder não é o mesmo que revogar.** O schema `public`
+   deste projeto tem `ALTER DEFAULT PRIVILEGES` concedendo TUDO a `anon` e
+   `authenticated` em toda tabela nova — uma tabela criada sem `REVOKE` nasce com
+   `anon=arwdDxtm | authenticated=arwdDxtm`, mesmo que nenhum `GRANT` a mencione.
+   Então **toda tabela nova leva `REVOKE ALL ON <tabela> FROM anon, authenticated`
+   explícito**, nomeando os papéis (`FROM PUBLIC` não remove grant explícito de papel),
+   e só depois o `GRANT` do que é intencional. O mesmo vale para funções
+   (`REVOKE EXECUTE ... FROM anon, authenticated, public`).
+   **O que prova o estado é `relacl` / `proacl`, nunca o texto do GRANT** — confira com
+   `select relacl from pg_class` / `select proacl from pg_proc` depois de aplicar.
+   Já foi errado três vezes: `list_orphan_cv_objects` e `expire_and_notify_prepaid`
+   (2026-09-10, migration `20260910112613`) e as três tabelas de
+   `resubscribe_blocks`/`usage_*` (2026-09-10, migration `20260910142000`) — nesta
+   última, na migration seguinte à que registrou a lição.
+
 7. **Sessão anônima é sagrada.** `signInAnonymously` no primeiro acesso. Ao converter em
    conta permanente, usar `updateUser` ou `linkIdentity` — **preservar `user.id`**. NUNCA
    criar usuário novo e copiar dados. Está em `src/hooks/use-auth.tsx` — não mexer sem

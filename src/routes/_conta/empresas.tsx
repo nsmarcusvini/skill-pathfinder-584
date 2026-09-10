@@ -50,7 +50,7 @@ import {
   getCompanyMonthly,
   type CompanyRankingItem,
 } from "@/lib/market.functions";
-import { listJobLocations } from "@/lib/jobs.functions";
+import { listJobLocations, recordApplyClick } from "@/lib/jobs.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_conta/empresas")({
@@ -544,6 +544,11 @@ function CompanyDetailPanel({
   followPending: boolean;
   company: CompanyRankingItem | null;
 }) {
+  // O detalhe da empresa também leva ao apply_url. Sem registrar aqui, a trilha
+  // teria um buraco por onde passa justamente quem procura vaga pela empresa em
+  // vez de pela lista.
+  const runApplyClick = useServerFn(recordApplyClick);
+
   return (
     <div className="mt-4 flex flex-col gap-5">
       {/* Header da empresa */}
@@ -646,6 +651,9 @@ function CompanyDetailPanel({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="shrink-0"
+                      onClick={() => {
+                        void runApplyClick({ data: { jobId: job.id } }).catch(() => {});
+                      }}
                     >
                       <Button variant="outline" size="sm">
                         <ExternalLink className="mr-1 size-3" aria-hidden />

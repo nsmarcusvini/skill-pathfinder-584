@@ -19,7 +19,14 @@ import {
   type MarketSegment,
   type Seniority,
 } from "@/hooks/use-market";
-import { listJobs, getJobDetail, listJobLocations, type JobListItem } from "@/lib/jobs.functions";
+import {
+  listJobs,
+  getJobDetail,
+  listJobLocations,
+  recordApplyClick,
+  type JobListItem,
+} from "@/lib/jobs.functions";
+import { mensagemDeLimite } from "@/lib/usage-limits";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_conta/vagas")({
@@ -103,6 +110,7 @@ function VagasPage() {
   const runList = useServerFn(listJobs);
   const runDetail = useServerFn(getJobDetail);
   const runLocations = useServerFn(listJobLocations);
+  const runApplyClick = useServerFn(recordApplyClick);
 
   const [busca, setBusca] = React.useState("");
   const [buscaAtiva, setBuscaAtiva] = React.useState("");
@@ -369,12 +377,24 @@ function VagasPage() {
       ) : null}
 
       {listaQuery.isPending ? <LoadingState /> : null}
-      {listaQuery.isError ? (
-        <ErrorState
-          description="Não foi possível carregar as vagas."
-          onRetry={() => void listaQuery.refetch()}
-        />
-      ) : null}
+      {listaQuery.isError
+        ? // Cota estourada não é falha: dizer "não foi possível carregar" para
+          // quem chegou ao teto do dia manda a pessoa recarregar sem parar
+          // atrás de um erro que não existe. `mensagemDeLimite` devolve o texto
+          // certo quando é limite, e null quando é erro de verdade — e sem botão
+          // de "tentar novamente", que aqui só produziria mais um bloqueio.
+          (() => {
+            const limite = mensagemDeLimite(listaQuery.error);
+            return limite ? (
+              <ErrorState title="Limite de hoje atingido" description={limite} />
+            ) : (
+              <ErrorState
+                description="Não foi possível carregar as vagas."
+                onRetry={() => void listaQuery.refetch()}
+              />
+            );
+          })()
+        : null}
 
       {page && page.items.length === 0 ? (
         page.totalNoFilters === 0 ? (
@@ -493,6 +513,24 @@ function VagasPage() {
 
           {detalheQuery.isPending ? <LoadingState /> : null}
 
+          {/* O detalhe não tinha tratamento de erro: falhava e a gaveta ficava
+              vazia, sem dizer nada. Com a cota diária isso passou a ser um
+              caminho real — abrir a 301ª vaga do dia devolve erro —, e uma
+              gaveta em branco seria lida como bug. */}
+          {detalheQuery.isError
+            ? (() => {
+                const limite = mensagemDeLimite(detalheQuery.error);
+                return limite ? (
+                  <ErrorState title="Limite de hoje atingido" description={limite} />
+                ) : (
+                  <ErrorState
+                    description="Não foi possível carregar esta vaga."
+                    onRetry={() => void detalheQuery.refetch()}
+                  />
+                );
+              })()
+            : null}
+
           {detalhe ? (
             <div className="mt-4 flex flex-col gap-5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-neutral-600">
@@ -576,7 +614,19 @@ function VagasPage() {
               <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
                 {detalhe.applyUrl ? (
                   <Button asChild>
-                    <a href={detalhe.applyUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={detalhe.applyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      // Dispara e segue: a navegação NÃO espera o registro. Se
+                      // esta chamada falhar ou demorar, a pessoa vai para a
+                      // vaga do mesmo jeito — segurar o clique mais importante
+                      // do produto por causa de um log seria trocar a coisa
+                      // certa pela conveniente.
+                      onClick={() => {
+                        void runApplyClick({ data: { jobId: detalhe.id } }).catch(() => {});
+                      }}
+                    >
                       Ver vaga original
                       <ExternalLink className="size-4" aria-hidden />
                     </a>

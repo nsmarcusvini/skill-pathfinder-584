@@ -1236,6 +1236,56 @@ export type Database = {
           },
         ]
       }
+      resubscribe_blocks: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          email_hash: string | null
+          id: string
+          provider_customer_id: string | null
+          reason: string
+          released_at: string | null
+          released_by: string | null
+          released_note: string | null
+          subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          email_hash?: string | null
+          id?: string
+          provider_customer_id?: string | null
+          reason: string
+          released_at?: string | null
+          released_by?: string | null
+          released_note?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          email_hash?: string | null
+          id?: string
+          provider_customer_id?: string | null
+          reason?: string
+          released_at?: string | null
+          released_by?: string | null
+          released_note?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resubscribe_blocks_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_observations: {
         Row: {
           amount_max: number | null
@@ -1818,6 +1868,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      usage_daily: {
+        Row: {
+          count: number
+          day: string
+          event_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          day: string
+          event_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          event_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: number
+          ip_hash: string | null
+          subject_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: never
+          ip_hash?: string | null
+          subject_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: never
+          ip_hash?: string | null
+          subject_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_certifications: {
         Row: {
@@ -2469,6 +2570,16 @@ export type Database = {
       match_company: { Args: { _name: string }; Returns: string }
       notify_expiring_certs: { Args: never; Returns: undefined }
       purge_inactive_anonymous: { Args: never; Returns: number }
+      purge_usage_history: { Args: never; Returns: undefined }
+      record_usage: {
+        Args: {
+          _event_type: string
+          _ip_hash?: string | null
+          _subject_id?: string | null
+          _user_id: string
+        }
+        Returns: number
+      }
       refresh_market_views: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

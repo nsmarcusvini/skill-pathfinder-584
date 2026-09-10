@@ -16,14 +16,14 @@ gerado por `vite build`.
 | 1 | Paywall não cobre `study.functions.ts` e `learning.functions.ts` | **Alto** | ✅ Corrigido 2026-09-10 |
 | 2 | `expire_and_notify_prepaid()` executável sem login | Médio | ✅ Corrigido 2026-09-10 |
 | 3 | `list_orphan_cv_objects()` executável sem login | Médio | ✅ Corrigido 2026-09-10 |
-| 4 | `user_followed_companies` aceita sessão anônima | Baixo | Aberto |
+| 4 | `user_followed_companies` aceita sessão anônima | Baixo | ✅ Corrigido 2026-09-10 |
 | 5 | Proteção contra senha vazada desligada | Baixo | Aberto |
 
 **Estado em 2026-09-10.** Os achados 2 e 3 caíram na migration
 `20260910112613_restringe_funcoes_internas_a_service_role` — conferido no ACL de
 produção: `has_function_privilege('anon', …, 'EXECUTE')` devolve `false` para as
-duas. O achado 1 foi corrigido no mesmo dia (detalhe na seção 1). Sobram os dois
-achados baixos, ambos com correção conhecida e nenhuma exposição de dado.
+duas. Os achados 1 e 4 foram corrigidos no mesmo dia (detalhe nas seções 1 e 4).
+Sobra o **achado 5**, que é um toggle no painel — sem código, sem exposição de dado.
 
 O que **já está certo** está listado no fim — é a maior parte, e vale ler antes de
 concluir que a casa está pegando fogo.
@@ -178,7 +178,7 @@ REVOKE EXECUTE ON FUNCTION public.list_orphan_cv_objects() FROM PUBLIC, anon, au
 
 ---
 
-## 4. `user_followed_companies` aceita sessão anônima — **Baixo**
+## 4. `user_followed_companies` aceita sessão anônima — **Baixo** — ✅ corrigido em `20260910150000`
 
 A regra 6 do `CLAUDE.md` lista essa tabela entre as **exclusivas de conta permanente**,
 que devem ter na policy:
@@ -261,10 +261,29 @@ junto (catálogo totalmente pago).
 
 ### O que continua aberto
 
-1. **Achado 4** — migration alinhando as três policies de `user_followed_companies`
-   à regra 6 (`is_anonymous IS NOT TRUE`). Desvio de regra escrita, não brecha de
-   dados: a pessoa só popula a própria lista.
-2. **Achado 5** — toggle no painel (Authentication → Policies), sem código.
+Só o **achado 5** — toggle em Authentication → Policies no painel do Supabase, sem
+código. Não expõe dado de usuário nem recurso pago, e por isso não bloqueia o
+lançamento.
 
-Nenhum dos dois expõe dado de usuário nem recurso pago, e por isso nenhum bloqueia
-o lançamento.
+O achado 4 saiu em `20260910150000_empresas_seguidas_exige_conta_permanente`, e a
+aplicação revelou uma **divergência entre a regra escrita e o que as irmãs fazem**,
+que vale registrar porque a próxima pessoa vai tropeçar nela:
+
+- A **regra 6** do `CLAUDE.md` escreve a cláusula no `USING`.
+- As irmãs que esta auditoria citou como conformes — `user_certifications` e
+  `user_courses` — são `FOR ALL` com `USING (user_id = auth.uid())` e a cláusula
+  **só no `WITH CHECK`**. Ou seja, guardam a escrita e deixam a leitura livre para
+  o dono.
+
+Segui a constituição: a cláusula entrou nos três comandos de
+`user_followed_companies`. Custa nada e fecha mais — quem não pode inserir não terá
+linha para ler, e conta permanente tem `is_anonymous` falso. Conferido antes de
+aplicar: a tabela tinha 1 linha, de conta permanente, então ninguém perdeu acesso.
+
+**Verificado depois, com sessão anônima real:** o `POST` em
+`/rest/v1/user_followed_companies` com uma empresa existente devolve
+`42501 — new row violates row-level security policy`. Antes, inseria.
+
+Se a divergência incomodar, o lugar de resolvê-la é a regra 6 — decidindo se o
+padrão do projeto guarda a escrita ou também a leitura — e não caso a caso na
+próxima migration.

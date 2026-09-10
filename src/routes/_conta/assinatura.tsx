@@ -26,6 +26,7 @@ import {
   rotuloCobranca,
   rotuloPeriodo,
 } from "@/lib/plan-copy";
+import { semPrefixoDeBloqueio } from "@/lib/resubscribe-copy";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -111,7 +112,11 @@ function AssinaturaPage() {
     try {
       await checkout.mutateAsync({ planKey, method });
     } catch (err) {
-      toast.error((err as Error).message);
+      // Quem teve estorno ou chargeback não contrata de novo sem liberação
+      // manual. A mensagem já vem pronta do servidor; aqui só cai o marcador,
+      // que apareceria como se fosse erro de sistema justamente na tela em que
+      // a pessoa precisa entender que a decisão foi deliberada.
+      toast.error(semPrefixoDeBloqueio((err as Error).message));
     }
   }
 

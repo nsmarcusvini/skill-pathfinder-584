@@ -343,6 +343,19 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
     }
 
     const userId = context.userId;
+
+    // Quem já teve estorno por arrependimento ou abriu chargeback não compra de
+    // novo. Devolver o dinheiro foi obrigação (art. 49); vender outra vez não é
+    // — e sem esta trava o ciclo "assina, usa 6 dias, estorna, repete" não
+    // tinha fim. Antes de qualquer coisa cara: nada de consultar plano ou abrir
+    // checkout no gateway para uma venda que já está recusada.
+    const { bloqueioAtivo, mensagemDeBloqueio } = await import("@/lib/resubscribe-block.server");
+    const emailDaSessao =
+      typeof (context.claims as Record<string, unknown>)["email"] === "string"
+        ? ((context.claims as Record<string, unknown>)["email"] as string)
+        : null;
+    const bloqueio = await bloqueioAtivo(userId, emailDaSessao);
+    if (bloqueio) throw new Error(mensagemDeBloqueio(bloqueio.reason));
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: plan, error: planError } = await supabaseAdmin
@@ -556,7 +569,13 @@ export async function encerrarAssinaturaViva(
 
   const { data: sub } = await supabaseAdmin
     .from("subscriptions")
-    .select("id, status, provider_subscription_id, provider_payment_id, first_activated_at")
+    // Uma linha só: o supabase-js tipa a linha a partir do literal do select.
+    // Concatenar com `+` faz a inferência cair para `GenericStringError` e todo
+    // acesso a campo abaixo vira erro de tipo.
+    // prettier-ignore
+    .select(
+      "id, status, provider_subscription_id, provider_payment_id, provider_customer_id, amount_cents, first_activated_at",
+    )
     .eq("user_id", userId)
     .in("status", LIVE_STATUSES)
     .maybeSingle();
@@ -628,6 +647,22 @@ export async function encerrarAssinaturaViva(
     })
     .eq("id", sub.id);
   if (error) throw new Error(error.message);
+
+  // Estorno feito = a pessoa exerceu o arrependimento e recebeu o valor cheio.
+  // A partir daqui ela não contrata de novo sem liberação manual. Registrado
+  // DEPOIS do estorno e nunca antes: o bloqueio é consequência do reembolso ter
+  // acontecido, e `registrarBloqueio` não lança justamente para que uma falha
+  // aqui não deixe a impressão de que o estorno falhou.
+  if (refunded) {
+    const { registrarBloqueio } = await import("@/lib/resubscribe-block.server");
+    await registrarBloqueio({
+      userId,
+      reason: "arrependimento_cdc",
+      subscriptionId: sub.id,
+      providerCustomerId: sub.provider_customer_id ?? null,
+      amountCents: sub.amount_cents ?? null,
+    });
+  }
 
   return { refunded };
 }

@@ -19,7 +19,23 @@ export const FORNECEDOR = {
  * relevante. É o valor gravado em `terms_acceptances.version`: sem isso, uma
  * mudança no texto não teria como provar qual versão cada pessoa aceitou.
  */
-export const TERMOS_VERSAO = "2026-09-05";
+export const TERMOS_VERSAO = "2026-09-10";
+
+/**
+ * Histórico das versões, para a próxima pessoa entender por que a data mudou.
+ * Não vai para a tela — é `terms_acceptances.version` que prova o aceite; isto
+ * é a memória de o que cada valor significa.
+ *
+ *   2026-09-05  Texto original (fornecedor, ciclo, renovação, arrependimento).
+ *   2026-09-10  + "Nova assinatura após reembolso" e + "Uso justo". A seção de
+ *               arrependimento NÃO mudou: quem desiste continua recebendo o
+ *               valor cheio. O que passou a estar escrito é a consequência —
+ *               não vendemos outra assinatura à mesma pessoa sem liberação
+ *               manual — e o teto diário contra extração automatizada.
+ *               Quem aceitou 2026-09-05 mantém aquele aceite: a versão nova
+ *               vale para quem se cadastrar a partir daqui, como a seção
+ *               "Alterações" promete.
+ */
 
 /** Chave de localStorage que carrega o aceite do clique até existir sessão permanente. */
 export const TERMOS_PENDENTES_KEY = "rumvia:termos_pendentes";

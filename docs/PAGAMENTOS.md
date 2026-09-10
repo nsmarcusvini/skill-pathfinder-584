@@ -142,6 +142,58 @@ Sem `provider_payment_id` gravado (dado antigo, ou correlação que não chegou 
 `cancelMySubscription` cai para `asaas.listPaymentsBySubscription()` antes de desistir — o
 direito não pode depender de um campo estar preenchido.
 
+### Bloqueio de recontratação (2026-09-10)
+
+Devolver o dinheiro é obrigação e não é renunciável por contrato (art. 51, I — cláusula de
+renúncia ao arrependimento é nula). **Vender de novo não é obrigação nenhuma.** Até
+2026-09-10 essa distinção não estava no código: depois do estorno o status virava
+`refunded`, `startSubscriptionCheckout` só recusava quem tinha assinatura em
+`LIVE_STATUSES`, e o ciclo *assinar → usar 6 dias → estornar → assinar de novo no dia 8*
+não tinha fim. Acesso vitalício de graça, com o mesmo e-mail.
+
+```
+resubscribe_blocks   ← user_id (SEM FK), provider_customer_id, email_hash, reason, released_at
+```
+
+**Por que não tem FK para `auth.users`:** com `ON DELETE CASCADE`, excluir a conta (botão
+de LGPD em `/conta`) apagaria a própria trava. Excluir a conta é justamente a evasão mais
+óbvia — o bloqueio precisa sobreviver a ela. É por isso que o `user_id` pode apontar para
+ninguém, e por isso a busca também usa `email_hash`.
+
+Três pontos de escrita e dois de leitura:
+
+| Onde | O quê |
+|---|---|
+| `encerrarAssinaturaViva` | grava o bloqueio **depois** do estorno dar certo (`arrependimento_cdc`) |
+| webhook `PAYMENT_CHARGEBACK_REQUESTED` | grava o bloqueio (`chargeback`) |
+| `startSubscriptionCheckout` | **lê** por `user_id` e `email_hash`, antes de tocar no gateway |
+| webhook `PAYMENT_CONFIRMED` | **lê** por `provider_customer_id` — é o único ponto que enxerga conta nova, mesmo CPF |
+
+O caminho do webhook existe porque o `cust_...` (que a página hospedada gera a partir do
+CPF) só aparece **depois** do pagamento: no checkout não há como saber. Quando um pagamento
+chega de cliente bloqueado, o dinheiro já entrou, e a ação vem de
+`app_settings.resubscribe_block_action`:
+
+- `"flag"` (**default**) — marca `subscriptions.metadata.resubscribe_block_hit` e grita no
+  log; o acesso continua e ninguém mexe no dinheiro sem alguém olhar.
+- `"refund"` — estorna na hora e cancela. Também é honesto (a venda simplesmente não
+  aconteceu), mas é dinheiro se movendo sozinho a partir de um webhook: um falso positivo
+  na lista vira estorno indevido. **Só ligue depois de ver o `flag` acertando na prática.**
+
+⚠️ **A confirmar no sandbox:** se o Asaas reaproveita o mesmo `cust_...` quando o mesmo CPF
+paga de novo com outro e-mail. Se reaproveitar, esse caminho pega conta nova sozinho; se
+criar cliente novo a cada checkout, quem carrega o peso é o `email_hash` e o alcance é
+menor. O código funciona nos dois casos.
+
+**Liberar alguém** (o bloqueio não é sentença — engano acontece, e uma desistência honesta
+não deveria virar banimento perpétuo):
+
+```sql
+update public.resubscribe_blocks
+   set released_at = now(), released_note = 'motivo aqui'
+ where user_id = '<uuid>' and released_at is null;
+```
+
 ---
 
 ## O que foi criado

@@ -112,33 +112,52 @@ function ContaPage() {
     setExporting(true);
     try {
       const db = supabase;
-      const [perfil, prefs, gapAnalyses, userSkills, studyPlans, userCerts, userCourses] =
-        await Promise.all([
-          supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-          supabase.from("user_track_preferences").select("*").eq("user_id", user.id),
-          supabase
-            .from("gap_analyses")
-            .select("id, track_id, seniority, market_segment, adherence_score, created_at")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("user_skills")
-            .select("skill_id, self_level, years_exp")
-            .eq("user_id", user.id),
-          db
-            .from("study_plans")
-            .select("title, status, target_date, created_at")
-            .eq("user_id", user.id),
-          db
-            .from("user_certifications")
-            .select("certification_id, custom_name, status, obtained_at, expires_at")
-            .eq("user_id", user.id),
-          db
-            .from("user_courses")
-            .select("course_id, custom_title, status, progress_percent, completed_at")
-            .eq("user_id", user.id),
-        ]);
+      const [
+        perfil,
+        prefs,
+        gapAnalyses,
+        userSkills,
+        studyPlans,
+        userCerts,
+        userCourses,
+        usoDiario,
+      ] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("user_track_preferences").select("*").eq("user_id", user.id),
+        supabase
+          .from("gap_analyses")
+          .select("id, track_id, seniority, market_segment, adherence_score, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("user_skills")
+          .select("skill_id, self_level, years_exp")
+          .eq("user_id", user.id),
+        db
+          .from("study_plans")
+          .select("title, status, target_date, created_at")
+          .eq("user_id", user.id),
+        db
+          .from("user_certifications")
+          .select("certification_id, custom_name, status, obtained_at, expires_at")
+          .eq("user_id", user.id),
+        db
+          .from("user_courses")
+          .select("course_id, custom_title, status, progress_percent, completed_at")
+          .eq("user_id", user.id),
+        // Registro de uso da conta assinante. Entra na exportação porque a
+        // página de privacidade promete que entra — e porque é dado sobre a
+        // pessoa que ela tem direito de ver (LGPD, direito de acesso). Só o
+        // agregado por dia: é o que a policy `usage_daily_own_select` libera,
+        // e o detalhe evento a evento não acrescenta nada que ela já não
+        // saiba sobre o próprio uso.
+        db
+          .from("usage_daily")
+          .select("day, event_type, count")
+          .eq("user_id", user.id)
+          .order("day", { ascending: false }),
+      ]);
       const payload = {
         exportado_em: new Date().toISOString(),
         conta: { id: user.id, email: user.email },
@@ -149,6 +168,7 @@ function ContaPage() {
         planos_de_estudo: studyPlans.data ?? [],
         certificacoes: userCerts.data ?? [],
         cursos: userCourses.data ?? [],
+        uso_por_dia: usoDiario.data ?? [],
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -276,7 +296,8 @@ function ContaPage() {
       <Blueprint className="p-5">
         <h2 className="label-h6 text-neutral-700">Meus dados</h2>
         <p className="mt-1 text-caption text-neutral-700">
-          Baixe uma cópia em JSON com seu perfil e suas preferências de trilha.
+          Baixe uma cópia em JSON com seu perfil, preferências de trilha, skills, análises, planos
+          de estudo, certificações, cursos e o registro de uso da sua conta.
         </p>
         <Button className="mt-3" variant="outline" loading={exporting} onClick={exportarDados}>
           Exportar meus dados

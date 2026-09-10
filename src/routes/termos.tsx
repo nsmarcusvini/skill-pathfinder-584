@@ -112,6 +112,32 @@ function TermosPage() {
           </section>
 
           <section>
+            <h2 className="label-h6 text-neutral-900">Nova assinatura após reembolso</h2>
+            <p className="mt-1 text-body text-neutral-700">
+              O direito de arrependimento é seu e nós o cumprimos integralmente: dentro dos 7 dias,
+              o valor volta inteiro e sem discussão. Depois disso, porém,{" "}
+              <strong>não abrimos uma nova assinatura para a mesma pessoa</strong> — do mesmo modo
+              que ninguém é obrigado a permanecer em um contrato, também não somos obrigados a
+              celebrar outro. A mesma regra vale se houver contestação de cobrança junto ao emissor
+              do cartão. Isso não afeta em nada o reembolso já recebido, e não é definitivo: se você
+              quiser voltar, fale com o contato acima — a liberação é manual e costuma ser rápida.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="label-h6 text-neutral-900">Uso justo</h2>
+            <p className="mt-1 text-body text-neutral-700">
+              A assinatura é individual e destinada ao seu próprio uso. Existe um{" "}
+              <strong>teto diário</strong> de consultas — dimensionado bem acima do uso real de uma
+              pessoa procurando emprego, de modo que você não deve encostar nele — cuja única função
+              é impedir a extração automatizada da base. Não é permitido raspar, copiar em massa,
+              revender ou redistribuir o conteúdo, nem compartilhar as credenciais da conta. Se você
+              encostar no teto em uso legítimo, avise: o limite é ajustável e o problema, nesse
+              caso, é do número e não seu.
+            </p>
+          </section>
+
+          <section>
             <h2 className="label-h6 text-neutral-900">Reajuste de preço</h2>
             <p className="mt-1 text-body text-neutral-700">
               Mudanças de preço valem só para assinaturas novas. Quem já está assinando continua

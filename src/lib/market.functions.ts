@@ -161,6 +161,10 @@ export const getToolDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: ToolDetailInput) => input)
   .handler(async ({ data, context }): Promise<ToolDetail | null> => {
+    // Sem cota, mesmo motivo do salário: agregado por skill, não extração.
+    const { registrarUso } = await import("@/lib/usage.server");
+    await registrarUso(context.userId, "tool_detail", data.skillId);
+
     const supabase = await marketDb();
     const [{ data: rows, error }, { data: skillRow }] = await Promise.all([
       supabase.rpc("tool_detail", {
@@ -297,6 +301,9 @@ export const getCompanyDetail = createServerFn({ method: "POST" })
     // garante o escopo — e `userId` vem do JWT já verificado pelo middleware,
     // nunca do input.
     const { userId } = context;
+    const { registrarUsoComCota } = await import("@/lib/usage.server");
+    await registrarUsoComCota(userId, "company_detail", data.companyId);
+
     const supabase = await marketDb();
 
     let openJobsQuery = supabase
@@ -382,6 +389,11 @@ export const getSalaryStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<SalaryStatsResult> => {
+    // Sem cota: é uma leitura agregada por trilha, não extração linha a linha.
+    // Registra como prova de entrega e nada mais.
+    const { registrarUso } = await import("@/lib/usage.server");
+    await registrarUso(context.userId, "salary_view", data.trackId);
+
     const supabase = await marketDb();
     const [{ data: rows }, { data: setting }] = await Promise.all([
       supabase

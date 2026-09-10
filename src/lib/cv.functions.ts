@@ -1,19 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+// Mesma função que a trilha de uso da conta paga usa. Era uma cópia local até
+// 2026-09-10; duas cópias dariam hashes diferentes para o mesmo visitante no
+// dia em que uma delas passasse a olhar outro header de proxy.
+import { hashIpDaRequisicao as hashIp } from "@/lib/request-ip.server";
 
 /** Janela de cota: a hora cheia do relógio. */
 function janelaAtual(): string {
   return new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString();
-}
-
-async function hashIp(): Promise<string> {
-  const forwarded = getRequestHeader("x-forwarded-for") ?? "";
-  const ip = forwarded.split(",")[0]?.trim() || "desconhecido";
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /** Cota configurável em `app_settings`; o número no código é só o piso de segurança. */
@@ -129,16 +125,15 @@ export const parseCv = createServerFn({ method: "POST" })
     if (!cv) throw new Error("Currículo não encontrado.");
 
     const fail = async (message: string) => {
-      await supabase
-        .from("cvs")
-        .update({ status: "failed", parse_error: message })
-        .eq("id", cv.id);
+      await supabase.from("cvs").update({ status: "failed", parse_error: message }).eq("id", cv.id);
       return { ok: false as const, error: message };
     };
 
     if (isAnonymous) {
       if (cv.file_size > 5 * 1024 * 1024) {
-        return fail("Sem conta, o limite é de 5 MB por arquivo. Crie sua conta para enviar até 10 MB.");
+        return fail(
+          "Sem conta, o limite é de 5 MB por arquivo. Crie sua conta para enviar até 10 MB.",
+        );
       }
       const { count } = await supabase
         .from("cvs")
@@ -176,7 +171,10 @@ export const parseCv = createServerFn({ method: "POST" })
         await Promise.all([
           supabase.from("skills").select("id, canonical_name, is_ambiguous, match_patterns"),
           supabase.from("skill_aliases").select("skill_id, alias"),
-          supabase.from("track_role_variants").select("id, track_id, name, search_terms").eq("is_active", true),
+          supabase
+            .from("track_role_variants")
+            .select("id, track_id, name, search_terms")
+            .eq("is_active", true),
           supabase.from("track_skill_baselines").select("track_id, skill_id, importance"),
         ]);
 
@@ -233,7 +231,18 @@ export const parseCv = createServerFn({ method: "POST" })
 
       // Só aqui a cota é debitada: a leitura funcionou e a pessoa recebeu o
       // resultado. Quem mandou arquivo ilegível não pagou tentativa.
-      if (isAnonymous) await debitarCota(userId);
+      //
+      // Duas contabilidades, para dois públicos diferentes: `parse_rate_limits`
+      // é a cota HORÁRIA da prévia grátis (anti-automação, some em uma hora), e
+      // a trilha de uso é a prova de entrega da CONTA PAGA, que precisa durar
+      // meses. Registrar o anônimo na trilha só engordaria a tabela — ele não
+      // paga, logo não pede estorno nem abre chargeback.
+      if (isAnonymous) {
+        await debitarCota(userId);
+      } else {
+        const { registrarUso } = await import("@/lib/usage.server");
+        await registrarUso(userId, "cv_parse", cv.id);
+      }
 
       return {
         ok: true as const,
