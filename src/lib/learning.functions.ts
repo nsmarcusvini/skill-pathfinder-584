@@ -1,5 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireActiveSubscription } from "@/integrations/supabase/subscription-middleware";
+
+/**
+ * Catálogo de certificações e cursos é PAGO (CLAUDE.md, regra 12). Duas travas,
+ * mesmo par de `market.functions.ts` — e a segunda é a que fecha de verdade:
+ *
+ * 1. `requireActiveSubscription` em toda função daqui.
+ * 2. As leituras de `certifications_catalog` e `courses_catalog` usam
+ *    `catalogDb()` (service_role), não `context.supabase`. Sem isso o paywall
+ *    seria decorativo: `anon`/`authenticated` tinham SELECT direto nas duas
+ *    tabelas, e sessão anônima é `authenticated` no JWT (regra 7) — qualquer
+ *    visitante lia o catálogo inteiro pelo PostgREST sem passar por aqui. O
+ *    GRANT foi revogado na migration `20260910130000_catalogo_de_aprendizagem_e_pago`.
+ *
+ * As tabelas do usuário (`user_certifications`, `user_courses`) continuam em
+ * `context.supabase`: são dado dele, protegido por RLS, e é assim que a policy
+ * segue sendo a fonte da verdade sobre posse.
+ */
+async function catalogDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,13 +100,14 @@ export interface UserCourse {
 // ─── Certifications Catalog ──────────────────────────────────────────────────
 
 export const getCertsCatalog = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CertCatalogItem[]> => {
     const { supabase, userId } = context;
+    const catalogo = await catalogDb();
 
     const [{ data: certs }, { data: userCerts }] = await Promise.all([
-      supabase.from("certifications_catalog").select("*").contains("track_ids", [data.trackId]),
+      catalogo.from("certifications_catalog").select("*").contains("track_ids", [data.trackId]),
       supabase
         .from("user_certifications")
         .select("id, certification_id, status, expires_at")
@@ -123,13 +146,14 @@ export const getCertsCatalog = createServerFn({ method: "POST" })
 // ─── Courses Catalog ──────────────────────────────────────────────────────────
 
 export const getCoursesCatalog = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string }) => input)
   .handler(async ({ data, context }): Promise<CourseCatalogItem[]> => {
     const { supabase, userId } = context;
+    const catalogo = await catalogDb();
 
     const [{ data: courses }, { data: userCourses }] = await Promise.all([
-      supabase.from("courses_catalog").select("*").contains("track_ids", [data.trackId]),
+      catalogo.from("courses_catalog").select("*").contains("track_ids", [data.trackId]),
       supabase
         .from("user_courses")
         .select("id, course_id, status, progress_percent")
@@ -164,11 +188,15 @@ export const getCoursesCatalog = createServerFn({ method: "POST" })
 // ─── User Certifications ──────────────────────────────────────────────────────
 
 export const getUserCerts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<UserCert[]> => {
     const { userId } = context;
-    const db = context.supabase;
+    // Embute `certifications_catalog`, e o PostgREST exige SELECT na tabela
+    // embutida — que `authenticated` não tem mais. Daí service_role. A posse
+    // deixa de vir da RLS e passa a vir do `.eq("user_id", userId)` abaixo:
+    // `userId` sai do JWT validado por requireSupabaseAuth, não do input.
+    const db = await catalogDb();
     const { data, error } = await db
       .from("user_certifications")
       .select(
@@ -212,7 +240,7 @@ interface UpsertUserCertInput {
 }
 
 export const upsertUserCert = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: UpsertUserCertInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -237,7 +265,7 @@ export const upsertUserCert = createServerFn({ method: "POST" })
   });
 
 export const deleteUserCert = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -252,11 +280,13 @@ export const deleteUserCert = createServerFn({ method: "POST" })
 // ─── User Courses ─────────────────────────────────────────────────────────────
 
 export const getUserCourses = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<UserCourse[]> => {
     const { userId } = context;
-    const db = context.supabase;
+    // Mesmo motivo de getUserCerts: embute `courses_catalog`, então service_role
+    // + filtro explícito por `userId` vindo do JWT.
+    const db = await catalogDb();
     const { data, error } = await db
       .from("user_courses")
       .select(
@@ -294,7 +324,7 @@ interface UpsertUserCourseInput {
 }
 
 export const upsertUserCourse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: UpsertUserCourseInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -319,7 +349,7 @@ export const upsertUserCourse = createServerFn({ method: "POST" })
   });
 
 export const deleteUserCourse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -334,7 +364,7 @@ export const deleteUserCourse = createServerFn({ method: "POST" })
 // ─── Add to study plan ────────────────────────────────────────────────────────
 
 export const addLearningItemToStudyPlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator(
     (input: {
       planId: string;

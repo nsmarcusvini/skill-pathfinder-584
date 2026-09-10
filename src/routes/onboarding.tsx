@@ -12,7 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useMarket, SEGMENT_CURRENCY, type MarketSegment } from "@/hooks/use-market";
+import {
+  useMarket,
+  SEGMENT_CURRENCY,
+  SENIORITIES,
+  SENIORITY_LABEL,
+  type MarketSegment,
+} from "@/hooks/use-market";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({
@@ -42,13 +48,6 @@ export const Route = createFileRoute("/onboarding")({
     </ProtectedRoute>
   ),
 });
-
-const SENIORIDADES = [
-  { value: "junior", label: "Júnior" },
-  { value: "pleno", label: "Pleno" },
-  { value: "senior", label: "Sênior" },
-  { value: "staff", label: "Staff" },
-];
 
 function OnboardingPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -206,9 +205,9 @@ function OnboardingPage() {
           value={seniority}
           onChange={(e) => setSeniority(e.target.value)}
         >
-          {SENIORIDADES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          {SENIORITIES.map((s) => (
+            <option key={s} value={s}>
+              {SENIORITY_LABEL[s]}
             </option>
           ))}
         </select>
@@ -223,9 +222,9 @@ function OnboardingPage() {
           value={targetSeniority}
           onChange={(e) => setTargetSeniority(e.target.value)}
         >
-          {SENIORIDADES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          {SENIORITIES.map((s) => (
+            <option key={s} value={s}>
+              {SENIORITY_LABEL[s]}
             </option>
           ))}
         </select>

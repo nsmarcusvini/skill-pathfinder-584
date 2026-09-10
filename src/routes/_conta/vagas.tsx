@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useMarket, SENIORITY_LABEL, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
+import {
+  useMarket,
+  SENIORITIES,
+  SENIORITY_LABEL,
+  SEGMENT_LABEL,
+  type MarketSegment,
+  type Seniority,
+} from "@/hooks/use-market";
 import { listJobs, getJobDetail, listJobLocations, type JobListItem } from "@/lib/jobs.functions";
 import { cn } from "@/lib/utils";
 
@@ -101,6 +108,9 @@ function VagasPage() {
   const [buscaAtiva, setBuscaAtiva] = React.useState("");
   const [soRemoto, setSoRemoto] = React.useState(false);
   const [quaseLa, setQuaseLa] = React.useState(false);
+  /** Janela de publicação em dias; null = sem limite. Exclusivo entre si. */
+  const [recencia, setRecencia] = React.useState<number | null>(null);
+  const [senioridades, setSenioridades] = React.useState<Seniority[]>([]);
   /** Chaves de cidade selecionadas (sem acento) — ver listJobLocations. */
   const [cidades, setCidades] = React.useState<string[]>([]);
   const [pagina, setPagina] = React.useState(0);
@@ -136,10 +146,21 @@ function VagasPage() {
   // Filtros novos recomeçam da primeira página.
   React.useEffect(() => {
     setPagina(0);
-  }, [trackId, segment, buscaAtiva, soRemoto, quaseLa, cidades]);
+  }, [trackId, segment, buscaAtiva, soRemoto, quaseLa, cidades, recencia, senioridades]);
 
   const listaQuery = useQuery({
-    queryKey: ["vagas", trackId, segment, buscaAtiva, soRemoto, quaseLa, cidades, pagina],
+    queryKey: [
+      "vagas",
+      trackId,
+      segment,
+      buscaAtiva,
+      soRemoto,
+      quaseLa,
+      cidades,
+      recencia,
+      senioridades,
+      pagina,
+    ],
     enabled: Boolean(trackId),
     queryFn: () =>
       runList({
@@ -150,6 +171,8 @@ function VagasPage() {
           ...(soRemoto ? { onlyRemote: true } : {}),
           ...(quaseLa ? { maxMissing: 2 } : {}),
           ...(grafiasSelecionadas.length > 0 ? { cities: grafiasSelecionadas } : {}),
+          ...(recencia ? { postedWithinDays: recencia } : {}),
+          ...(senioridades.length > 0 ? { seniorities: senioridades } : {}),
           limit: PAGE_SIZE,
           offset: pagina * PAGE_SIZE,
         },
@@ -163,7 +186,9 @@ function VagasPage() {
   });
 
   const page = listaQuery.data;
-  const temFiltro = Boolean(buscaAtiva || soRemoto || quaseLa || cidades.length > 0);
+  const temFiltro = Boolean(
+    buscaAtiva || soRemoto || quaseLa || cidades.length > 0 || recencia || senioridades.length > 0,
+  );
   const detalhe = detalheQuery.data;
 
   return (
@@ -219,6 +244,27 @@ function VagasPage() {
               {f.label}
             </button>
           ))}
+          {/* Recência: exclusivos entre si — clicar no ativo desliga. */}
+          {[
+            { dias: 7, label: "Últimos 7 dias" },
+            { dias: 30, label: "Últimos 30 dias" },
+          ].map((r) => (
+            <button
+              key={r.dias}
+              type="button"
+              onClick={() => setRecencia(recencia === r.dias ? null : r.dias)}
+              aria-pressed={recencia === r.dias}
+              className={cn(
+                "cursor-pointer border px-3 py-1.5 text-caption transition-colors",
+                recencia === r.dias
+                  ? "border-accent-700 bg-accent-100 text-accent-800"
+                  : "border-divider text-neutral-700 hover:bg-surface",
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+
           {temFiltro ? (
             <Button
               variant="ghost"
@@ -229,10 +275,45 @@ function VagasPage() {
                 setSoRemoto(false);
                 setQuaseLa(false);
                 setCidades([]);
+                setRecencia(null);
+                setSenioridades([]);
               }}
             >
               Limpar
             </Button>
+          ) : null}
+        </div>
+
+        {/* Senioridade: acumulativo. O servidor já aceitava `seniorities`; só
+            faltava expor. Metade da base não declara senioridade, e o filtro é
+            `IN` — por isso o aviso, senão parece que a lista quebrou. */}
+        <div className="flex w-full flex-wrap items-center gap-2 border-t border-divider pt-3">
+          <span className="label-h6 mr-1 text-neutral-700">Senioridade</span>
+          {SENIORITIES.map((s) => {
+            const on = senioridades.includes(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() =>
+                  setSenioridades(on ? senioridades.filter((x) => x !== s) : [...senioridades, s])
+                }
+                aria-pressed={on}
+                className={cn(
+                  "cursor-pointer border px-3 py-1.5 text-caption transition-colors",
+                  on
+                    ? "border-accent-700 bg-accent-100 text-accent-800"
+                    : "border-divider text-neutral-700 hover:bg-surface",
+                )}
+              >
+                {SENIORITY_LABEL[s]}
+              </button>
+            );
+          })}
+          {senioridades.length > 0 ? (
+            <span className="text-caption text-neutral-700">
+              Vagas que não declaram senioridade ficam de fora.
+            </span>
           ) : null}
         </div>
       </Blueprint>

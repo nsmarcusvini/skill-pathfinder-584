@@ -1016,7 +1016,7 @@ export const createSalaryObservation = createServerFn({ method: "POST" })
     z
       .object({
         trackId: z.string().uuid(),
-        seniority: z.enum(["junior", "pleno", "senior", "staff"]),
+        seniority: z.enum(["estagiario", "trainee", "junior", "pleno", "senior", "staff"]),
         marketSegment: z.enum(["br", "remoto_global"]),
         currency: z.enum(["BRL", "USD", "EUR"]),
         period: z.enum(["hour", "month", "year"]),
@@ -1115,7 +1115,9 @@ export const updateSalaryObservation = createServerFn({ method: "POST" })
         amountMax: z.number().nonnegative().nullable(),
         currency: z.enum(["BRL", "USD", "EUR"]),
         period: z.enum(["hour", "month", "year"]),
-        seniority: z.enum(["junior", "pleno", "senior", "staff"]).nullable(),
+        seniority: z
+          .enum(["estagiario", "trainee", "junior", "pleno", "senior", "staff"])
+          .nullable(),
         marketSegment: z.enum(["br", "remoto_global"]),
         trackId: z.string().uuid().nullable(),
       })

@@ -92,6 +92,14 @@ interface ListJobsInput {
   cities?: string[];
   /** Só vagas em que falta no máximo N skills. */
   maxMissing?: number;
+  /**
+   * Só vagas publicadas nos últimos N dias.
+   *
+   * Filtra por `posted_at`, que é a mesma coluna que o card exibe — nenhuma
+   * vaga listável tem esse campo nulo (conferido na base), então não há o risco
+   * de sumir vaga por falta de data.
+   */
+  postedWithinDays?: number;
   limit?: number;
   offset?: number;
 }
@@ -138,6 +146,10 @@ export const listJobs = createServerFn({ method: "POST" })
     if (data.seniorities?.length) q = q.in("seniority", data.seniorities);
     if (data.onlyRemote) q = q.eq("is_remote", true);
     if (data.cities?.length) q = q.in("city", data.cities);
+    if (data.postedWithinDays) {
+      const corte = new Date(Date.now() - data.postedWithinDays * 86_400_000).toISOString();
+      q = q.gte("posted_at", corte);
+    }
     if (data.search?.trim()) {
       const term = `%${data.search.trim()}%`;
       q = q.or(`title.ilike.${term},company_name_raw.ilike.${term}`);
@@ -334,7 +346,9 @@ export const listJobLocations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { trackId: string; segment: string }) => input)
   .handler(async ({ data, context }): Promise<JobLocation[]> => {
-    const { data: rows, error } = await (await marketDb()).rpc("job_locations", {
+    const { data: rows, error } = await (
+      await marketDb()
+    ).rpc("job_locations", {
       _track_id: data.trackId,
       _segments: [data.segment],
     });

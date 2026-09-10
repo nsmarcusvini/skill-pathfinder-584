@@ -155,8 +155,28 @@ describe("inferSeniority", () => {
   it("reconhece júnior de verdade", () => {
     expect(inferSeniority("Desenvolvedor Júnior", null)).toBe("junior");
     expect(inferSeniority("QA Engineer Jr.", null)).toBe("junior");
-    expect(inferSeniority("Summer Internship 2027 | Software Engineering", null)).toBe("junior");
     expect(inferSeniority("Data Engineer", "Entry level")).toBe("junior");
+  });
+
+  it("separa estágio e trainee de júnior", () => {
+    // Os três caíam em "junior" — a base inteira de estágio aparecia como
+    // Júnior para quem filtrava por senioridade.
+    expect(inferSeniority("Summer Internship 2027 | Software Engineering", null)).toBe(
+      "estagiario",
+    );
+    expect(inferSeniority("Estágio em Desenvolvimento Back-End", null)).toBe("estagiario");
+    expect(inferSeniority("Estagiário de Dados", null)).toBe("estagiario");
+    expect(inferSeniority("Software Engineer Intern", null)).toBe("estagiario");
+    expect(inferSeniority("Data Engineer", "Internship")).toBe("estagiario");
+
+    expect(inferSeniority("Programa Trainee 2027 - Tecnologia", null)).toBe("trainee");
+    expect(inferSeniority("Trainee Front-End", null)).toBe("trainee");
+  });
+
+  it('não confunde "internacional" com estágio', () => {
+    // `\bintern` solto casava as duas — daí o `\b` dos dois lados.
+    expect(inferSeniority("Analista de Suporte Internacional", null)).toBeNull();
+    expect(inferSeniority("Internal Tools Engineer", null)).toBeNull();
   });
 
   it('não confunde "PL/SQL" com pleno', () => {

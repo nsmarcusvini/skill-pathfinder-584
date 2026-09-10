@@ -41,7 +41,23 @@ export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
-const HOW_IT_WORKS = [
+/**
+ * "A, B e C" — para citar as trilhas em prosa sem escrever a lista à mão.
+ *
+ * Existe porque a landing já prometeu trilha que o usuário não podia escolher:
+ * o FAQ e o passo 02 enumeravam "… Back-End, Front-End e Full Stack" em string
+ * literal, e quando `frontend` foi desativada em 2026-09-10 (amostra de 6 vagas)
+ * os dois textos viraram propaganda falsa em silêncio. Trilha é dado (regra 1),
+ * então o texto que fala dela também tem que vir do dado — de `landing_stats()`,
+ * a mesma fonte do contador "Trilhas disponíveis".
+ */
+function listaPtBr(nomes: string[]): string {
+  if (nomes.length === 0) return "";
+  if (nomes.length === 1) return nomes[0];
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
+
+const howItWorks = (trilhas: string) => [
   {
     num: "01",
     title: "Envie o currículo",
@@ -50,7 +66,7 @@ const HOW_IT_WORKS = [
   {
     num: "02",
     title: "Escolha a trilha",
-    body: "DevOps/SRE, Data Engineer, Back-End, Front-End ou Full Stack — cada uma medida separadamente, mesmo quando a vaga serve a mais de uma. Brasil (BRL) e remoto global (USD) sempre separados.",
+    body: `${trilhas} — cada uma medida separadamente, mesmo quando a vaga serve a mais de uma. Brasil (BRL) e remoto global (USD) sempre separados.`,
   },
   {
     num: "03",
@@ -59,7 +75,7 @@ const HOW_IT_WORKS = [
   },
 ];
 
-const FAQ_ITEMS = [
+const faqItems = (trilhas: string) => [
   {
     q: "O que é gratuito e o que é pago?",
     a: "A prévia é gratuita e não exige cadastro: score de aderência, amostra das skills em falta e das ferramentas mais pedidas. O RUMVIA completo — painel, histórico de gap, plano de estudos, salários, empresas e progresso — é assinatura. Criar a conta não libera o acesso: o painel só abre depois que a assinatura for confirmada.",
@@ -82,7 +98,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Que trilhas estão disponíveis agora?",
-    a: "DevOps / SRE / Platform Engineer, Data Engineer, Back-End, Front-End e Full Stack. Back-End e Front-End são trilhas próprias, não subconjuntos de Full Stack: uma vaga de \"Senior Backend Engineer\" conta para Back-End, e o gap é calculado sobre a demanda daquela trilha específica. Naturalmente há sobreposição — a mesma empresa e a mesma faixa salarial podem aparecer em mais de uma. Novas trilhas são adicionadas como dados no banco, sem alteração de código.",
+    a: `${trilhas}. Cada uma é uma trilha própria, não subconjunto de outra: uma vaga de "Senior Backend Engineer" conta para Back-End, e o gap é calculado sobre a demanda daquela trilha específica. Naturalmente há sobreposição — a mesma empresa e a mesma faixa salarial podem aparecer em mais de uma. Uma trilha só entra nesta lista quando a base tem vagas suficientes para gerar um gap honesto; novas trilhas são adicionadas como dados no banco, sem alteração de código.`,
   },
   {
     q: "Meus dados ficam salvos e seguros?",
@@ -102,6 +118,14 @@ function LandingPage() {
     staleTime: 5 * 60 * 1000,
     queryFn: () => loadStats(),
   });
+  // Nomes das trilhas ATIVAS, em prosa, para os textos que as citam. Enquanto
+  // `landing_stats()` não responde, o texto fala em genérico em vez de chutar
+  // uma lista — a mesma postura do hint do contador logo abaixo.
+  const trilhasEmProsa = stats?.tracks?.length
+    ? listaPtBr(stats.tracks.map((t) => t.name))
+    : "As trilhas disponíveis hoje";
+  const passos = howItWorks(trilhasEmProsa);
+  const perguntas = faqItems(trilhasEmProsa);
   const { data: plans } = usePublicPlans();
   // Preço nunca é escrito no JSX (regra 1) — vem de billing_plans, a mesma
   // fonte que o checkout cobra. Sem catálogo carregado, o card não inventa
@@ -289,7 +313,7 @@ function LandingPage() {
           </p>
           {/* hairline grid: gap-px + bg-divider cria a separação de 1px */}
           <div className="mt-10 grid gap-px bg-divider sm:grid-cols-3">
-            {HOW_IT_WORKS.map((step) => (
+            {passos.map((step) => (
               <div key={step.num} className="flex flex-col gap-3 bg-bg p-8">
                 <span className="label-h6 text-accent-700">{step.num} ——</span>
                 <h3
@@ -622,7 +646,7 @@ function LandingPage() {
           <p className="label-h6 text-neutral-500">// Dúvidas frequentes</p>
           <h2 className="mt-3 font-heading text-h2 uppercase">Perguntas comuns</h2>
           <div className="mt-8 border-t border-divider">
-            {FAQ_ITEMS.map((item, i) => (
+            {perguntas.map((item, i) => (
               <div key={i} className="border-b border-divider">
                 <button
                   type="button"

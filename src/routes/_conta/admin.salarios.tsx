@@ -18,7 +18,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useMarket, SENIORITY_LABEL, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
+import {
+  useMarket,
+  SENIORITIES,
+  SENIORITY_LABEL,
+  SEGMENT_LABEL,
+  type MarketSegment,
+  type Seniority,
+} from "@/hooks/use-market";
 import {
   listSalaryObservations,
   createSalaryObservation,
@@ -40,7 +47,7 @@ type StatusFiltro = "pendente" | "aprovada" | "rejeitada" | "todos";
  *  elas a linha não entra em mv_salary_stats e o dado sumiria sem aviso. */
 interface NovoSalario {
   trackId: string;
-  seniority: "junior" | "pleno" | "senior" | "staff";
+  seniority: Seniority;
   marketSegment: "br" | "remoto_global";
   currency: "BRL" | "USD" | "EUR";
   period: "hour" | "month" | "year";
@@ -397,7 +404,7 @@ function DialogNovo({
   onSalvar: (p: NovoSalario) => void;
 }) {
   const [trilha, setTrilha] = React.useState("");
-  const [sen, setSen] = React.useState<"junior" | "pleno" | "senior" | "staff">("pleno");
+  const [sen, setSen] = React.useState<Seniority>("pleno");
   const [seg, setSeg] = React.useState<"br" | "remoto_global">("br");
   const [moeda, setMoeda] = React.useState<"BRL" | "USD" | "EUR">("BRL");
   const [periodo, setPeriodo] = React.useState<"hour" | "month" | "year">("month");
@@ -463,10 +470,11 @@ function DialogNovo({
               value={sen}
               onChange={(e) => setSen(e.target.value as typeof sen)}
             >
-              <option value="junior">Júnior</option>
-              <option value="pleno">Pleno</option>
-              <option value="senior">Sênior</option>
-              <option value="staff">Staff</option>
+              {SENIORITIES.map((s) => (
+                <option key={s} value={s}>
+                  {SENIORITY_LABEL[s]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">
@@ -573,7 +581,7 @@ function DialogEdicao({
     amountMax: number | null;
     currency: "BRL" | "USD" | "EUR";
     period: "hour" | "month" | "year";
-    seniority: "junior" | "pleno" | "senior" | "staff" | null;
+    seniority: Seniority | null;
     marketSegment: "br" | "remoto_global";
     trackId: string | null;
   }) => void;
@@ -635,10 +643,11 @@ function DialogEdicao({
             <span className="label-h6 text-neutral-700">Senioridade</span>
             <select className="field" value={sen} onChange={(e) => setSen(e.target.value)}>
               <option value="">Não informada</option>
-              <option value="junior">Júnior</option>
-              <option value="pleno">Pleno</option>
-              <option value="senior">Sênior</option>
-              <option value="staff">Staff</option>
+              {SENIORITIES.map((s) => (
+                <option key={s} value={s}>
+                  {SENIORITY_LABEL[s]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">
@@ -677,7 +686,7 @@ function DialogEdicao({
                 amountMax: max.trim() ? Number(max) : null,
                 currency: moeda as "BRL" | "USD" | "EUR",
                 period: periodo as "hour" | "month" | "year",
-                seniority: (sen || null) as "junior" | "pleno" | "senior" | "staff" | null,
+                seniority: (sen || null) as Seniority | null,
                 marketSegment: seg as "br" | "remoto_global",
                 trackId: trilha || null,
               })

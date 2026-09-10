@@ -160,7 +160,7 @@ direito não pode depender de um campo estar preenchido.
 | `src/lib/billing.functions.ts` | `getBillingOverview`, `getPublicPlans`, `startSubscriptionCheckout(planKey)`, `cancelMySubscription` |
 | `scripts/asaas-reconcile.ts` | Repara assinatura presa (webhook perdido ou órfão) |
 | `scripts/relatorio-faturamento.ts` | Faturamento por mês a partir de `billing_events` — base numérica para o contador |
-| `src/routes/termos.tsx` | Termos de uso — versão + identificação do fornecedor (⚠️ pendente, ver `src/lib/legal-copy.ts`) |
+| `src/routes/termos.tsx` | Termos de uso — versão + identificação do fornecedor (✅ preenchida em `src/lib/legal-copy.ts`; a página cai num EmptyState se algum campo for esvaziado) |
 | `src/lib/legal-copy.ts` | Identificação do fornecedor e versão dos Termos, em um lugar só |
 | `supabase/migrations/20260905155813_conformidade_arrependimento_e_termos.sql` | `first_activated_at`, `provider_payment_id`, `terms_acceptances` |
 | `src/integrations/supabase/subscription-middleware.ts` | `requireActiveSubscription` — trava server-side |

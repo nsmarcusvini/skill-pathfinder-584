@@ -179,7 +179,9 @@ export function sectionize(text: string): SectionedCv {
   let current: Section | null = null;
 
   for (const line of lines) {
-    const flat = normalize(line.trim()).replace(/[:•\-–—]+$/g, "").trim();
+    const flat = normalize(line.trim())
+      .replace(/[:•\-–—]+$/g, "")
+      .trim();
     const hit =
       flat.length > 0 && flat.length <= 40
         ? SECTION_PATTERNS.find((p) => p.re.test(flat))
@@ -207,8 +209,25 @@ export function sectionize(text: string): SectionedCv {
 /* ------------------------------------------------------------ experiência */
 
 const MONTHS: Record<string, number> = {
-  jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
-  feb: 2, apr: 4, may: 5, aug: 8, sep: 9, oct: 10, dec: 12,
+  jan: 1,
+  fev: 2,
+  mar: 3,
+  abr: 4,
+  mai: 5,
+  jun: 6,
+  jul: 7,
+  ago: 8,
+  set: 9,
+  out: 10,
+  nov: 11,
+  dez: 12,
+  feb: 2,
+  apr: 4,
+  may: 5,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  dec: 12,
 };
 
 interface ExperienceBlock {
@@ -346,7 +365,6 @@ export function matchSkills(
     });
   }
 
-
   // termos da seção de skills que não casaram: trigram e, por fim, curadoria
   const rawTerms = sectioned.sections.skills
     .split(/[\n,;|/•·]|\s{3,}/)
@@ -394,7 +412,6 @@ export function matchSkills(
         level_hint: null,
       });
     }
-
   }
 
   const titles = (sectioned.headline + "\n" + sectioned.sections.experiencia)
@@ -425,7 +442,7 @@ export interface Detection {
   roleVariantId: string | null;
   confidence: number;
   alternatives: Array<{ trackId: string; score: number }>;
-  seniority: "junior" | "pleno" | "senior" | "staff" | null;
+  seniority: "estagiario" | "trainee" | "junior" | "pleno" | "senior" | "staff" | null;
 }
 
 export function detectTrackAndSeniority(
@@ -442,7 +459,10 @@ export function detectTrackAndSeniority(
   for (const variant of variants) {
     let hits = 0;
     for (const term of variant.search_terms ?? []) {
-      const re = new RegExp(`(?<![\\p{L}\\d])${escapeRegExp(normalize(term))}(?![\\p{L}\\d])`, "gu");
+      const re = new RegExp(
+        `(?<![\\p{L}\\d])${escapeRegExp(normalize(term))}(?![\\p{L}\\d])`,
+        "gu",
+      );
       hits += (titleBlob.match(re) ?? []).length;
     }
     if (hits > 0) {
@@ -465,8 +485,16 @@ export function detectTrackAndSeniority(
   if (/\b(staff|principal|lead)\b/.test(titleBlob)) seniority = "staff";
   else if (/\b(senior|sr\.?|especialista)\b/.test(titleBlob)) seniority = "senior";
   else if (/\b(pleno|mid|middle|pl\.?)\b/.test(titleBlob)) seniority = "pleno";
-  else if (/\b(junior|jr\.?|trainee|estagi)/.test(titleBlob)) seniority = "junior";
+  // Estágio e trainee ANTES de júnior: os três casavam a mesma regra e caíam
+  // todos em "junior". `intern(ship)?\b` não pode virar `\bintern` solto —
+  // pegaria "internacional" e "internal".
+  else if (/\b(estagi|intern(ship)?\b)/.test(titleBlob)) seniority = "estagiario";
+  else if (/\btrainee\b/.test(titleBlob)) seniority = "trainee";
+  else if (/\b(junior|jr\.?)/.test(titleBlob)) seniority = "junior";
   else if (totalYears > 0) {
+    // Tempo de experiência não distingue estágio de trainee — quem chega aqui
+    // não disse o nível no título, e inferir o degrau de entrada por anos
+    // seria chutar. O piso continua sendo júnior.
     seniority =
       totalYears < 2 ? "junior" : totalYears < 5 ? "pleno" : totalYears < 9 ? "senior" : "staff";
   }

@@ -97,8 +97,11 @@ if (dryRun) {
 
 // Grava em lotes, agrupando por valor novo: um UPDATE por senioridade em vez de
 // um por vaga.
+// Os alvos saem das próprias mudanças, não de uma lista fixa: quando
+// estagiario/trainee viraram níveis próprios, uma lista escrita à mão aqui
+// teria calculado as transições e engolido as gravações sem erro nenhum.
 let gravadas = 0;
-for (const alvo of ["junior", "pleno", "senior", "staff"]) {
+for (const alvo of new Set(mudancas.map((m) => m.para))) {
   const ids = mudancas.filter((m) => m.para === alvo).map((m) => m.id);
   for (let i = 0; i < ids.length; i += 200) {
     const fatia = ids.slice(i, i + 200);

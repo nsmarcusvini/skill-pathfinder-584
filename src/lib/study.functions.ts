@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireActiveSubscription } from "@/integrations/supabase/subscription-middleware";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ export interface StudyLogHeatmapRow {
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
 export const getStudyPlans = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<StudyPlan[]> => {
     const db = context.supabase;
@@ -83,7 +84,7 @@ export const getStudyPlans = createServerFn({ method: "POST" })
   });
 
 export const createStudyPlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator(
     (input: { trackId?: string; title: string; description?: string; targetDate?: string }) =>
       input,
@@ -104,7 +105,7 @@ export const createStudyPlan = createServerFn({ method: "POST" })
   });
 
 export const updatePlanStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { planId: string; status: PlanStatus }) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -141,7 +142,7 @@ function mapItem(r: Record<string, unknown>): StudyItem {
 }
 
 export const getStudyItems = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { planId: string }) => input)
   .handler(async ({ data, context }): Promise<StudyItem[]> => {
     const db = context.supabase;
@@ -169,7 +170,7 @@ interface CreateItemInput {
 }
 
 export const createStudyItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: CreateItemInput) => input)
   .handler(async ({ data, context }): Promise<StudyItem> => {
     const db = context.supabase;
@@ -202,7 +203,7 @@ interface UpdateItemInput {
 }
 
 export const updateStudyItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: UpdateItemInput) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -224,7 +225,7 @@ export const updateStudyItem = createServerFn({ method: "POST" })
   });
 
 export const deleteStudyItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: { itemId: string }) => input)
   .handler(async ({ data, context }): Promise<void> => {
     const db = context.supabase;
@@ -239,7 +240,7 @@ export const deleteStudyItem = createServerFn({ method: "POST" })
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
 export const addStudyLog = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator(
     (input: { itemId: string; hours: number; note?: string; loggedAt?: string }) => input,
   )
@@ -257,7 +258,7 @@ export const addStudyLog = createServerFn({ method: "POST" })
   });
 
 export const getStudyHeatmap = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: Record<string, never>) => input)
   .handler(async ({ context }): Promise<StudyLogHeatmapRow[]> => {
     const db = context.supabase;
@@ -325,7 +326,7 @@ function gapItemInsert(planId: string, userId: string, g: GapItemRow, priority: 
 }
 
 export const generatePlanFromGap = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: GeneratePlanInput) => input)
   .handler(async ({ data, context }): Promise<GeneratePlanResult> => {
     const { supabase, userId } = context;
@@ -467,7 +468,7 @@ interface AddSkillToPlanInput {
  * nenhum que o usuário revisitasse.
  */
 export const addSkillToStudyPlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireActiveSubscription])
   .inputValidator((input: AddSkillToPlanInput) => input)
   .handler(async ({ data, context }): Promise<{ added: boolean; planId: string }> => {
     const db = context.supabase;

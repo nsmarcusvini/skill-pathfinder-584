@@ -53,9 +53,10 @@ const AMBIGUOUS_SENIORITY = /\bmid[- ]?senior\b/;
  * por último — assim "Senior Staff Engineer" vira staff e "Pleno" não é
  * atropelado.
  *
- * Os valores TÊM de ser junior | pleno | senior | staff — é o CHECK de
- * job_postings.seniority, profiles.seniority e track_skill_baselines.seniority.
- * Emitir qualquer outra coisa faz o INSERT da vaga ser rejeitado inteiro.
+ * Os valores TÊM de ser estagiario | trainee | junior | pleno | senior | staff
+ * — é o CHECK de job_postings.seniority, profiles.seniority e
+ * track_skill_baselines.seniority. Emitir qualquer outra coisa faz o INSERT da
+ * vaga ser rejeitado inteiro.
  *
  * Cuidados que vieram de olhar a base real, não invente de novo:
  *  - Nada de `\b3\b` ou `\b2\b`: "L3", "Nível 2" e "3 anos" viravam senioridade.
@@ -72,9 +73,21 @@ const SENIORITY_RULES: Array<{ seniority: string; re: RegExp }> = [
     seniority: "staff",
     re: /\b(staff|principal|lead|tech lead|head|especialista|specialist|architect|arquiteto)\b/,
   },
+  // Estágio e trainee vêm ANTES de júnior e são níveis próprios: os três
+  // dividiam uma regra só e a base inteira de estágio aparecia como "Júnior".
+  // `intern` fica com `\b` dos dois lados (senão casa "internacional"), e
+  // `internship` precisa da própria alternativa porque o `\b` final não deixa
+  // `intern` casar o começo dela.
+  // Sem formas acentuadas: `inferSeniority` roda `deaccent()` antes de casar,
+  // então "estágio" chega aqui como "estagio".
+  {
+    seniority: "estagiario",
+    re: /\b(estagio|estagiario|internship|intern)\b/,
+  },
+  { seniority: "trainee", re: /\btrainee\b/ },
   {
     seniority: "junior",
-    re: /\b(jr\.?|junior|júnior|entry[- ]?level|trainee|estagio|estágio|intern|internship)\b/,
+    re: /\b(jr\.?|junior|júnior|entry[- ]?level)\b/,
   },
   {
     // `associate` ficou de fora: como nível do LinkedIn significa pleno, mas em

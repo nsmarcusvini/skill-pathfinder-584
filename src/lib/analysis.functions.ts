@@ -17,7 +17,9 @@ export const applyCvAnalysis = createServerFn({ method: "POST" })
       .object({
         cvId: z.string().uuid(),
         trackId: z.string().uuid().optional(),
-        seniority: z.enum(["junior", "pleno", "senior", "staff"]).optional(),
+        seniority: z
+          .enum(["estagiario", "trainee", "junior", "pleno", "senior", "staff"])
+          .optional(),
         marketSegment: z.enum(["br", "remoto_global"]).optional(),
       })
       .parse(data),

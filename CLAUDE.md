@@ -11,9 +11,16 @@ escolheu. Também mostra as ferramentas mais pedidas, empresas contratando, faix
 e recomenda plano de estudos.
 
 Trilhas **ativas**: `devops` (variantes: DevOps Engineer, Platform Engineer, SRE),
-`data_engineer`, `fullstack`, `backend` e `frontend`. `qa` existe mas está
-**desativada** (`is_active = false`) — sai de toda a interface, que filtra por
+`data_engineer`, `fullstack` e `backend`. `qa` e `frontend` existem mas estão
+**desativadas** (`is_active = false`) — saem de toda a interface, que filtra por
 `is_active`. Trilha nova segue `docs/ADICIONAR_TRILHA.md`.
+
+O critério para uma trilha estar ativa é **amostra**, não código pronto:
+`MIN_SAMPLE` em `gap.functions.ts` é 30, e abaixo disso o gap sobe marcado como
+`lowConfidence`. `frontend` foi desativada em 2026-09-10 com 6 vagas no segmento
+`br` — a app avisaria que o número não é confiável, e não dá para cobrar por isso.
+Quando a ingestão passar dos 30, um `UPDATE career_tracks SET is_active = true`
+devolve a trilha, sem deploy.
 
 `backend` e `frontend` são trilhas próprias, **não subconjuntos de `fullstack`**:
 "Senior Backend Software Engineer" conta para Back-End. Quem decide isso é
@@ -112,7 +119,13 @@ Cron jobs do `pg_cron` chamam URLs do próprio app via `pg_net`
     `billing_plans`, zero deploy — o desconto exibido é **derivado**
     (`price_cents / months` contra o maior equivalente mensal), nunca gravado.
     Esconder botão não é proteção — a server function que serve dado pago usa
-    `requireActiveSubscription`.
+    `requireActiveSubscription`. E **middleware sozinho também não é proteção**:
+    enquanto `anon`/`authenticated` tiverem GRANT de SELECT na tabela, dá para ler
+    tudo direto pelo PostgREST sem passar pela server function — sessão anônima é
+    `authenticated` no JWT (regra 7). Esse erro já foi cometido duas vezes (dado de
+    mercado em 2026-09-03, catálogo de certificações/cursos em 2026-09-10). Feature
+    paga nova = `requireActiveSubscription` **+** `revoke select … from anon,
+    authenticated` **+** leitura por `supabaseAdmin`. Os três, sempre.
 
 ## Layout do projeto
 

@@ -24,10 +24,15 @@ export const SEGMENT_CURRENCY: Record<MarketSegment, "BRL" | "USD"> = {
   remoto_global: "USD",
 };
 
-export const SENIORITIES = ["junior", "pleno", "senior", "staff"] as const;
+// Ordem crescente. É a MESMA lista do CHECK de seniority no banco e do
+// SENIORITY_ORDER em gap.functions.ts (que usa o índice para achar níveis
+// adjacentes ao alargar a busca) — as três precisam concordar.
+export const SENIORITIES = ["estagiario", "trainee", "junior", "pleno", "senior", "staff"] as const;
 export type Seniority = (typeof SENIORITIES)[number];
 
 export const SENIORITY_LABEL: Record<Seniority, string> = {
+  estagiario: "Estagiário",
+  trainee: "Trainee",
   junior: "Júnior",
   pleno: "Pleno",
   senior: "Sênior",
@@ -168,7 +173,16 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       periodDays,
       setPeriodDays,
     }),
-    [tracks, tracksQuery.isLoading, trackId, segment, seniority, periodDays, setPeriodDays, persist],
+    [
+      tracks,
+      tracksQuery.isLoading,
+      trackId,
+      segment,
+      seniority,
+      periodDays,
+      setPeriodDays,
+      persist,
+    ],
   );
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;

@@ -92,7 +92,7 @@ export interface GapResult {
   items: GapItem[];
 }
 
-const SENIORITY_ORDER = ["junior", "pleno", "senior", "staff"] as const;
+const SENIORITY_ORDER = ["estagiario", "trainee", "junior", "pleno", "senior", "staff"] as const;
 
 function adjacentSeniorities(seniority: string): string[] {
   const i = SENIORITY_ORDER.indexOf(seniority as (typeof SENIORITY_ORDER)[number]);
@@ -236,7 +236,9 @@ export const computeGap = createServerFn({ method: "POST" })
         new Date(latest.computed_at).getTime() >= new Date(lastSkill.updated_at).getTime();
       const cachedStep = (latest.widening_step as WideningStep) ?? "base";
       const cfg = stepConfig(cachedStep, periodDays, seniority, marketSegment);
-      const { data: cachedStats } = await (await marketDb()).rpc("market_scope_stats", {
+      const { data: cachedStats } = await (
+        await marketDb()
+      ).rpc("market_scope_stats", {
         _track_id: trackId,
         _seniorities: cfg.sen,
         _segments: cfg.seg,
