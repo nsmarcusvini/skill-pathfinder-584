@@ -56,7 +56,7 @@ import {
 } from "@/hooks/use-market";
 import { useGap } from "@/hooks/use-gap";
 import { WIDENING_LABEL, type GapItem } from "@/lib/gap.functions";
-import { addSkillToStudyPlan } from "@/lib/study.functions";
+import { addSkillToStudyPlan, getStudyPlans } from "@/lib/study.functions";
 
 export const Route = createFileRoute("/_conta/dashboard")({
   head: () => ({
@@ -365,19 +365,40 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
   // Acima de 0 a skill já existe no perfil, só está abaixo do nível pedido:
   // "já tenho" não faria sentido, o ajuste é em /minhas-skills.
   const naoPossui = item.userLevel === 0;
-  const { trackId } = useMarket();
+  const { trackId, tracks } = useMarket();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const runAddToPlan = useServerFn(addSkillToStudyPlan);
+  const runGetPlans = useServerFn(getStudyPlans);
+
+  // Mesma queryKey usada em progresso.tsx/cursos.tsx/certificacoes.tsx — GapRow
+  // se repete uma vez por lacuna, mas o React Query deduplica requisições
+  // concorrentes com a mesma chave, então isso não vira N idas ao banco.
+  const plansQuery = useQuery({
+    queryKey: ["study_plans"],
+    queryFn: () => runGetPlans({ data: {} }),
+  });
+  const activePlans = (plansQuery.data ?? []).filter((p) => p.status === "ativo");
 
   // A adição em si já acontece no clique (onSuccess), sempre — o diálogo só
   // pergunta o próximo passo, nunca condiciona se a skill entra no plano.
   const [irAoPlanoAberto, setIrAoPlanoAberto] = React.useState(false);
 
+  // Só pergunta ONDE quando há ambiguidade de verdade (mais de um plano
+  // ativo). Com zero ou um, o comportamento de sempre decide sozinho —
+  // perguntar aí seria fricção sem escolha real por trás.
+  const [escolhaPlanoAberta, setEscolhaPlanoAberta] = React.useState(false);
+  const [planoEscolhidoId, setPlanoEscolhidoId] = React.useState<string | null>(null);
+
   const addToPlan = useMutation({
-    mutationFn: () =>
+    mutationFn: (planId?: string) =>
       runAddToPlan({
-        data: { trackId: trackId as string, skillId: item.skillId, skillName: item.name },
+        data: {
+          trackId: trackId as string,
+          skillId: item.skillId,
+          skillName: item.name,
+          ...(planId ? { planId } : {}),
+        },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["study_plans"] });
@@ -386,6 +407,17 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function clicouAdicionar() {
+    if (activePlans.length > 1) {
+      // Pré-seleciona o plano da trilha atual, se houver um — reduz o clique
+      // extra no caso mais comum sem esconder a escolha.
+      setPlanoEscolhidoId(activePlans.find((p) => p.trackId === trackId)?.id ?? activePlans[0]!.id);
+      setEscolhaPlanoAberta(true);
+      return;
+    }
+    addToPlan.mutate(undefined);
+  }
 
   return (
     <li className="grid grid-cols-1 items-center gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
@@ -417,12 +449,51 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
         <Button
           variant="outline"
           size="sm"
-          disabled={!trackId || addToPlan.isPending}
-          onClick={() => addToPlan.mutate()}
+          disabled={!trackId || plansQuery.isLoading || addToPlan.isPending}
+          onClick={clicouAdicionar}
         >
           Adicionar ao plano de estudos
         </Button>
       </div>
+
+      <Dialog open={escolhaPlanoAberta} onOpenChange={setEscolhaPlanoAberta}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Em qual plano?</DialogTitle>
+            <DialogDescription>
+              Você tem mais de um plano de estudos ativo. Escolha onde "{item.name}" deve
+              entrar.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={planoEscolhidoId ?? undefined} onValueChange={setPlanoEscolhidoId}>
+            <SelectTrigger aria-label="Plano de estudos">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {activePlans.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.title}
+                  {p.trackId ? ` — ${tracks.find((t) => t.id === p.trackId)?.name ?? ""}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEscolhaPlanoAberta(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!planoEscolhidoId || addToPlan.isPending}
+              onClick={() => {
+                setEscolhaPlanoAberta(false);
+                addToPlan.mutate(planoEscolhidoId ?? undefined);
+              }}
+            >
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={irAoPlanoAberto} onOpenChange={setIrAoPlanoAberto}>
         <DialogContent>

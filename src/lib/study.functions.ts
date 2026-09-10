@@ -458,12 +458,18 @@ interface AddSkillToPlanInput {
   trackId: string;
   skillId: string;
   skillName: string;
+  /**
+   * Escolhido explicitamente pela pessoa quando ela tem mais de um plano
+   * ativo (o botão abre um seletor nesse caso — dashboard.tsx). Ausente,
+   * cai no comportamento de sempre: acha o plano ativo da trilha ou cria um.
+   */
+  planId?: string;
 }
 
 /**
  * Usado pelos botões "Adicionar ao plano de estudos" do dashboard e de
- * ferramentas — não abrem diálogo escolhendo o plano, então esta função acha
- * o plano ativo da trilha ou cria um. O item entra em `study_items`, a mesma
+ * ferramentas. Sem `planId`, não abre diálogo escolhendo o plano: acha o
+ * plano ativo da trilha ou cria um. O item entra em `study_items`, a mesma
  * tabela que a aba Progresso lê; sem isso o clique não aparecia em lugar
  * nenhum que o usuário revisitasse.
  */
@@ -474,18 +480,40 @@ export const addSkillToStudyPlan = createServerFn({ method: "POST" })
     const db = context.supabase;
     const userId = context.userId;
 
-    const { data: existingPlan, error: planQueryError } = await db
-      .from("study_plans")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("track_id", data.trackId)
-      .eq("status", "ativo")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (planQueryError) throw new Error(planQueryError.message);
+    let planId: string | undefined;
 
-    let planId = existingPlan?.id as string | undefined;
+    if (data.planId) {
+      // Veio de um seletor explícito (mais de um plano ativo). `db` é o
+      // client escopado por RLS (`sp_own`: user_id = auth.uid()) — se o id
+      // não for do próprio usuário, ou não existir, a consulta devolve nulo
+      // em vez de vazar outro plano ou inserir num id qualquer que o cliente
+      // mandou. Nunca confia cegamente no id recebido.
+      // `status = ativo` também aqui: se o plano foi concluído/pausado noutra
+      // aba entre o seletor carregar e o clique confirmar, recusa em vez de
+      // inserir num plano que a pessoa já não está trabalhando.
+      const { data: chosenPlan, error: chosenPlanError } = await db
+        .from("study_plans")
+        .select("id")
+        .eq("id", data.planId)
+        .eq("status", "ativo")
+        .maybeSingle();
+      if (chosenPlanError) throw new Error(chosenPlanError.message);
+      if (!chosenPlan) throw new Error("Plano de estudos não encontrado ou não está mais ativo.");
+      planId = chosenPlan.id;
+    } else {
+      const { data: existingPlan, error: planQueryError } = await db
+        .from("study_plans")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("track_id", data.trackId)
+        .eq("status", "ativo")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (planQueryError) throw new Error(planQueryError.message);
+      planId = existingPlan?.id as string | undefined;
+    }
+
     if (!planId) {
       const { data: createdPlan, error: createPlanError } = await db
         .from("study_plans")
