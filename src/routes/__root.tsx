@@ -9,7 +9,11 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Analytics } from "@vercel/analytics/next";
+// `/react`, não `/next`: este projeto é TanStack Start (CLAUDE.md, "Stack real").
+// O entry `/next` importa `useParams` de `next/navigation`, que não existe aqui —
+// o build quebra com MISSING_EXPORT em vez de erro de módulo não encontrado,
+// porque o Vite resolve `next` como peer dependency opcional e devolve um stub vazio.
+import { Analytics } from "@vercel/analytics/react";
 
 import { cn } from "@/lib/utils";
 

@@ -53,7 +53,7 @@ export const Route = createFileRoute("/")({
  */
 function listaPtBr(nomes: string[]): string {
   if (nomes.length === 0) return "";
-  if (nomes.length === 1) return nomes[0];
+  if (nomes.length === 1) return nomes[0] ?? "";
   return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
 }
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -465,7 +465,13 @@ function GapRow({ item, totalWeight }: { item: GapItem; totalWeight: number }) {
               entrar.
             </DialogDescription>
           </DialogHeader>
-          <Select value={planoEscolhidoId ?? undefined} onValueChange={setPlanoEscolhidoId}>
+          {/* `exactOptionalPropertyTypes` está ligado: passar `undefined` explícito para
+              uma prop opcional é erro de tipo. O spread condicional deixa o Select
+              genuinamente não-controlado enquanto ninguém escolheu nada. */}
+          <Select
+            {...(planoEscolhidoId ? { value: planoEscolhidoId } : {})}
+            onValueChange={setPlanoEscolhidoId}
+          >
             <SelectTrigger aria-label="Plano de estudos">
               <SelectValue />
             </SelectTrigger>
