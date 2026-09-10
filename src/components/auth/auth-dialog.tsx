@@ -116,7 +116,10 @@ export function AuthDialog({
   );
 
   async function handleGoogle() {
-    const { error } = await auth.signInWithGoogle();
+    // Na aba "Já tenho conta" a intenção é entrar: vincular o Google à sessão
+    // anônima falharia com `identity_already_exists`, porque a identidade já
+    // pertence à conta que a pessoa quer acessar.
+    const { error } = await auth.signInWithGoogle(mode === "entrar" ? "entrar" : "vincular");
     if (error) toast.error(error);
   }
 
@@ -280,7 +283,13 @@ export function AuthDialog({
 
         <GoogleButton
           onClick={handleGoogle}
-          label={auth.isAnonymous ? "Vincular conta Google" : "Continuar com Google"}
+          label={
+            mode === "entrar"
+              ? "Entrar com Google"
+              : auth.isAnonymous
+                ? "Vincular conta Google"
+                : "Continuar com Google"
+          }
         />
       </DialogContent>
     </Dialog>

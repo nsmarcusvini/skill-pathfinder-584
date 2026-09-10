@@ -13,6 +13,7 @@ import {
   smartrecruitersAdapter,
   workableAdapter,
 } from "./ats";
+import { gupyAdapter } from "./gupy";
 import {
   brightDataGlassdoorAdapter,
   brightDataIndeedAdapter,
@@ -35,6 +36,7 @@ export const ADAPTERS: Record<string, JobAdapter> = {
   himalayas: himalayasAdapter,
   jobicy: jobicyAdapter,
   arbeitnow: arbeitnowAdapter,
+  gupy: gupyAdapter,
   manual: csvManualAdapter,
   adzuna: adzunaAdapter,
   jsearch: jsearchAdapter,

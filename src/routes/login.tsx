@@ -92,9 +92,13 @@ function LoginPage() {
         <span className="h-px flex-1 bg-divider" />
       </div>
 
+      {/* "entrar", não "vincular": nesta tela a conta já existe. Vincular a
+          identidade Google à sessão anônima do visitante devolveria
+          `identity_already_exists` e prenderia a pessoa em /auth/callback. */}
       <GoogleButton
+        label="Entrar com Google"
         onClick={async () => {
-          const { error } = await auth.signInWithGoogle();
+          const { error } = await auth.signInWithGoogle("entrar");
           if (error) toast.error(error);
         }}
       />

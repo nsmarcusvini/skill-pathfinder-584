@@ -11,7 +11,7 @@ export const FORNECEDOR = {
   nome: "Marcus Vinicius Nascimento Souza",
   documento: "CPF 526.985.108-38",
   cidadeUf: "São Paulo/SP",
-  contato: "eu.marcussouza@gmail.com",
+  contato: "rumvia2026@gmail.com",
 };
 
 /**

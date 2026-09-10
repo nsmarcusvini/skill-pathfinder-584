@@ -11,6 +11,15 @@ import { TERMOS_PENDENTES_KEY } from "@/lib/legal-copy";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
+/**
+ * Por que o botão do Google foi clicado. "vincular" acrescenta o Google à
+ * sessão anônima atual preservando o `user.id` (regra 7). "entrar" é a tela
+ * de login: a conta já existe, e tentar vincular ali sempre falha com
+ * `identity_already_exists` — aquela identidade Google já pertence à conta
+ * permanente que a pessoa está tentando acessar.
+ */
+export type GoogleAuthIntent = "vincular" | "entrar";
+
 export type AuthResult = {
   error: string | null;
   /** true quando o e-mail informado já pertence a uma conta existente. */
@@ -33,7 +42,7 @@ export interface AuthValue {
   isOnboarded: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string, fullName?: string) => Promise<AuthResult>;
-  signInWithGoogle: () => Promise<AuthResult>;
+  signInWithGoogle: (intencao?: GoogleAuthIntent) => Promise<AuthResult>;
   /**
    * Converte a sessão anônima atual em conta permanente.
    * O user.id NUNCA muda — CV, skills e análises já gravadas continuam válidos.
@@ -279,11 +288,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
        * dispara no primeiro acesso, então quem clica em "Continuar com Google"
        * já é anônimo e cai no `linkIdentity`. "Quase nunca" não é "nunca".
        */
-      async signInWithGoogle() {
+      async signInWithGoogle(intencao: GoogleAuthIntent = "vincular") {
         try {
           const redirectTo = `${authRedirectOrigin()}/auth/callback`;
 
-          if (isAnonymous) {
+          // `isAnonymous` sozinho não basta para escolher o caminho: TODO
+          // visitante é anônimo (signInAnonymously roda no primeiro acesso),
+          // inclusive quem abre /login para voltar a uma conta que já existe.
+          // Vincular nesse caso é impossível — o GoTrue devolve
+          // `identity_already_exists` e o retorno cai em /auth/callback com
+          // erro. Quem tem intenção de entrar vai por OAuth normal.
+          if (isAnonymous && intencao === "vincular") {
             // Vincula o Google à MESMA conta anônima: o user.id é preservado
             // (regra 7). O CV já enviado e as análises continuam valendo — por
             // isso é `linkIdentity`, nunca um login novo.

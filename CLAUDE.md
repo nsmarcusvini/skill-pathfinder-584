@@ -271,6 +271,22 @@ Detalhes completos de cada um vivem em `docs/roadmap/`.
   terceiro (webhook de gateway, callback de OAuth) tem que usar o `www`: webhook é POST, e
   cliente que não segue redirect simplesmente falha.
 
+- **`linkIdentity` na tela de login sempre falha com `identity_already_exists`.** Todo
+  visitante é anônimo (`signInAnonymously` no primeiro acesso), então "quem é anônimo,
+  vincula" mandava para o `linkIdentity` até quem só queria voltar para uma conta que já
+  existe — e o GoTrue recusa, porque aquela identidade Google já pertence à conta
+  permanente. Por isso `signInWithGoogle` recebe intenção (`"entrar"` | `"vincular"`,
+  2026-09-10): `/login` e a aba "Já tenho conta" do diálogo passam `"entrar"` e vão por
+  `signInWithOAuth`; `/cadastro` e o fluxo com CV enviado continuam em `linkIdentity`
+  para preservar o `user.id` (regra 7).
+
+- **Erro de OAuth volta no fragmento, não só na query.** O GoTrue devolve
+  `/auth/callback?error=…#error=…`, e `auth.callback.tsx` lia só `type`: sem sessão e sem
+  erro reconhecido, a tela ficava presa em "Confirmando acesso" para sempre. Hoje o
+  callback lê os dois lados, tem tela própria para `identity_already_exists` (com o
+  atalho de entrar na conta existente) e um timeout de 12s que vira saída com link para
+  o login — nenhum caminho pode terminar em spinner eterno.
+
 - **Anonymous sign-in precisa estar habilitado no painel do Supabase**
   (Authentication → Providers). Se `useAuth` receber erro silencioso, é aqui.
 
