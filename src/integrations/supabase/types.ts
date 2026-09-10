@@ -109,6 +109,7 @@ export type Database = {
           key: string
           max_retry?: number
           methods?: string[]
+          months?: number | null
           name: string
           price_cents: number
           provider_plan_ref?: string | null
@@ -127,6 +128,7 @@ export type Database = {
           key?: string
           max_retry?: number
           methods?: string[]
+          months?: number | null
           name?: string
           price_cents?: number
           provider_plan_ref?: string | null
@@ -1664,6 +1666,7 @@ export type Database = {
       subscriptions: {
         Row: {
           amount_cents: number
+          cancel_at_period_end: boolean
           cancelled_at: string | null
           cancelled_due_to: string | null
           checkout_url: string | null
@@ -1692,6 +1695,7 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           cancelled_due_to?: string | null
           checkout_url?: string | null
@@ -1720,6 +1724,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           cancelled_due_to?: string | null
           checkout_url?: string | null
@@ -1827,6 +1832,7 @@ export type Database = {
           id: string
           importance: number
           is_core: boolean
+          is_provisional: boolean
           required_level: number
           seniority: string
           skill_id: string
@@ -1837,6 +1843,7 @@ export type Database = {
           id?: string
           importance?: number
           is_core?: boolean
+          is_provisional?: boolean
           required_level?: number
           seniority: string
           skill_id: string
@@ -1847,6 +1854,7 @@ export type Database = {
           id?: string
           importance?: number
           is_core?: boolean
+          is_provisional?: boolean
           required_level?: number
           seniority?: string
           skill_id?: string
@@ -2525,7 +2533,9 @@ export type Database = {
           grupos: number
         }[]
       }
+      expire_and_notify_prepaid: { Args: never; Returns: undefined }
       expire_old_jobs: { Args: never; Returns: number }
+      finalize_scheduled_cancellations: { Args: never; Returns: undefined }
       has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       job_locations: {
@@ -2538,6 +2548,14 @@ export type Database = {
         }[]
       }
       landing_stats: { Args: never; Returns: Json }
+      list_orphan_cv_objects: {
+        Args: never
+        Returns: {
+          created_at: string
+          path: string
+          size_bytes: number
+        }[]
+      }
       market_demand: {
         Args: {
           _include_unranked?: boolean
@@ -2574,8 +2592,8 @@ export type Database = {
       record_usage: {
         Args: {
           _event_type: string
-          _ip_hash?: string | null
-          _subject_id?: string | null
+          _ip_hash?: string
+          _subject_id?: string
           _user_id: string
         }
         Returns: number
@@ -2662,12 +2680,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2691,11 +2709,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2716,11 +2734,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2741,11 +2759,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2758,11 +2776,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

@@ -105,9 +105,11 @@ function TermosPage() {
             <h2 className="label-h6 text-neutral-900">Como cancelar</h2>
             <p className="mt-1 text-body text-neutral-700">
               O cancelamento é feito por você mesmo, a qualquer momento, em Configurações →
-              Assinatura, e tem efeito <strong>imediato</strong>: o acesso ao painel termina na hora
-              do pedido, sem aviso prévio a dar. Fora do prazo de arrependimento, não há reembolso
-              proporcional pelo tempo não utilizado do ciclo já cobrado.
+              Assinatura, e interrompe a renovação <strong>imediatamente</strong>: nenhuma cobrança
+              nova é feita a partir do pedido. Fora do prazo de arrependimento não há reembolso
+              proporcional, mas <strong>o ciclo já pago é honrado até o fim</strong> — o acesso ao
+              painel continua até a data de término do período vigente, informada na própria tela de
+              Assinatura.
             </p>
           </section>
 

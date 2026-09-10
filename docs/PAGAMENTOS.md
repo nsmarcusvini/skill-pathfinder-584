@@ -1,5 +1,32 @@
 # Pagamentos — assinatura RUMVIA Pro via Asaas
 
+> ## ⛔ PIX está SUSPENSO desde 2026-09-10 — só cartão
+>
+> `billing_plans.methods` é `ARRAY['CARD']` nos três planos. A vitrine não
+> mostra botão de PIX e `startSubscriptionCheckout` recusa `method: "PIX"` no
+> servidor. **Nenhum código foi removido** — é dado (regra 1), e religar é um
+> `UPDATE` (receita no fim de "PIX avulso", abaixo).
+>
+> **Por quê:** PIX aqui nunca foi assinatura, e sim pré-pago — um período por
+> compra, sem renovação, porque PIX Automático exige recebedor **pessoa
+> jurídica** (regra do Banco Central). Enquanto o RUMVIA for pessoa física, o
+> cliente teria que lembrar de pagar todo mês. Cartão renova sozinho e tem
+> estorno imediato, que é o que o arrependimento do CDC precisa.
+>
+> **Religar quando o MEI existir** — e só depois de cadastrar a chave PIX na
+> conta de **produção** do Asaas:
+>
+> ```sql
+> UPDATE public.billing_plans SET methods = ARRAY['CARD','PIX']::text[]
+>  WHERE is_active = true;
+> ```
+>
+> **Quem já pagou por PIX não foi afetado.** `has_active_subscription` lê
+> `subscriptions`, nunca o catálogo: o período comprado vale até o fim, com o
+> aviso de 3 dias antes funcionando normalmente. Em 2026-09-10 havia **um**
+> assinante nessa situação (acesso até 2026-10-09); ao renovar, ele encontra só
+> cartão. O cron `rumvia-expira-avisa-pix` continua no ar por causa dele.
+
 Cobrança recorrente pelo [Asaas](https://docs.asaas.com), em três ciclos:
 
 | Plano (`billing_plans.key`) | Ciclo Asaas | Cobrado | Equivalente mensal | Desconto |
@@ -108,6 +135,42 @@ falhas, deploy fora do ar, domínio trocado).
 
 ---
 
+## Cancelar: o período já pago é honrado
+
+Desde 2026-09-10, cancelar **fora** do prazo de arrependimento não corta o
+acesso na hora. Antes cortava — a pessoa pagava o mês inteiro, cancelava no dia
+20 e perdia os 10 dias restantes sem receber nada de volta (cancelamento comum
+não estorna). Isso não se defendia: se o dinheiro do período não volta, o
+período tem que valer.
+
+```
+subscriptions.cancel_at_period_end  ← true = renovação interrompida, acesso
+                                       segue até current_period_end
+```
+
+O clique em cancelar faz, na ordem: cancela a assinatura no Asaas (nenhuma
+cobrança futura é gerada) e marca `cancel_at_period_end = true` — **sem tocar
+em `status`**. É de propósito: `has_active_subscription` olha status *e*
+`current_period_end` juntos, então deixar `active` é o que mantém o acesso pelo
+tempo que foi pago, e a data é o que o encerra.
+
+Quem fecha o `status` depois é o cron diário `rumvia-finaliza-cancelamentos`
+(`finalize_scheduled_cancellations`), que não muda acesso nenhum — a essa
+altura a data já cortou. Ele existe para o status refletir a verdade e para
+destravar `uq_subscriptions_user_viva`, liberando uma compra nova. É o mesmo
+padrão de `expire_and_notify_prepaid`, que fecha o PIX pré-pago vencido.
+
+**Estorno por arrependimento é a exceção e continua imediato:** o dinheiro
+voltou inteiro, então não há período pago a honrar — `status` vira `cancelled`
+na hora, como sempre foi.
+
+⚠️ **Ao reaproveitar a linha em um checkout novo, `startSubscriptionCheckout`
+zera `cancel_at_period_end`, `cancelled_at` e `cancelled_due_to`.** Sem isso a
+assinatura nova nasceria com o cancelamento agendado do ciclo velho, e o cron
+cancelaria uma renovação que ninguém pediu para parar.
+
+---
+
 ## Direito de arrependimento (CDC art. 49)
 
 Sete dias corridos a partir da **primeira** cobrança confirmada — nunca da mais recente —
@@ -132,11 +195,27 @@ própria a cada chamada; dentro dela, o cancelamento também chama
 padrão do cancelamento comum, que também não antecipa o que o Asaas vai confirmar depois.
 
 **Estorno de cartão é imediato no Asaas.** Testado no sandbox em 2026-09-05:
-`POST /payments/{id}/refund` devolve `status: "REFUNDED"` na hora, sem espera — diferente
-de PIX, que teria fluxo próprio. Um segundo pedido de estorno na mesma cobrança devolve
-`400 — "Não é possível cancelar a venda."`; `cancelMySubscription` trata esse erro
-especificamente como sucesso (idempotência), porque o dinheiro já voltou e um duplo clique
-não pode virar erro para o usuário.
+`POST /payments/{id}/refund` devolve `status: "REFUNDED"` na hora, sem espera. Um segundo
+pedido de estorno na mesma cobrança devolve `400 — "Não é possível cancelar a venda."`;
+`cancelMySubscription` trata esse erro especificamente como sucesso (idempotência), porque
+o dinheiro já voltou e um duplo clique não pode virar erro para o usuário.
+
+⚠️ **Estorno de PIX sai do SALDO da carteira Asaas — confirmado em produção em 2026-09-10.**
+Diferente de cartão (que reverte a operação, sem depender de saldo nosso), o Asaas debita o
+estorno de PIX do que estiver disponível na conta. Sem saldo suficiente (dinheiro já
+transferido para a conta bancária, por exemplo), `refund` devolve `400 — "Saldo insuficiente."`
+Foi exatamente o que aconteceu com o único assinante PIX ativo hoje: ele pediu cancelamento
+dentro do prazo do CDC, o estorno falhou por saldo, e o erro cru da Asaas ia direto para o
+toast do cliente (`Asaas /payments/.../refund (400): Saldo insuficiente`). Corrigido em
+`encerrarAssinaturaViva` — esse erro específico agora vira uma mensagem que não expõe API
+interna, e **nada é gravado** quando ele acontece: a assinatura fica exatamente como estava
+(`active`, sem `cancelled_at`), a pessoa não perde acesso, e o clique seguinte funciona assim
+que houver saldo. O toast de sucesso do estorno também estava fixo em "aparece no seu
+cartão" mesmo para PIX — corrigido para citar o método certo.
+
+**Ação operacional, não de código:** antes de aceitar novo PIX (ou processar o cancelamento
+do assinante atual), garanta saldo na carteira Asaas de produção cobrindo os estornos
+possíveis dentro da janela do CDC.
 
 Sem `provider_payment_id` gravado (dado antigo, ou correlação que não chegou ainda),
 `cancelMySubscription` cai para `asaas.listPaymentsBySubscription()` antes de desistir — o
@@ -215,6 +294,9 @@ update public.resubscribe_blocks
 | `src/routes/termos.tsx` | Termos de uso — versão + identificação do fornecedor (✅ preenchida em `src/lib/legal-copy.ts`; a página cai num EmptyState se algum campo for esvaziado) |
 | `src/lib/legal-copy.ts` | Identificação do fornecedor e versão dos Termos, em um lugar só |
 | `supabase/migrations/20260905155813_conformidade_arrependimento_e_termos.sql` | `first_activated_at`, `provider_payment_id`, `terms_acceptances` |
+| `supabase/migrations/20260910200000_cancelamento_de_cartao_respeita_periodo_pago.sql` | `cancel_at_period_end`, `finalize_scheduled_cancellations()` + cron diário |
+| `supabase/migrations/20260910200100_corrige_grant_finalize_scheduled_cancellations.sql` | revoga a função de `anon`/`authenticated` — `FROM PUBLIC` não bastava |
+| `supabase/migrations/20260910210000_suspende_pix_ate_mei.sql` | `methods = ARRAY['CARD']` nos três planos |
 | `src/integrations/supabase/subscription-middleware.ts` | `requireActiveSubscription` — trava server-side |
 | `src/hooks/use-subscription.tsx` | `useSubscription()`, `useStartCheckout()`, `useCancelSubscription()` |
 | `src/components/rumvia/paywall.tsx` | `<Paywall>`, `<PaywallCard>`, `formatCents()` |
@@ -403,8 +485,10 @@ feature.
   PIX Automático (via separada, para recorrência de verdade) exige recebedor **pessoa
   jurídica**, regra do Banco Central. O RUMVIA é pessoa física.
 
-- **PIX avulso: IMPLEMENTADO em 2026-09-08** (era "decisão de produto em aberto" até
-  aqui). `chargeTypes: ["DETACHED"]` + `billingTypes: ["PIX"]`, no mesmo checkout
+- **PIX avulso: implementado em 2026-09-08, SUSPENSO em 2026-09-10** (ver o aviso no
+  topo). O código descrito abaixo continua todo no lugar e volta com um `UPDATE` em
+  `billing_plans.methods`; o que segue vale para quando ele for religado.
+  `chargeTypes: ["DETACHED"]` + `billingTypes: ["PIX"]`, no mesmo checkout
   hospedado do cartão — então o Asaas continua coletando os dados do cliente e o RUMVIA
   segue sem tocar em CPF. Mesmo gateway, mesmo webhook, mesmo schema.
 

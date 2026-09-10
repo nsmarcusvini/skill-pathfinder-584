@@ -58,6 +58,15 @@ export interface MySubscription {
   lastReceiptUrl: string | null;
   cancelledAt: string | null;
   cancelledDueTo: string | null;
+  /**
+   * Cancelamento pedido fora do prazo de arrependimento: `status` continua
+   * `active`/`past_due` (o acesso não é cortado) até `currentPeriodEnd`, sem
+   * renovar — a recorrência já foi cancelada no Asaas. Vira `status =
+   * 'cancelled'` sozinho quando o período passa (cron
+   * `finalize_scheduled_cancellations`). Estorno por arrependimento não passa
+   * por aqui: ali o acesso já cai na hora, com `status = 'cancelled'` direto.
+   */
+  cancelAtPeriodEnd: boolean;
   /** Só preenchido enquanto status = pending: leva o usuário de volta ao pagamento. */
   checkoutUrl: string | null;
   devMode: boolean;
@@ -208,7 +217,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
     const { data: subRow, error: subError } = await db
       .from("subscriptions")
       .select(
-        "status, amount_cents, method, current_period_end, trial_ends_at, last_payment_at, last_receipt_url, cancelled_at, cancelled_due_to, checkout_url, dev_mode, created_at, first_activated_at, billing_plans(key, name, cycle)",
+        "status, amount_cents, method, current_period_end, trial_ends_at, last_payment_at, last_receipt_url, cancelled_at, cancelled_due_to, cancel_at_period_end, checkout_url, dev_mode, created_at, first_activated_at, billing_plans(key, name, cycle)",
       )
       .order("created_at", { ascending: false })
       .limit(1)
@@ -232,6 +241,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
           lastReceiptUrl: subRow.last_receipt_url ?? null,
           cancelledAt: subRow.cancelled_at ?? null,
           cancelledDueTo: subRow.cancelled_due_to ?? null,
+          cancelAtPeriodEnd: subRow.cancel_at_period_end ?? false,
           checkoutUrl: subRow.status === "pending" ? (subRow.checkout_url ?? null) : null,
           devMode: subRow.dev_mode,
           createdAt: subRow.created_at,
@@ -529,6 +539,15 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
       amount_cents: plan.price_cents,
       currency: "BRL",
       dev_mode: isSandboxKey(),
+      // Esta linha pode estar sendo REAPROVEITADA de um ciclo cancelado
+      // anterior (guard acima só bloqueia active/past_due não vencido — uma
+      // linha 'cancelled' com cancel_at_period_end=true passa livre). Sem
+      // zerar aqui, a assinatura nova nasceria com cancelamento agendado do
+      // ciclo velho, e o cron `finalize_scheduled_cancellations` cancelaria
+      // uma renovação que ninguém pediu para parar.
+      cancel_at_period_end: false,
+      cancelled_at: null,
+      cancelled_due_to: null,
       // `method` fica gravado já no pending para a tela saber que período
       // comprado por PIX não renova sozinho — e para o cron de aviso achar
       // essas linhas sem precisar consultar o Asaas.
@@ -548,7 +567,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
 
 /**
  * Encerra a assinatura viva do usuário: estorna se estiver no prazo do CDC,
- * cancela no Asaas e grava o estado local.
+ * para a recorrência no Asaas e grava o estado local.
  *
  * SERVER-ONLY. Vive fora de `cancelMySubscription` porque tem DOIS chamadores,
  * e o segundo é fácil de esquecer: `deleteMyAccount`. Quem exclui a conta
@@ -564,7 +583,7 @@ export const startSubscriptionCheckout = createServerFn({ method: "POST" })
  */
 export async function encerrarAssinaturaViva(
   userId: string,
-): Promise<{ refunded: boolean } | null> {
+): Promise<{ refunded: boolean; cancelAtPeriodEnd: boolean } | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const { data: sub } = await supabaseAdmin
@@ -621,39 +640,61 @@ export async function encerrarAssinaturaViva(
           error instanceof AsaasError &&
           error.status === 400 &&
           error.message.toLowerCase().includes("não é possível cancelar a venda");
-        if (!jaEstornado) throw error;
-        refunded = true;
+        if (jaEstornado) {
+          refunded = true;
+        } else if (
+          // Confirmado em produção em 2026-09-10: estorno de PIX sai do SALDO
+          // da carteira Asaas, diferente de cartão (que reverte a operação sem
+          // depender de saldo nosso). Sem fundo suficiente na conta, o Asaas
+          // recusa com este erro — não é bug do nosso lado, é operacional.
+          // Nada foi gravado ainda (nem `refunded` nem `cancelled_*`), então a
+          // pessoa não perde acesso: ela só precisa tentar de novo depois que
+          // colocarmos saldo, e o clique duplo cai no ramo `jaEstornado` acima
+          // quando o estorno já tiver sido feito por fora (painel do Asaas).
+          error instanceof AsaasError &&
+          error.status === 400 &&
+          error.message.toLowerCase().includes("saldo insuficiente")
+        ) {
+          throw new Error(
+            "Não foi possível concluir o estorno agora por um problema operacional nosso " +
+              "(nada foi cobrado ou alterado na sua assinatura). Tente novamente em algumas " +
+              "horas ou fale com o suporte — o valor será devolvido integralmente.",
+          );
+        } else {
+          throw error;
+        }
       }
     }
   }
 
   if (sub.provider_subscription_id) {
     const { asaas } = await import("@/lib/asaas/client.server");
-    // Remove a assinatura no Asaas: nenhuma cobrança futura é gerada.
+    // Remove a assinatura no Asaas: nenhuma cobrança futura é gerada, esteja
+    // ou não dentro do prazo de arrependimento.
     await asaas.cancelSubscription(sub.provider_subscription_id);
   }
 
-  // Grava já, sem esperar o webhook subscription.cancelled / PAYMENT_REFUNDED
-  // — que também chegam e só confirmam o mesmo estado (idempotente). O
-  // status final de um estorno é `refunded`, mas quem grava isso é o
-  // webhook; aqui fica `cancelled` com o motivo específico, igual ao
-  // cancelamento comum, até a confirmação chegar.
-  const { error } = await supabaseAdmin
-    .from("subscriptions")
-    .update({
-      status: "cancelled",
-      cancelled_at: new Date().toISOString(),
-      cancelled_due_to: refunded ? "arrependimento_cdc" : "cancelled_by_user",
-    })
-    .eq("id", sub.id);
-  if (error) throw new Error(error.message);
-
-  // Estorno feito = a pessoa exerceu o arrependimento e recebeu o valor cheio.
-  // A partir daqui ela não contrata de novo sem liberação manual. Registrado
-  // DEPOIS do estorno e nunca antes: o bloqueio é consequência do reembolso ter
-  // acontecido, e `registrarBloqueio` não lança justamente para que uma falha
-  // aqui não deixe a impressão de que o estorno falhou.
   if (refunded) {
+    // Dinheiro já voltou por inteiro: não há período pago para honrar, então
+    // o acesso cai na hora. Grava já, sem esperar o webhook
+    // subscription.cancelled / PAYMENT_REFUNDED — que também chegam e só
+    // confirmam o mesmo estado (idempotente).
+    const { error } = await supabaseAdmin
+      .from("subscriptions")
+      .update({
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancelled_due_to: "arrependimento_cdc",
+      })
+      .eq("id", sub.id);
+    if (error) throw new Error(error.message);
+
+    // Estorno feito = a pessoa exerceu o arrependimento e recebeu o valor
+    // cheio. A partir daqui ela não contrata de novo sem liberação manual.
+    // Registrado DEPOIS do estorno e nunca antes: o bloqueio é consequência
+    // do reembolso ter acontecido, e `registrarBloqueio` não lança
+    // justamente para que uma falha aqui não deixe a impressão de que o
+    // estorno falhou.
     const { registrarBloqueio } = await import("@/lib/resubscribe-block.server");
     await registrarBloqueio({
       userId,
@@ -662,18 +703,45 @@ export async function encerrarAssinaturaViva(
       providerCustomerId: sub.provider_customer_id ?? null,
       amountCents: sub.amount_cents ?? null,
     });
+
+    return { refunded: true, cancelAtPeriodEnd: false };
   }
 
-  return { refunded };
+  // Fora do prazo de arrependimento: o período corrente já foi pago por
+  // inteiro (mês, trimestre ou ano), então o acesso continua até
+  // `current_period_end` — só a renovação para, e essa já foi garantida pelo
+  // `cancelSubscription` acima. `status` fica como estava DE PROPÓSITO:
+  // `has_active_subscription` olha status + data juntos, e virar `cancelled`
+  // agora cortaria dias que a pessoa já pagou. Quem fecha o status quando o
+  // período realmente terminar é `finalize_scheduled_cancellations` (cron
+  // diário), no mesmo padrão que `expire_and_notify_prepaid` já usa para
+  // fechar o PIX pré-pago vencido.
+  const { error } = await supabaseAdmin
+    .from("subscriptions")
+    .update({
+      cancel_at_period_end: true,
+      cancelled_at: new Date().toISOString(),
+      cancelled_due_to: "cancelled_by_user",
+    })
+    .eq("id", sub.id);
+  if (error) throw new Error(error.message);
+
+  return { refunded: false, cancelAtPeriodEnd: true };
 }
 
 export const cancelMySubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: Record<string, never>) => input)
-  .handler(async ({ context }): Promise<{ ok: true; refunded: boolean }> => {
-    const resultado = await encerrarAssinaturaViva(context.userId);
-    // Aqui a ausência É erro: a pessoa clicou em "cancelar" numa tela que só
-    // mostra o botão quando existe assinatura.
-    if (!resultado) throw new Error("Nenhuma assinatura ativa para cancelar.");
-    return { ok: true, refunded: resultado.refunded };
-  });
+  .handler(
+    async ({ context }): Promise<{ ok: true; refunded: boolean; cancelAtPeriodEnd: boolean }> => {
+      const resultado = await encerrarAssinaturaViva(context.userId);
+      // Aqui a ausência É erro: a pessoa clicou em "cancelar" numa tela que só
+      // mostra o botão quando existe assinatura.
+      if (!resultado) throw new Error("Nenhuma assinatura ativa para cancelar.");
+      return {
+        ok: true,
+        refunded: resultado.refunded,
+        cancelAtPeriodEnd: resultado.cancelAtPeriodEnd,
+      };
+    },
+  );

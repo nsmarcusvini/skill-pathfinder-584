@@ -126,8 +126,12 @@ function AssinaturaPage() {
       setConfirmarCancelamento("");
       toast.success(
         resultado.refunded
-          ? "Assinatura cancelada e valor estornado. O reembolso aparece no seu cartão em alguns dias."
-          : "Assinatura cancelada. O acesso Pro termina agora.",
+          ? // "Cartão" era fixo aqui mesmo quando o estorno era de PIX — o valor
+            // volta pela mesma chave PIX que pagou, não por cartão nenhum.
+            subscription?.method === "PIX"
+            ? "Assinatura cancelada e valor estornado. O reembolso volta via Pix em alguns instantes."
+            : "Assinatura cancelada e valor estornado. O reembolso aparece no seu cartão em alguns dias."
+          : "Assinatura cancelada. Você mantém acesso Pro até o fim do período já pago — não haverá nova cobrança.",
       );
     } catch (err) {
       toast.error((err as Error).message);
@@ -146,6 +150,11 @@ function AssinaturaPage() {
    * pagamento está pendente.
    */
   const pixSemCobrancaFutura = subscription?.method === "PIX" && !dentroDoPrazoArrependimento;
+
+  // Cancelamento fora do prazo de arrependimento já foi pedido: a renovação
+  // parou, mas o período pago continua valendo. Não mostra o formulário de
+  // cancelar de novo — só o aviso de até quando o acesso dura.
+  const cancelamentoAgendado = subscription?.cancelAtPeriodEnd === true;
 
   // Checkout já aberto para ESTE plano: o link antigo ainda vale, não abrimos
   // outro. Trocar de ciclo cai no botão normal, que gera um checkout novo.
@@ -337,7 +346,19 @@ function AssinaturaPage() {
               ali cancelar significa estorno integral, que é direito do
               consumidor (CDC art. 49). Esconder seria remover o único meio de
               exercê-lo. */}
-          {isPro && pixSemCobrancaFutura ? (
+          {isPro && cancelamentoAgendado ? (
+            <Blueprint className="p-5">
+              <h2 className="label-h6">Assinatura cancelada</h2>
+              <p className="mt-1 text-caption text-neutral-700">
+                A renovação foi interrompida — <strong>não haverá nova cobrança</strong>. Como o
+                período atual já está pago, o acesso Pro continua até{" "}
+                {subscription?.currentPeriodEnd
+                  ? new Date(subscription.currentPeriodEnd).toLocaleDateString("pt-BR")
+                  : "o fim do período pago"}
+                .
+              </p>
+            </Blueprint>
+          ) : isPro && pixSemCobrancaFutura ? (
             <Blueprint className="p-5">
               <h2 className="label-h6">Seu acesso</h2>
               <p className="mt-1 text-caption text-neutral-700">
@@ -362,8 +383,9 @@ function AssinaturaPage() {
                 </p>
               ) : (
                 <p className="mt-1 text-caption text-neutral-700">
-                  O cancelamento é <strong>imediato e irreversível</strong>: não há reembolso
-                  proporcional e o acesso Pro termina na hora. Digite <strong>CANCELAR</strong> para
+                  Não há reembolso proporcional, mas você{" "}
+                  <strong>mantém o acesso Pro até o fim do período já pago</strong> — a renovação
+                  para na hora, sem nenhuma cobrança nova. Digite <strong>CANCELAR</strong> para
                   confirmar.
                 </p>
               )}
@@ -456,6 +478,9 @@ function StatusAtual({ subscription }: { subscription: MySubscription }) {
         </h2>
         <span className={cobrancaFalhou ? "label-h6 text-danger" : "label-h6"}>
           {STATUS_LABEL[subscription.status]}
+          {subscription.cancelAtPeriodEnd && subscription.status !== "cancelled"
+            ? " · cancelamento agendado"
+            : ""}
           {subscription.devMode ? " · sandbox" : ""}
         </span>
       </div>
@@ -476,7 +501,11 @@ function StatusAtual({ subscription }: { subscription: MySubscription }) {
         </div>
         <div>
           <dt className="text-caption text-neutral-600">
-            {subscription.status === "cancelled" ? "Cancelada em" : "Próxima cobrança"}
+            {subscription.status === "cancelled"
+              ? "Cancelada em"
+              : subscription.cancelAtPeriodEnd
+                ? "Acesso até"
+                : "Próxima cobrança"}
           </dt>
           <dd className="font-heading">
             {subscription.status === "cancelled"

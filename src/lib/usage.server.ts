@@ -80,7 +80,10 @@ async function gravar(
     const { data, error } = await supabaseAdmin.rpc("record_usage", {
       _user_id: userId,
       _event_type: event,
-      _subject_id: subjectId ?? null,
+      // Omitido (não `null`) quando não há sujeito: `exactOptionalPropertyTypes`
+      // recusa `undefined` explícito, e a função tem DEFAULT NULL — não passar
+      // a chave dá exatamente o mesmo NULL no banco.
+      ...(subjectId ? { _subject_id: subjectId } : {}),
       _ip_hash: await hashIpDaRequisicao(),
     });
     if (error) {

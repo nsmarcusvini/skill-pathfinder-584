@@ -35,6 +35,14 @@ export const TERMOS_VERSAO = "2026-09-10";
  *               Quem aceitou 2026-09-05 mantém aquele aceite: a versão nova
  *               vale para quem se cadastrar a partir daqui, como a seção
  *               "Alterações" promete.
+ *   2026-09-10  (mesma data, segunda alteração) "Como cancelar" deixou de
+ *               prometer corte imediato do acesso: o ciclo já pago passou a ser
+ *               honrado até o fim, e só a renovação para na hora. Mudança a
+ *               FAVOR do consumidor, então quem aceitou a versão de mais cedo
+ *               não fica em condição pior — por isso não se criou um sufixo de
+ *               versão. Se algum dia uma segunda alteração no mesmo dia for
+ *               restritiva, aí a chave de versão precisa deixar de ser só a
+ *               data.
  */
 
 /** Chave de localStorage que carrega o aceite do clique até existir sessão permanente. */
