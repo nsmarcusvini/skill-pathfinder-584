@@ -839,6 +839,709 @@ export const setUserActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── Clientes e assinaturas ───────────────────────────────────────────────────
+
+/**
+ * Dia de calendário em Brasília, em `YYYY-MM-DD`, com deslocamento em dias.
+ *
+ * `usage_daily.day` é gravado por `record_usage` como
+ * `(now() AT TIME ZONE 'America/Sao_Paulo')::date`. Montar a janela a partir do
+ * UTC do servidor deslocaria o recorte em relação ao dado: entre 21h e
+ * meia-noite de Brasília o UTC já virou o dia e a coluna não, e "hoje" viria
+ * vazio. `en-CA` é o locale que o `Intl` formata em ISO — o caminho mais curto
+ * para uma data de calendário em outro fuso sem arrastar biblioteca de datas.
+ */
+function diaEmBrasilia(deslocamentoDias = 0): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + deslocamentoDias);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
+ * Uso agregado de um cliente numa janela de dias.
+ *
+ * É o que responde "ele usa?" e "o que ele usa?" sem abrir o detalhe. Vem de
+ * `usage_daily` (o agregado que sobrevive ao expurgo), nunca de `usage_events`
+ * — o detalhe é efêmero e some com a retenção.
+ */
+export interface AdminUsageSummary {
+  /** Tamanho da janela, para a tela não precisar assumir 30 ou 90. */
+  janelaDias: number;
+  /** Eventos na janela inteira. */
+  total: number;
+  /** Eventos nos últimos 7 dias da janela. Uso recente pesa mais que volume. */
+  ultimos7: number;
+  /** Dias distintos com ao menos um evento. Mede hábito, não pico. */
+  diasAtivos: number;
+  /** Último dia com uso (`YYYY-MM-DD`), ou `null` se não usou na janela. */
+  ultimoDia: string | null;
+  /** Contagem por tipo, do maior para o menor — o "o que ele usa". */
+  porEvento: Array<{ event: string; count: number }>;
+  /** Uma posição por dia, do mais antigo ao de hoje. Alimenta a sparkline. */
+  serie: number[];
+}
+
+function usoVazio(janelaDias: number): AdminUsageSummary {
+  return {
+    janelaDias,
+    total: 0,
+    ultimos7: 0,
+    diasAtivos: 0,
+    ultimoDia: null,
+    porEvento: [],
+    serie: new Array<number>(janelaDias).fill(0),
+  };
+}
+
+interface LinhaUsoDiario {
+  user_id: string;
+  day: string;
+  event_type: string;
+  count: number;
+}
+
+/**
+ * Agrupa linhas de `usage_daily` por usuário numa passada só.
+ *
+ * Uma query para todo mundo e o agrupamento em memória, em vez de uma query por
+ * cliente: a tela lista dezenas de assinaturas, e N+1 aqui viraria N+1 idas ao
+ * banco a cada refresh do admin.
+ */
+function agruparUso(linhas: LinhaUsoDiario[], janelaDias: number): Map<string, AdminUsageSummary> {
+  const indiceDoDia = new Map<string, number>();
+  for (let i = 0; i < janelaDias; i++) {
+    indiceDoDia.set(diaEmBrasilia(-(janelaDias - 1 - i)), i);
+  }
+
+  const acumulado = new Map<
+    string,
+    { serie: number[]; porEvento: Map<string, number>; ultimoDia: string | null }
+  >();
+
+  for (const linha of linhas) {
+    let acc = acumulado.get(linha.user_id);
+    if (!acc) {
+      acc = { serie: new Array<number>(janelaDias).fill(0), porEvento: new Map(), ultimoDia: null };
+      acumulado.set(linha.user_id, acc);
+    }
+    const i = indiceDoDia.get(linha.day);
+    if (i !== undefined) acc.serie[i] = (acc.serie[i] ?? 0) + linha.count;
+    acc.porEvento.set(linha.event_type, (acc.porEvento.get(linha.event_type) ?? 0) + linha.count);
+    if (!acc.ultimoDia || linha.day > acc.ultimoDia) acc.ultimoDia = linha.day;
+  }
+
+  const corte7 = Math.max(0, janelaDias - 7);
+  const saida = new Map<string, AdminUsageSummary>();
+  for (const [userId, acc] of acumulado) {
+    saida.set(userId, {
+      janelaDias,
+      serie: acc.serie,
+      total: acc.serie.reduce((a, b) => a + b, 0),
+      ultimos7: acc.serie.slice(corte7).reduce((a, b) => a + b, 0),
+      diasAtivos: acc.serie.filter((n) => n > 0).length,
+      ultimoDia: acc.ultimoDia,
+      porEvento: [...acc.porEvento]
+        .map(([event, count]) => ({ event, count }))
+        .sort((a, b) => b.count - a.count),
+    });
+  }
+  return saida;
+}
+
+/** Eventos de webhook que mexem em dinheiro. `CONFIRMED` e `RECEIVED` são a MESMA cobrança. */
+const EVENTOS_DE_DINHEIRO = [
+  "PAYMENT_CONFIRMED",
+  "PAYMENT_RECEIVED",
+  "PAYMENT_REFUNDED",
+  "PAYMENT_CHARGEBACK_REQUESTED",
+] as const;
+
+/**
+ * Campos de `billing_events` que interessam para somar dinheiro.
+ *
+ * Puxa os três escalares de dentro do JSON pelo operador `->>` do PostgREST em
+ * vez de trazer `payload` inteiro: um payload do Asaas tem dezenas de campos e
+ * alguns KB, e isto roda para todos os pagamentos de todos os clientes.
+ */
+// prettier-ignore
+const SELECT_PAGAMENTO =
+  "subscription_id, event_type, received_at, paymentId:payload->payment->>id, valorTexto:payload->payment->>value, receiptUrl:payload->payment->>transactionReceiptUrl, customerId:payload->payment->>customer";
+
+interface LinhaPagamento {
+  subscription_id: string | null;
+  event_type: string;
+  received_at: string;
+  paymentId: string | null;
+  valorTexto: string | null;
+  receiptUrl: string | null;
+  customerId: string | null;
+}
+
+export interface AdminPagamento {
+  /** id da cobrança no Asaas (`pay_...`). É a chave de deduplicação. */
+  paymentId: string;
+  /** Quando o primeiro evento daquela cobrança chegou. */
+  at: string;
+  amountCents: number;
+  /** Estornada ou com chargeback aberto: entrou e voltou. */
+  estornado: boolean;
+  receiptUrl: string | null;
+  /** `cus_...` do Asaas. É o único fio para achar o dono de cobrança órfã. */
+  customerId: string | null;
+}
+
+/**
+ * Reduz eventos de webhook a cobranças únicas.
+ *
+ * Deduplica por `payment.id` porque o Asaas manda `PAYMENT_CONFIRMED` (cartão
+ * autorizado) e depois `PAYMENT_RECEIVED` (dinheiro liquidado) para a MESMA
+ * cobrança — somar os dois dobraria o faturamento de todo cliente de cartão.
+ * `value` vem em reais no payload; o resto do sistema conta em centavos.
+ */
+function deduplicarCobrancas(linhas: LinhaPagamento[]): AdminPagamento[] {
+  const cobrancas = new Map<string, AdminPagamento>();
+
+  for (const linha of linhas) {
+    if (!linha.paymentId) continue;
+
+    const valor = Number(linha.valorTexto);
+    const existente = cobrancas.get(linha.paymentId);
+    const estorno =
+      linha.event_type === "PAYMENT_REFUNDED" ||
+      linha.event_type === "PAYMENT_CHARGEBACK_REQUESTED";
+
+    cobrancas.set(linha.paymentId, {
+      paymentId: linha.paymentId,
+      // O evento mais ANTIGO marca quando o dinheiro entrou; o estorno chega
+      // depois e não pode reescrever a data da cobrança.
+      at: existente && existente.at < linha.received_at ? existente.at : linha.received_at,
+      amountCents:
+        Number.isFinite(valor) && valor > 0
+          ? Math.round(valor * 100)
+          : (existente?.amountCents ?? 0),
+      estornado: (existente?.estornado ?? false) || estorno,
+      receiptUrl: linha.receiptUrl ?? existente?.receiptUrl ?? null,
+      customerId: linha.customerId ?? existente?.customerId ?? null,
+    });
+  }
+
+  return [...cobrancas.values()].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+function pagamentosPorAssinatura(linhas: LinhaPagamento[]): Map<string, AdminPagamento[]> {
+  const grupos = new Map<string, LinhaPagamento[]>();
+  for (const linha of linhas) {
+    if (!linha.subscription_id) continue;
+    const grupo = grupos.get(linha.subscription_id);
+    if (grupo) grupo.push(linha);
+    else grupos.set(linha.subscription_id, [linha]);
+  }
+
+  const saida = new Map<string, AdminPagamento[]>();
+  for (const [subId, doGrupo] of grupos) saida.set(subId, deduplicarCobrancas(doGrupo));
+  return saida;
+}
+
+/**
+ * Cobrança que chegou sem assinatura correlacionada (`subscription_id IS NULL`).
+ *
+ * É dinheiro que entrou e não achou dono: o `findSubscription` do webhook não
+ * conseguiu ligar o pagamento a nenhuma linha local. Some do faturamento por
+ * cliente e, pior, o pagante fica sem acesso mesmo tendo pagado — então tem que
+ * aparecer em destaque, não virar silêncio numa tabela.
+ */
+export const listOrphanPayments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AdminPagamento[]> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data, error } = await supabaseAdmin
+      .from("billing_events")
+      .select(SELECT_PAGAMENTO)
+      .is("subscription_id", null)
+      .in("event_type", [...EVENTOS_DE_DINHEIRO]);
+    if (error) throw new Error(error.message);
+
+    return deduplicarCobrancas((data ?? []) as unknown as LinhaPagamento[]);
+  });
+
+export interface AdminSubscriber {
+  /** id da linha em `subscriptions` — um usuário pode ter várias, no histórico. */
+  id: string;
+  userId: string;
+  email: string | null;
+  fullName: string | null;
+  status: string;
+  /** Vocabulário do Asaas: CREDIT_CARD | PIX. Nulo em linha antiga sem método. */
+  method: string | null;
+  planKey: string | null;
+  planName: string | null;
+  /** Chave crua do Asaas (MONTHLY/QUARTERLY/YEARLY); a tela é quem traduz. */
+  planCycle: string | null;
+  /** Cobrado pelo ciclo inteiro, congelado no checkout — preço antigo é honrado. */
+  amountCents: number;
+  /**
+   * `amountCents / meses do ciclo`. É a única régua que compara mensal,
+   * trimestral e anual no mesmo número. Derivado, nunca gravado.
+   */
+  monthlyEquivalentCents: number | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  cancelledAt: string | null;
+  /** Motivo gravado no cancelamento (pedido do cliente, inadimplência, estorno). */
+  cancelledDueTo: string | null;
+  lastPaymentAt: string | null;
+  lastReceiptUrl: string | null;
+  /**
+   * Primeira vez que ESTA assinatura foi ativada. É o "cliente desde" de
+   * verdade: `createdAt` marca quando o checkout abriu, e quem abriu e nunca
+   * pagou não é cliente desde coisa nenhuma.
+   */
+  firstActivatedAt: string | null;
+  createdAt: string;
+  devMode: boolean;
+  /** `cus_...` do Asaas — é por onde se acha o cliente no painel do gateway. */
+  providerCustomerId: string | null;
+  /**
+   * Acesso valendo AGORA. Espelha `has_active_subscription`: status vivo E
+   * período não vencido. Um `active` com data passada (PIX que ainda não foi
+   * expirado pelo cron) não conta — e é justamente o caso em que olhar só o
+   * status enganaria quem lê a tela.
+   */
+  accessNow: boolean;
+
+  // ─── conta (`auth.users` + `profiles`) ─────────────────────────────────────
+  accountCreatedAt: string | null;
+  /** Último login. É o sinal mais barato de "sumiu" — não depende de trilha de uso. */
+  lastSignInAt: string | null;
+  emailConfirmed: boolean;
+  isAdmin: boolean;
+  trackName: string | null;
+  seniority: string | null;
+  onboardingCompleted: boolean;
+
+  // ─── dinheiro que entrou de fato (`billing_events`) ────────────────────────
+  /** Cobranças distintas pagas e não estornadas nesta assinatura. */
+  paidCycles: number;
+  /** Somatório dessas cobranças, em centavos. Recebido, não contratado. */
+  paidTotalCents: number;
+
+  // ─── uso (`usage_daily`, janela da lista) ──────────────────────────────────
+  usage: AdminUsageSummary;
+}
+
+/** Janela da lista. 30 dias cobre um ciclo mensal inteiro. */
+const JANELA_LISTA = 30;
+/** Janela do detalhe. 90 dias mostra tendência, não só o mês corrente. */
+const JANELA_DETALHE = 90;
+
+/**
+ * Todos os clientes que já abriram checkout, com plano, método, ciclo, dinheiro
+ * recebido e uso dos últimos 30 dias.
+ *
+ * Lê tudo por `supabaseAdmin` porque a RLS destas tabelas só deixa cada um ver a
+ * própria linha (regra 6) — inclusive para admin, que não tem policy de exceção
+ * ali. Todas as consultas em paralelo e agrupadas em memória: uma por tabela,
+ * nunca uma por cliente.
+ */
+export const listSubscribers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AdminSubscriber[]> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const desde = diaEmBrasilia(-(JANELA_LISTA - 1));
+
+    const [
+      { data: subs, error },
+      { data: profiles },
+      { data: authList, error: authErr },
+      { data: tracks },
+      { data: uso },
+      { data: eventosDeCobranca },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("subscriptions")
+        // prettier-ignore
+        .select(
+          "id, user_id, status, method, amount_cents, current_period_start, current_period_end, cancel_at_period_end, cancelled_at, cancelled_due_to, last_payment_at, last_receipt_url, first_activated_at, provider_customer_id, created_at, dev_mode, billing_plans(key, name, cycle, months)",
+        )
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, current_track_id, seniority, onboarding_completed, is_admin"),
+      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      supabaseAdmin.from("career_tracks").select("id, name"),
+      supabaseAdmin.from("usage_daily").select("user_id, day, event_type, count").gte("day", desde),
+      supabaseAdmin
+        .from("billing_events")
+        .select(SELECT_PAGAMENTO)
+        .in("event_type", [...EVENTOS_DE_DINHEIRO]),
+    ]);
+    if (error) throw new Error(error.message);
+    if (authErr) throw new Error(authErr.message);
+
+    const perfis = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const trilhas = new Map((tracks ?? []).map((t) => [t.id, t.name]));
+    const contas = new Map((authList?.users ?? []).map((u) => [u.id, u]));
+    const usoPorUsuario = agruparUso((uso ?? []) as LinhaUsoDiario[], JANELA_LISTA);
+    const pagamentos = pagamentosPorAssinatura(
+      (eventosDeCobranca ?? []) as unknown as LinhaPagamento[],
+    );
+    const agora = Date.now();
+
+    return (subs ?? []).map((s) => {
+      const plano = s.billing_plans as {
+        key: string;
+        name: string;
+        cycle: string;
+        months: number | null;
+      } | null;
+      const meses = plano?.months && plano.months > 0 ? plano.months : null;
+      const periodoVigente =
+        !s.current_period_end || new Date(s.current_period_end).getTime() > agora;
+
+      const perfil = perfis.get(s.user_id);
+      const conta = contas.get(s.user_id);
+      const pagas = (pagamentos.get(s.id) ?? []).filter((p) => !p.estornado);
+
+      return {
+        id: s.id,
+        userId: s.user_id,
+        email: conta?.email ?? null,
+        fullName: perfil?.full_name ?? null,
+        status: s.status,
+        method: s.method ?? null,
+        planKey: plano?.key ?? null,
+        planName: plano?.name ?? null,
+        planCycle: plano?.cycle ?? null,
+        amountCents: s.amount_cents,
+        monthlyEquivalentCents: meses ? Math.round(s.amount_cents / meses) : null,
+        currentPeriodStart: s.current_period_start ?? null,
+        currentPeriodEnd: s.current_period_end ?? null,
+        cancelAtPeriodEnd: s.cancel_at_period_end ?? false,
+        cancelledAt: s.cancelled_at ?? null,
+        cancelledDueTo: s.cancelled_due_to ?? null,
+        lastPaymentAt: s.last_payment_at ?? null,
+        lastReceiptUrl: s.last_receipt_url ?? null,
+        firstActivatedAt: s.first_activated_at ?? null,
+        createdAt: s.created_at,
+        devMode: s.dev_mode,
+        providerCustomerId: s.provider_customer_id ?? null,
+        accessNow: (s.status === "active" || s.status === "past_due") && periodoVigente,
+
+        accountCreatedAt: conta?.created_at ?? null,
+        lastSignInAt: conta?.last_sign_in_at ?? null,
+        emailConfirmed: Boolean(conta?.email_confirmed_at),
+        isAdmin: perfil?.is_admin ?? false,
+        trackName: perfil?.current_track_id ? (trilhas.get(perfil.current_track_id) ?? null) : null,
+        seniority: perfil?.seniority ?? null,
+        onboardingCompleted: perfil?.onboarding_completed ?? false,
+
+        paidCycles: pagas.length,
+        paidTotalCents: pagas.reduce((a, p) => a + p.amountCents, 0),
+
+        usage: usoPorUsuario.get(s.user_id) ?? usoVazio(JANELA_LISTA),
+      };
+    });
+  });
+
+// ─── Dossiê de um cliente ─────────────────────────────────────────────────────
+
+export interface AdminSubscriberSubscription {
+  id: string;
+  status: string;
+  planName: string | null;
+  planCycle: string | null;
+  method: string | null;
+  amountCents: number;
+  createdAt: string;
+  firstActivatedAt: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelledAt: string | null;
+  cancelledDueTo: string | null;
+  cancelAtPeriodEnd: boolean;
+  devMode: boolean;
+  providerCustomerId: string | null;
+  pagamentos: AdminPagamento[];
+}
+
+/** O que a pessoa efetivamente construiu dentro do produto. */
+export interface AdminSubscriberProduto {
+  cvs: number;
+  ultimoCvAt: string | null;
+  ultimoCvStatus: string | null;
+  analises: number;
+  ultimaAnaliseAt: string | null;
+  ultimoScore: number | null;
+  skills: number;
+  planosEstudo: number;
+  itensEstudo: number;
+  itensConcluidos: number;
+  horasRegistradas: number;
+  certificacoes: number;
+  cursos: number;
+  empresasSeguidas: number;
+}
+
+export interface AdminSubscriberDetail {
+  userId: string;
+  email: string | null;
+  fullName: string | null;
+  headline: string | null;
+  localidade: string | null;
+  yearsExperience: number | null;
+  seniority: string | null;
+  trackName: string | null;
+  onboardingCompleted: boolean;
+  tourStatus: string | null;
+  isAdmin: boolean;
+  isAnonymous: boolean;
+  isBanned: boolean;
+  emailConfirmed: boolean;
+  accountCreatedAt: string | null;
+  lastSignInAt: string | null;
+  termosVersao: string | null;
+  termosAceitosAt: string | null;
+  subscriptions: AdminSubscriberSubscription[];
+  usage: AdminUsageSummary;
+  /** Últimos eventos crus. Somem com a retenção — é rastro recente, não histórico. */
+  ultimosEventos: Array<{ event: string; at: string; subjectId: string | null }>;
+  produto: AdminSubscriberProduto;
+  /** Bloqueios de reassinatura, em aberto ou já liberados. */
+  bloqueios: Array<{
+    id: string;
+    reason: string;
+    createdAt: string;
+    releasedAt: string | null;
+    releasedNote: string | null;
+  }>;
+}
+
+/**
+ * Dossiê de um cliente. Carregado sob demanda, ao abrir a linha.
+ *
+ * Separado de `listSubscribers` de propósito: são ~15 consultas, e rodá-las
+ * para a lista inteira transformaria a abertura da tela numa varredura do banco
+ * para montar dado que ninguém pediu ainda.
+ */
+export const getSubscriberDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ userId: z.string().uuid() }).parse(data))
+  .handler(async ({ context, data }): Promise<AdminSubscriberDetail> => {
+    await assertAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const alvo = data.userId;
+    const desde = diaEmBrasilia(-(JANELA_DETALHE - 1));
+    const contar = (
+      tabela:
+        | "user_skills"
+        | "user_certifications"
+        | "user_courses"
+        | "user_followed_companies"
+        | "study_plans",
+    ) => supabaseAdmin.from(tabela).select("*", { count: "exact", head: true }).eq("user_id", alvo);
+
+    const [
+      { data: conta, error: contaErr },
+      { data: perfil },
+      { data: subs, error: subsErr },
+      { data: uso },
+      { data: eventos },
+      { data: termos },
+      { data: bloqueios },
+    ] = await Promise.all([
+      supabaseAdmin.auth.admin.getUserById(alvo),
+      supabaseAdmin
+        .from("profiles")
+        // prettier-ignore
+        .select(
+          "full_name, headline, city, state, country, years_experience, seniority, current_track_id, onboarding_completed, tour_status, is_admin, is_anonymous",
+        )
+        .eq("id", alvo)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("subscriptions")
+        // prettier-ignore
+        .select(
+          "id, status, method, amount_cents, created_at, first_activated_at, current_period_start, current_period_end, cancelled_at, cancelled_due_to, cancel_at_period_end, dev_mode, provider_customer_id, billing_plans(name, cycle)",
+        )
+        .eq("user_id", alvo)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("usage_daily")
+        .select("user_id, day, event_type, count")
+        .eq("user_id", alvo)
+        .gte("day", desde),
+      supabaseAdmin
+        .from("usage_events")
+        .select("event_type, created_at, subject_id")
+        .eq("user_id", alvo)
+        .order("created_at", { ascending: false })
+        .limit(25),
+      supabaseAdmin
+        .from("terms_acceptances")
+        .select("version, accepted_at")
+        .eq("user_id", alvo)
+        .order("accepted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("resubscribe_blocks")
+        .select("id, reason, created_at, released_at, released_note")
+        .eq("user_id", alvo)
+        .order("created_at", { ascending: false }),
+    ]);
+    if (contaErr) throw new Error(contaErr.message);
+    if (subsErr) throw new Error(subsErr.message);
+
+    const idsAssinatura = (subs ?? []).map((s) => s.id);
+
+    const [
+      { data: eventosDeCobranca },
+      { data: trilha },
+      { data: cvs },
+      { data: analises },
+      { data: itens },
+      { data: logs },
+      skills,
+      certificacoes,
+      cursos,
+      empresas,
+      planos,
+    ] = await Promise.all([
+      idsAssinatura.length
+        ? supabaseAdmin
+            .from("billing_events")
+            .select(SELECT_PAGAMENTO)
+            .in("subscription_id", idsAssinatura)
+            .in("event_type", [...EVENTOS_DE_DINHEIRO])
+        : Promise.resolve({ data: [] }),
+      perfil?.current_track_id
+        ? supabaseAdmin
+            .from("career_tracks")
+            .select("name")
+            .eq("id", perfil.current_track_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabaseAdmin
+        .from("cvs")
+        .select("status, created_at")
+        .eq("user_id", alvo)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("gap_analyses")
+        .select("overall_score, computed_at")
+        .eq("user_id", alvo)
+        .order("computed_at", { ascending: false }),
+      supabaseAdmin.from("study_items").select("status").eq("user_id", alvo),
+      supabaseAdmin.from("study_logs").select("hours").eq("user_id", alvo),
+      contar("user_skills"),
+      contar("user_certifications"),
+      contar("user_courses"),
+      contar("user_followed_companies"),
+      contar("study_plans"),
+    ]);
+
+    const pagamentos = pagamentosPorAssinatura(
+      (eventosDeCobranca ?? []) as unknown as LinhaPagamento[],
+    );
+    const ultimoCv = (cvs ?? [])[0] ?? null;
+    const ultimaAnalise = (analises ?? [])[0] ?? null;
+    const u = conta?.user ?? null;
+    const bannedUntil = (u as { banned_until?: string | null } | null)?.banned_until ?? null;
+    const localidade =
+      [perfil?.city, perfil?.state].filter(Boolean).join(" / ") || (perfil?.country ?? null);
+
+    return {
+      userId: alvo,
+      email: u?.email ?? null,
+      fullName: perfil?.full_name ?? null,
+      headline: perfil?.headline ?? null,
+      localidade,
+      yearsExperience: perfil?.years_experience ?? null,
+      seniority: perfil?.seniority ?? null,
+      trackName: trilha?.name ?? null,
+      onboardingCompleted: perfil?.onboarding_completed ?? false,
+      tourStatus: perfil?.tour_status ?? null,
+      isAdmin: perfil?.is_admin ?? false,
+      isAnonymous: perfil?.is_anonymous ?? false,
+      isBanned: Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now()),
+      emailConfirmed: Boolean(u?.email_confirmed_at),
+      accountCreatedAt: u?.created_at ?? null,
+      lastSignInAt: u?.last_sign_in_at ?? null,
+      termosVersao: termos?.version ?? null,
+      termosAceitosAt: termos?.accepted_at ?? null,
+
+      subscriptions: (subs ?? []).map((s) => {
+        const plano = s.billing_plans as { name: string; cycle: string } | null;
+        return {
+          id: s.id,
+          status: s.status,
+          planName: plano?.name ?? null,
+          planCycle: plano?.cycle ?? null,
+          method: s.method ?? null,
+          amountCents: s.amount_cents,
+          createdAt: s.created_at,
+          firstActivatedAt: s.first_activated_at ?? null,
+          currentPeriodStart: s.current_period_start ?? null,
+          currentPeriodEnd: s.current_period_end ?? null,
+          cancelledAt: s.cancelled_at ?? null,
+          cancelledDueTo: s.cancelled_due_to ?? null,
+          cancelAtPeriodEnd: s.cancel_at_period_end ?? false,
+          devMode: s.dev_mode,
+          providerCustomerId: s.provider_customer_id ?? null,
+          pagamentos: pagamentos.get(s.id) ?? [],
+        };
+      }),
+
+      usage:
+        agruparUso((uso ?? []) as LinhaUsoDiario[], JANELA_DETALHE).get(alvo) ??
+        usoVazio(JANELA_DETALHE),
+
+      ultimosEventos: (eventos ?? []).map((e) => ({
+        event: e.event_type,
+        at: e.created_at,
+        subjectId: e.subject_id ?? null,
+      })),
+
+      produto: {
+        cvs: (cvs ?? []).length,
+        ultimoCvAt: ultimoCv?.created_at ?? null,
+        ultimoCvStatus: ultimoCv?.status ?? null,
+        analises: (analises ?? []).length,
+        ultimaAnaliseAt: ultimaAnalise?.computed_at ?? null,
+        ultimoScore: ultimaAnalise?.overall_score ?? null,
+        skills: skills.count ?? 0,
+        planosEstudo: planos.count ?? 0,
+        itensEstudo: (itens ?? []).length,
+        itensConcluidos: (itens ?? []).filter((i) => i.status === "done").length,
+        horasRegistradas:
+          Math.round((logs ?? []).reduce((a, l) => a + (l.hours ?? 0), 0) * 10) / 10,
+        certificacoes: certificacoes.count ?? 0,
+        cursos: cursos.count ?? 0,
+        empresasSeguidas: empresas.count ?? 0,
+      },
+
+      bloqueios: (bloqueios ?? []).map((b) => ({
+        id: b.id,
+        reason: b.reason,
+        createdAt: b.created_at,
+        releasedAt: b.released_at ?? null,
+        releasedNote: b.released_note ?? null,
+      })),
+    };
+  });
+
 // ─── Moderação de salários ────────────────────────────────────────────────────
 
 export interface AdminSalaryRow {

@@ -47,3 +47,34 @@ export function mensagemDeLimite(error: unknown): string | null {
   const mensagem = corte >= 0 ? texto.slice(corte + 1).trim() : "";
   return mensagem || "Você atingiu o limite de uso de hoje.";
 }
+
+/**
+ * Rótulo humano de cada tipo de evento, em minúsculas, para caber no meio de
+ * uma frase ("limite de 300 buscas de vagas por dia") e também como legenda de
+ * coluna em `/admin/clientes`.
+ *
+ * Mora aqui, e não em `usage.server.ts`, porque as duas pontas precisam do
+ * mesmo texto: o servidor monta a mensagem de cota, e o admin mostra o que cada
+ * cliente consumiu. Duas cópias divergiriam no dia em que um evento novo
+ * entrasse em só uma delas.
+ */
+export const ROTULO_EVENTO_USO: Record<UsageEvent, string> = {
+  job_list: "buscas de vagas",
+  job_detail: "vagas abertas",
+  apply_click: "cliques em vagas originais",
+  company_detail: "empresas abertas",
+  salary_view: "consultas de salário",
+  tool_detail: "ferramentas abertas",
+  learning_catalog: "consultas ao catálogo",
+  cv_parse: "leituras de currículo",
+};
+
+/**
+ * Versão tolerante do rótulo. `usage_daily.event_type` é texto livre no banco
+ * (de propósito: evento novo não deveria exigir migration), então a tela pode
+ * receber um tipo que este código ainda não conhece — e mostrar a chave crua é
+ * melhor do que esconder a linha ou quebrar a página.
+ */
+export function rotuloEventoUso(event: string): string {
+  return (ROTULO_EVENTO_USO as Record<string, string | undefined>)[event] ?? event;
+}

@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_conta/admin")({
 const TABS = [
   { to: "/admin", label: "Visão geral", exact: true },
   { to: "/admin/usuarios", label: "Usuários" },
+  { to: "/admin/clientes", label: "Clientes" },
   { to: "/admin/salarios", label: "Salários" },
   { to: "/admin/fontes", label: "Fontes" },
   { to: "/admin/importar", label: "Importar CSV" },

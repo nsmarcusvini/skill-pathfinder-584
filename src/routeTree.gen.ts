@@ -34,6 +34,7 @@ import { Route as ContaSalariosRouteImport } from './routes/_conta/salarios'
 import { Route as ContaVagasRouteImport } from './routes/_conta/vagas'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ContaAdminIndexRouteImport } from './routes/_conta/admin.index'
+import { Route as ContaAdminClientesRouteImport } from './routes/_conta/admin.clientes'
 import { Route as ContaAdminDescobrirAtsRouteImport } from './routes/_conta/admin.descobrir-ats'
 import { Route as ContaAdminFontesRouteImport } from './routes/_conta/admin.fontes'
 import { Route as ContaAdminImportarRouteImport } from './routes/_conta/admin.importar'
@@ -173,6 +174,11 @@ const ContaAdminIndexRoute = ContaAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ContaAdminRoute,
 } as any)
+const ContaAdminClientesRoute = ContaAdminClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => ContaAdminRoute,
+} as any)
 const ContaAdminDescobrirAtsRoute = ContaAdminDescobrirAtsRouteImport.update({
   id: '/descobrir-ats',
   path: '/descobrir-ats',
@@ -270,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/salarios': typeof ContaSalariosRoute
   '/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/clientes': typeof ContaAdminClientesRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/salarios': typeof ContaSalariosRoute
   '/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/admin/clientes': typeof ContaAdminClientesRoute
   '/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/admin/fontes': typeof ContaAdminFontesRoute
   '/admin/importar': typeof ContaAdminImportarRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_conta/salarios': typeof ContaSalariosRoute
   '/_conta/vagas': typeof ContaVagasRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/_conta/admin/clientes': typeof ContaAdminClientesRoute
   '/_conta/admin/descobrir-ats': typeof ContaAdminDescobrirAtsRoute
   '/_conta/admin/fontes': typeof ContaAdminFontesRoute
   '/_conta/admin/importar': typeof ContaAdminImportarRoute
@@ -393,6 +402,7 @@ export interface FileRouteTypes {
     | '/salarios'
     | '/vagas'
     | '/auth/callback'
+    | '/admin/clientes'
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/salarios'
     | '/vagas'
     | '/auth/callback'
+    | '/admin/clientes'
     | '/admin/descobrir-ats'
     | '/admin/fontes'
     | '/admin/importar'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/_conta/salarios'
     | '/_conta/vagas'
     | '/auth/callback'
+    | '/_conta/admin/clientes'
     | '/_conta/admin/descobrir-ats'
     | '/_conta/admin/fontes'
     | '/_conta/admin/importar'
@@ -687,6 +699,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaAdminIndexRouteImport
       parentRoute: typeof ContaAdminRoute
     }
+    '/_conta/admin/clientes': {
+      id: '/_conta/admin/clientes'
+      path: '/clientes'
+      fullPath: '/admin/clientes'
+      preLoaderRoute: typeof ContaAdminClientesRouteImport
+      parentRoute: typeof ContaAdminRoute
+    }
     '/_conta/admin/descobrir-ats': {
       id: '/_conta/admin/descobrir-ats'
       path: '/descobrir-ats'
@@ -789,6 +808,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ContaAdminRouteChildren {
+  ContaAdminClientesRoute: typeof ContaAdminClientesRoute
   ContaAdminDescobrirAtsRoute: typeof ContaAdminDescobrirAtsRoute
   ContaAdminFontesRoute: typeof ContaAdminFontesRoute
   ContaAdminImportarRoute: typeof ContaAdminImportarRoute
@@ -801,6 +821,7 @@ interface ContaAdminRouteChildren {
 }
 
 const ContaAdminRouteChildren: ContaAdminRouteChildren = {
+  ContaAdminClientesRoute: ContaAdminClientesRoute,
   ContaAdminDescobrirAtsRoute: ContaAdminDescobrirAtsRoute,
   ContaAdminFontesRoute: ContaAdminFontesRoute,
   ContaAdminImportarRoute: ContaAdminImportarRoute,

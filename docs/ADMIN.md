@@ -1,6 +1,6 @@
 # Painel administrativo do RUMVIA
 
-Área interna em `/admin`. Oito telas, todas restritas a `profiles.is_admin = true`.
+Área interna em `/admin`. Dez abas (as do array `TABS` em `src/routes/_conta/admin.tsx`), todas restritas a `profiles.is_admin = true`.
 
 ## Como o acesso funciona
 
@@ -77,6 +77,50 @@ contas permanentes de anônimas e mostram quantos admins existem.
 > Contas anônimas são visitantes que enviaram currículo sem se cadastrar. O cron
 > `rumvia-purge-anon` as apaga após 7 dias sem acesso — é a retenção prometida em
 > `/privacidade`.
+
+### Clientes — `/admin/clientes`
+
+Quem abriu checkout, o que pagou de fato e se está usando o que pagou. É a tela de
+retenção; `/admin/usuarios` é a de conta.
+
+**Você vê, na lista:** nome, e-mail, status da assinatura, plano, ciclo, forma de pagamento,
+trilha e senioridade; **há quanto tempo é cliente** (de `first_activated_at` — quem só abriu
+o checkout aparece como "checkout aberto há X", porque chamar de cliente quem nunca pagou
+seria mentira); **quanto já pagou** (cobranças confirmadas e não estornadas, não o valor
+contratado); e o **uso dos últimos 30 dias** — sparkline por dia, total de eventos, dias
+ativos, quando foi o último uso e os dois tipos de evento mais frequentes.
+
+**Indicadores do topo:** clientes com acesso, receita mensal equivalente (cada ciclo dividido
+pelos seus meses — é o único jeito de somar mensal, trimestral e anual num número só, e não
+é caixa), total recebido (isso sim é caixa) e **"pagando e sem usar"**.
+
+**Cobranças órfãs.** Quando existe `billing_events` de dinheiro com `subscription_id IS NULL`,
+um bloco vermelho abre a tela. Significa que o `findSubscription` do webhook não ligou o
+pagamento a nenhuma assinatura local — o valor não entra no total de nenhum cliente e, se a
+cobrança não foi estornada, **há alguém que pagou e está sem acesso**. Investigue pelo
+`cus_...` no painel do Asaas.
+
+**Você faz:** buscar por e-mail, nome, plano ou trilha; filtrar por com acesso, pagando e sem
+usar, cobrança falhou, cancelamento agendado, aguardando pagamento, encerrados ou todos (cada
+chip mostra a contagem); ordenar por mais recentes, maior receita, quem mais usa, quem mais
+sumiu ou renovação mais próxima; e abrir uma linha para o dossiê completo.
+
+**O dossiê** (gaveta lateral, carregado sob demanda) traz: identificação e perfil; uso de 90
+dias com contagem por tipo de evento e os últimos 25 eventos um a um; o que a pessoa construiu
+no produto (currículos, análises e último score, skills, plano de estudos com itens concluídos,
+horas registradas, certificações, cursos, empresas seguidas); o histórico de assinaturas com
+cada cobrança e link para o recibo do Asaas; conta e conformidade (criação, último login,
+onboarding, tour, versão dos termos aceita); e bloqueios de reassinatura, se houver.
+
+> **"Pagando e sem usar"** é quem tem acesso e passou 14 dias sem nenhum evento registrado,
+> ou nunca usou depois de 7 dias de assinatura. Login não conta como uso — quem abre e fecha
+> não recebeu valor. Sandbox (`dev_mode`) e admin ficam fora da conta: um não é dinheiro, o
+> outro não cancela. As assinaturas de teste também saem de todos os indicadores por padrão,
+> com um botão para trazê-las de volta.
+
+> O uso vem de `usage_daily`, o mesmo agregado guardado como prova de entrega numa contestação
+> de cobrança (`docs/SEGURANCA.md`). `usage_events` é o detalhe e é expurgado pela retenção —
+> por isso o dossiê avisa que os eventos listados são rastro recente, não histórico.
 
 ### Salários — `/admin/salarios`
 

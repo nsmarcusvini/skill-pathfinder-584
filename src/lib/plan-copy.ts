@@ -41,8 +41,8 @@ export const DIAS_ARREPENDIMENTO = 7;
 export const AVISO_ARREPENDIMENTO =
   `Direito de arrependimento: você tem ${DIAS_ARREPENDIMENTO} dias corridos após a primeira ` +
   "cobrança para desistir e receber o valor pago de volta, na íntegra (Código de Defesa do " +
-  "Consumidor, art. 49). Depois desse prazo, o cancelamento continua imediato, mas sem " +
-  "reembolso proporcional do que já foi cobrado.";
+  "Consumidor, art. 49). Depois desse prazo, cancelar interrompe a renovação na hora e não há " +
+  "reembolso proporcional, mas o ciclo já pago continua valendo até o fim.";
 
 /**
  * Ciclo do Asaas → português. Chave crua do gateway (`billing_plans.cycle`),
@@ -81,4 +81,31 @@ export function rotuloCobranca(cycle: string): string {
 /** "Mensal", "Trimestral", "Anual" — nome curto para abas e seletores. */
 export function rotuloCiclo(cycle: string): string {
   return CYCLE_TEXT[cycle]?.curto ?? cycle;
+}
+
+/**
+ * `subscriptions.status` → português. Mora aqui pelo mesmo motivo do ciclo: a
+ * tela do cliente (`/assinatura`) e a do admin (`/admin/clientes`) mostram o
+ * mesmo estado, e duas listas separadas divergiriam no dia em que um status
+ * novo aparecesse em só uma delas.
+ */
+const STATUS_TEXT: Record<string, string> = {
+  pending: "Aguardando pagamento",
+  active: "Ativa",
+  past_due: "Pagamento pendente",
+  cancelled: "Cancelada",
+  refunded: "Estornada",
+  expired: "Expirada",
+};
+
+export function rotuloStatus(status: string): string {
+  return STATUS_TEXT[status] ?? status;
+}
+
+/** "Cartão" / "PIX" — `subscriptions.method` guarda o vocabulário do Asaas. */
+export function rotuloMetodo(method: string | null): string {
+  if (!method) return "—";
+  if (method === "CREDIT_CARD" || method === "CARD") return "Cartão";
+  if (method === "PIX") return "PIX";
+  return method;
 }

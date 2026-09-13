@@ -13,7 +13,7 @@
  * e escrever depois seriam duas viagens e uma corrida entre elas.
  */
 import { hashIpDaRequisicao } from "@/lib/request-ip.server";
-import { QUOTA_ERROR_PREFIX, type UsageEvent } from "@/lib/usage-limits";
+import { QUOTA_ERROR_PREFIX, ROTULO_EVENTO_USO, type UsageEvent } from "@/lib/usage-limits";
 
 /**
  * Cota lida de `app_settings`, memoizada por 60s.
@@ -26,21 +26,6 @@ import { QUOTA_ERROR_PREFIX, type UsageEvent } from "@/lib/usage-limits";
  */
 const memo = new Map<string, { valor: number; ate: number }>();
 const MEMO_MS = 60_000;
-
-/**
- * Rótulo em português para a mensagem de limite. O usuário precisa entender o
- * que ele estourou — "limite de 300 job_detail" não diz nada a ninguém.
- */
-const ROTULO: Record<UsageEvent, string> = {
-  job_list: "buscas de vagas",
-  job_detail: "vagas abertas",
-  apply_click: "cliques em vagas originais",
-  company_detail: "empresas abertas",
-  salary_view: "consultas de salário",
-  tool_detail: "ferramentas abertas",
-  learning_catalog: "consultas ao catálogo",
-  cv_parse: "leituras de currículo",
-};
 
 async function cotaDiaria(event: UsageEvent): Promise<number> {
   const key = `usage_quota_${event}`;
@@ -133,7 +118,7 @@ export async function registrarUsoComCota(
 
   console.warn(`[usage] cota estourada: ${userId} fez ${total} ${event} hoje (teto ${limite}).`);
   throw new Error(
-    `${QUOTA_ERROR_PREFIX}: Você atingiu o limite de ${limite} ${ROTULO[event]} por dia. ` +
+    `${QUOTA_ERROR_PREFIX}: Você atingiu o limite de ${limite} ${ROTULO_EVENTO_USO[event]} por dia. ` +
       `O contador zera à meia-noite (horário de Brasília). ` +
       `Se você precisa de mais que isso no uso normal, fale com a gente — o teto existe ` +
       `contra automação, não contra quem está procurando emprego.`,

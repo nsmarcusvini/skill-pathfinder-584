@@ -17,7 +17,7 @@ import {
   useStartCheckout,
   useSubscription,
 } from "@/hooks/use-subscription";
-import type { BillingPlan, MySubscription, SubscriptionStatus } from "@/lib/billing.functions";
+import type { BillingPlan, MySubscription } from "@/lib/billing.functions";
 import {
   AVISO_ACESSO_PAGO,
   AVISO_ARREPENDIMENTO,
@@ -25,18 +25,10 @@ import {
   rotuloCiclo,
   rotuloCobranca,
   rotuloPeriodo,
+  rotuloStatus,
 } from "@/lib/plan-copy";
 import { semPrefixoDeBloqueio } from "@/lib/resubscribe-copy";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  pending: "Aguardando pagamento",
-  active: "Ativa",
-  past_due: "Pagamento pendente",
-  cancelled: "Cancelada",
-  refunded: "Estornada",
-  expired: "Expirada",
-};
 
 function dataBR(iso: string | null): string {
   if (!iso) return "—";
@@ -477,7 +469,7 @@ function StatusAtual({ subscription }: { subscription: MySubscription }) {
           ) : null}
         </h2>
         <span className={cobrancaFalhou ? "label-h6 text-danger" : "label-h6"}>
-          {STATUS_LABEL[subscription.status]}
+          {rotuloStatus(subscription.status)}
           {subscription.cancelAtPeriodEnd && subscription.status !== "cancelled"
             ? " · cancelamento agendado"
             : ""}

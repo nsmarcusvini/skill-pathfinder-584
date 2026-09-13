@@ -9,3 +9,4 @@ export { ChartCard } from "./chart-card";
 export { AppShell, type NavItem } from "./app-shell";
 export { Tour } from "./tour";
 export { Paywall, PaywallCard, formatCents } from "./paywall";
+export { Sparkline, type SparklineProps } from "./sparkline";
