@@ -1,7 +1,8 @@
 import * as React from "react";
 import { Link } from "@tanstack/react-router";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Loader2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Blueprint } from "./blueprint";
 
 export interface NavItem {
   label: string;
@@ -35,6 +36,16 @@ export interface AppShellProps {
   segment?: string | undefined;
   onSegmentChange?: ((value: string) => void) | undefined;
   topbarExtra?: React.ReactNode | undefined;
+  /**
+   * Recorte trocando: o conteúdo em tela é do recorte ANTIGO até as consultas
+   * voltarem. Escurece o conteúdo, trava os seletores (dois cliques seguidos
+   * disparariam duas invalidações em corrida) e anuncia o que está vindo.
+   */
+  busy?: boolean | undefined;
+  /** Frase principal do aviso. Diga o DESTINO: "Recalculando para Back-End". */
+  busyLabel?: string | undefined;
+  /** Linha de apoio. É onde a espera vira evidência de trabalho, não de lentidão. */
+  busyHint?: string | undefined;
 }
 
 const DEFAULT_SEGMENTS: SelectOption[] = [
@@ -52,6 +63,9 @@ export function AppShell({
   segment,
   onSegmentChange,
   topbarExtra,
+  busy = false,
+  busyLabel,
+  busyHint,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = React.useState(false);
 
@@ -163,8 +177,9 @@ export function AppShell({
               <label className="flex min-w-0 items-center gap-2">
                 <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Trilha</span>
                 <select
-                  className="field h-7 w-auto min-w-0 py-0"
+                  className="field h-7 w-auto min-w-0 py-0 disabled:cursor-progress disabled:opacity-60"
                   value={track}
+                  disabled={busy}
                   onChange={(e) => onTrackChange?.(e.target.value)}
                 >
                   {trackOptions.map((o) => (
@@ -179,8 +194,9 @@ export function AppShell({
             <label className="flex min-w-0 items-center gap-2">
               <span className="label-h6 hidden shrink-0 text-neutral-600 sm:inline">Segmento</span>
               <select
-                className="field h-7 w-auto min-w-0 py-0"
+                className="field h-7 w-auto min-w-0 py-0 disabled:cursor-progress disabled:opacity-60"
                 value={segment}
+                disabled={busy}
                 onChange={(e) => onSegmentChange?.(e.target.value)}
               >
                 {segmentOptions.map((o) => (
@@ -193,9 +209,51 @@ export function AppShell({
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">{topbarExtra}</div>
+
+          {/* Fio na borda de baixo do topo. Fica FORA do fluxo (absolute) para
+              não empurrar o conteúdo 2px quando aparece — um salto de layout a
+              cada troca seria mais perceptível que o próprio carregamento. */}
+          {busy ? (
+            <span
+              aria-hidden
+              className="absolute inset-x-0 -bottom-px h-0.5 animate-pulse bg-accent-600"
+            />
+          ) : null}
         </header>
 
-        <main className="rumvia-container flex-1 py-6 pb-20 md:pb-6">{children}</main>
+        <main
+          aria-busy={busy}
+          className={cn(
+            "rumvia-container flex-1 py-6 pb-20 md:pb-6",
+            // Escurecer em vez de esvaziar: o usuário mantém a referência de
+            // onde estava na página, e os números velhos ficam ilegíveis o
+            // bastante para ninguém tentar lê-los como se fossem os novos.
+            busy && "pointer-events-none opacity-40 transition-opacity duration-200",
+          )}
+        >
+          {children}
+        </main>
+
+        {busy ? (
+          <Blueprint
+            role="status"
+            aria-live="polite"
+            // Centralizado por `inset-x-4 + mx-auto`, e não por
+            // `left-1/2 + -translate-x-1/2`: com `left:50%` a largura DISPONÍVEL
+            // vira metade da viewport, e no celular o cartão encolhia para
+            // 188px — o texto quebrava em cinco linhas dentro de uma coluna
+            // estreita. `w-fit` mantém o encolher ao conteúdo no desktop.
+            className="fixed inset-x-4 top-1/2 z-40 mx-auto flex w-fit max-w-[22rem] -translate-y-1/2 items-start gap-3 bg-bg px-5 py-4"
+          >
+            <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-accent-700" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-body font-semibold text-neutral-900">
+                {busyLabel ?? "Recalculando…"}
+              </p>
+              {busyHint ? <p className="caption mt-0.5">{busyHint}</p> : null}
+            </div>
+          </Blueprint>
+        ) : null}
       </div>
 
       {/* Mobile bottom nav — only first 6 items to fit the bar */}

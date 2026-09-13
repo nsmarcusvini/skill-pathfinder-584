@@ -23,6 +23,7 @@ import { Blueprint } from "@/components/rumvia/blueprint";
 import { Tour } from "@/components/rumvia/tour";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useDeferredBusy } from "@/hooks/use-deferred-busy";
 import { usePrefetchGap } from "@/hooks/use-gap";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useMarket, SEGMENT_LABEL, type MarketSegment } from "@/hooks/use-market";
@@ -152,6 +153,20 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
 
   const trackOptions = market.tracks.map((t) => ({ value: t.id, label: t.name }));
 
+  // Trocar o recorte invalida TODO o cache derivado: aderência, lacunas,
+  // ferramentas, empresas, salários e vagas. Enquanto as consultas não voltam,
+  // o que está na tela é da trilha anterior — daí o aviso, e não só um spinner
+  // solto num canto. O `useDeferredBusy` evita que uma troca rápida (cache
+  // quente) faça o aviso piscar.
+  const trocando = useDeferredBusy(market.mudando !== null);
+
+  // Segura o último destino conhecido. `mudando` volta a `null` assim que as
+  // consultas respondem, mas o aviso ainda fica alguns instantes em tela pelo
+  // tempo mínimo — sem a trava, o texto trocaria para a frase genérica bem na
+  // hora de sumir, que é exatamente onde o olho está.
+  const ultimoDestino = React.useRef<string | null>(null);
+  if (market.mudando) ultimoDestino.current = market.mudando.rotulo;
+
   return (
     <AppShell
       nav={nav}
@@ -160,6 +175,13 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
       onTrackChange={(value) => void market.setTrackId(value)}
       segment={market.segment}
       onSegmentChange={(value) => void market.setSegment(value as MarketSegment)}
+      busy={trocando}
+      busyLabel={
+        ultimoDestino.current
+          ? `Recalculando para ${ultimoDestino.current}`
+          : "Recalculando o recorte"
+      }
+      busyHint="Aderência, lacunas, ferramentas, empresas e salários são refeitos com as vagas desse recorte."
       segmentOptions={[
         { value: "br", label: SEGMENT_LABEL.br },
         { value: "remoto_global", label: SEGMENT_LABEL.remoto_global },
