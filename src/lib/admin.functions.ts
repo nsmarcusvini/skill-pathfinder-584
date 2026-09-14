@@ -990,6 +990,20 @@ export interface AdminPagamento {
   amountCents: number;
   /** Estornada ou com chargeback aberto: entrou e voltou. */
   estornado: boolean;
+  /**
+   * COMO o dinheiro voltou. Reembolso é decisão nossa — o cancelamento dentro
+   * dos 7 dias do CDC art. 49 estorna sozinho. Chargeback é o cliente
+   * contestando no banco, e vale como sinal de risco, não de atendimento.
+   * `estornado` sozinho não separa os dois, e mostrar contestação como
+   * reembolso esconderia justamente o caso que precisa de atenção.
+   */
+  estornoTipo: "reembolso" | "chargeback" | null;
+  /**
+   * Quando o dinheiro VOLTOU. Não dá para reaproveitar `at` para isso: `at` é
+   * a data do evento mais antigo, ou seja, de quando a cobrança entrou. Uma
+   * cobrança de janeiro estornada em março tem `at` em janeiro.
+   */
+  estornoAt: string | null;
   receiptUrl: string | null;
   /** `cus_...` do Asaas. É o único fio para achar o dono de cobrança órfã. */
   customerId: string | null;
@@ -1011,9 +1025,21 @@ function deduplicarCobrancas(linhas: LinhaPagamento[]): AdminPagamento[] {
 
     const valor = Number(linha.valorTexto);
     const existente = cobrancas.get(linha.paymentId);
-    const estorno =
-      linha.event_type === "PAYMENT_REFUNDED" ||
-      linha.event_type === "PAYMENT_CHARGEBACK_REQUESTED";
+    const chargeback = linha.event_type === "PAYMENT_CHARGEBACK_REQUESTED";
+    const reembolso = linha.event_type === "PAYMENT_REFUNDED";
+    const estorno = reembolso || chargeback;
+
+    // Chargeback vence reembolso quando os dois eventos chegam para a MESMA
+    // cobrança (acontece: estornamos e o cliente contesta assim mesmo, ou o
+    // contrário). Contestação no banco é o fato mais grave dos dois, e é ele
+    // que a tela precisa mostrar.
+    const tipoAnterior = existente?.estornoTipo ?? null;
+    const estornoTipo: AdminPagamento["estornoTipo"] =
+      chargeback || tipoAnterior === "chargeback"
+        ? "chargeback"
+        : reembolso || tipoAnterior === "reembolso"
+          ? "reembolso"
+          : null;
 
     cobrancas.set(linha.paymentId, {
       paymentId: linha.paymentId,
@@ -1025,6 +1051,14 @@ function deduplicarCobrancas(linhas: LinhaPagamento[]): AdminPagamento[] {
           ? Math.round(valor * 100)
           : (existente?.amountCents ?? 0),
       estornado: (existente?.estornado ?? false) || estorno,
+      estornoTipo,
+      // Ao contrário de `at`, aqui vale o evento MAIS RECENTE: é a última vez
+      // que aquele dinheiro voltou.
+      estornoAt: estorno
+        ? existente?.estornoAt && existente.estornoAt > linha.received_at
+          ? existente.estornoAt
+          : linha.received_at
+        : (existente?.estornoAt ?? null),
       receiptUrl: linha.receiptUrl ?? existente?.receiptUrl ?? null,
       customerId: linha.customerId ?? existente?.customerId ?? null,
     });
@@ -1132,6 +1166,23 @@ export interface AdminSubscriber {
   paidCycles: number;
   /** Somatório dessas cobranças, em centavos. Recebido, não contratado. */
   paidTotalCents: number;
+  /**
+   * Cobranças que voltaram — reembolso ou chargeback. Ficam FORA de
+   * `paidCycles`/`paidTotalCents`, que contam caixa de verdade; contadas aqui
+   * porque dinheiro devolvido não é dinheiro que nunca existiu, e some da tela
+   * se ninguém somar.
+   */
+  refundedCount: number;
+  refundedTotalCents: number;
+  /** Data do estorno mais recente, não da cobrança que foi estornada. */
+  lastRefundAt: string | null;
+  /**
+   * Subconjunto de `refundedCount` que foi contestação no banco. Separado
+   * porque reembolso é atendimento e chargeback é risco: quem pede reembolso
+   * no prazo do CDC está exercendo um direito, quem abre chargeback deixou de
+   * falar com a gente.
+   */
+  chargebackCount: number;
 
   // ─── uso (`usage_daily`, janela da lista) ──────────────────────────────────
   usage: AdminUsageSummary;
@@ -1210,7 +1261,9 @@ export const listSubscribers = createServerFn({ method: "GET" })
 
       const perfil = perfis.get(s.user_id);
       const conta = contas.get(s.user_id);
-      const pagas = (pagamentos.get(s.id) ?? []).filter((p) => !p.estornado);
+      const cobrancas = pagamentos.get(s.id) ?? [];
+      const pagas = cobrancas.filter((p) => !p.estornado);
+      const estornadas = cobrancas.filter((p) => p.estornado);
 
       return {
         id: s.id,
@@ -1247,6 +1300,13 @@ export const listSubscribers = createServerFn({ method: "GET" })
 
         paidCycles: pagas.length,
         paidTotalCents: pagas.reduce((a, p) => a + p.amountCents, 0),
+        refundedCount: estornadas.length,
+        refundedTotalCents: estornadas.reduce((a, p) => a + p.amountCents, 0),
+        lastRefundAt: estornadas.reduce<string | null>(
+          (maior, p) => (p.estornoAt && (!maior || p.estornoAt > maior) ? p.estornoAt : maior),
+          null,
+        ),
+        chargebackCount: estornadas.filter((p) => p.estornoTipo === "chargeback").length,
 
         usage: usoPorUsuario.get(s.user_id) ?? usoVazio(JANELA_LISTA),
       };

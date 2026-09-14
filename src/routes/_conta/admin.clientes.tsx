@@ -152,7 +152,14 @@ function textoDeUso(c: AdminSubscriber): string {
 }
 
 type Filtro =
-  "ativos" | "risco" | "inadimplentes" | "saindo" | "pendentes" | "cancelados" | "todos";
+  | "ativos"
+  | "risco"
+  | "inadimplentes"
+  | "saindo"
+  | "pendentes"
+  | "reembolsados"
+  | "cancelados"
+  | "todos";
 
 const FILTROS: Array<{ key: Filtro; label: string; conta: (c: AdminSubscriber) => boolean }> = [
   { key: "ativos", label: "Com acesso", conta: (c) => c.accessNow },
@@ -164,12 +171,33 @@ const FILTROS: Array<{ key: Filtro; label: string; conta: (c: AdminSubscriber) =
     conta: (c) => c.cancelAtPeriodEnd && c.accessNow,
   },
   { key: "pendentes", label: "Aguardando pagamento", conta: (c) => c.status === "pending" },
+  /**
+   * Dinheiro que voltou, por qualquer via. Olha `refundedCount` e não
+   * `status === "refunded"` de propósito: o status guarda só o desfecho da
+   * assinatura, então quem foi reembolsado e assinou de novo já não aparece
+   * ali — e é exatamente esse caso que vale a pena ver.
+   */
+  { key: "reembolsados", label: "Reembolsados", conta: (c) => c.refundedCount > 0 },
   {
     key: "cancelados",
     label: "Encerrados",
     conta: (c) => !c.accessNow && c.status !== "pending",
   },
   { key: "todos", label: "Todos", conta: () => true },
+];
+
+/**
+ * Ciclo é eixo INDEPENDENTE do estado do contrato: "com acesso" e "anual" são
+ * perguntas diferentes, e enfiar as duas no mesmo seletor impediria a
+ * combinação que mais interessa — quantos anuais estão ativos.
+ */
+type FiltroCiclo = "todos" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+const CICLOS: Array<{ key: FiltroCiclo; label: string }> = [
+  { key: "todos", label: "Todos os ciclos" },
+  { key: "MONTHLY", label: "Mensal" },
+  { key: "QUARTERLY", label: "Trimestral" },
+  { key: "YEARLY", label: "Anual" },
 ];
 
 type Ordem = "recentes" | "receita" | "uso" | "ocioso" | "renovacao";
@@ -218,6 +246,7 @@ function AdminClientesPage() {
    * trocar de filtro sozinha depois que a pessoa escolheu um.
    */
   const [filtro, setFiltro] = React.useState<Filtro | null>(null);
+  const [ciclo, setCiclo] = React.useState<FiltroCiclo>("todos");
   const [ordem, setOrdem] = React.useState<Ordem>("recentes");
   const [comSandbox, setComSandbox] = React.useState(false);
   const [aberto, setAberto] = React.useState<AdminSubscriber | null>(null);
@@ -253,10 +282,21 @@ function AdminClientesPage() {
    */
   const filtroEfetivo: Filtro = filtro ?? (base.some((c) => c.accessNow) ? "ativos" : "todos");
 
+  /**
+   * Recorte por ciclo aplicado ANTES do filtro de estado, para que a contagem
+   * em cada chip diga quantos sobram dentro do ciclo escolhido. Chip que
+   * continuasse contando sobre a base inteira prometeria linha que a lista não
+   * vai mostrar.
+   */
+  const baseCiclo = React.useMemo(
+    () => (ciclo === "todos" ? base : base.filter((c) => c.planCycle === ciclo)),
+    [base, ciclo],
+  );
+
   const visiveis = React.useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const regra = FILTROS.find((f) => f.key === filtroEfetivo)?.conta ?? (() => true);
-    return base
+    return baseCiclo
       .filter((c) => {
         if (!regra(c)) return false;
         if (!termo) return true;
@@ -268,7 +308,7 @@ function AdminClientesPage() {
         );
       })
       .sort((a, b) => comparar(ordem, a, b));
-  }, [base, busca, filtroEfetivo, ordem]);
+  }, [baseCiclo, busca, filtroEfetivo, ordem]);
 
   const totais = React.useMemo(() => {
     const comAcesso = base.filter((c) => c.accessNow);
@@ -292,6 +332,16 @@ function AdminClientesPage() {
       // Caixa de verdade: cobranças confirmadas e não estornadas, de todo o
       // histórico — inclusive de quem já cancelou.
       recebido: base.reduce((a, c) => a + c.paidTotalCents, 0),
+      // Dinheiro que entrou e voltou. Fica ao lado do recebido, não subtraído
+      // dele: são dois fatos, e juntar os dois num líquido esconderia o volume
+      // de devolução, que é o número que diz se a promessa de venda está
+      // desalinhada do produto.
+      devolvido: base.reduce((a, c) => a + c.refundedTotalCents, 0),
+      // Pessoas distintas, não linhas: a lista é uma linha por ASSINATURA, e
+      // quem assinou duas vezes e foi estornado nas duas contaria dobrado num
+      // número que a tela chama de "clientes".
+      reembolsados: new Set(base.filter((c) => c.refundedCount > 0).map((c) => c.userId)).size,
+      chargebacks: new Set(base.filter((c) => c.chargebackCount > 0).map((c) => c.userId)).size,
     };
   }, [base]);
 
@@ -348,6 +398,17 @@ function AdminClientesPage() {
         </span>
         <span>Cartão {totais.cartao}</span>
         <span>PIX {totais.pix}</span>
+        {totais.reembolsados > 0 ? (
+          <>
+            <span aria-hidden className="text-divider">
+              |
+            </span>
+            <span className={totais.chargebacks > 0 ? "text-danger" : "text-warning"}>
+              Devolvido {formatCents(totais.devolvido)} · {totais.reembolsados} cliente(s)
+              {totais.chargebacks > 0 ? ` · ${totais.chargebacks} por chargeback` : ""}
+            </span>
+          </>
+        ) : null}
       </p>
 
       <Blueprint className="flex flex-col gap-3 p-4">
@@ -360,6 +421,22 @@ function AdminClientesPage() {
               placeholder="E-mail, nome, plano ou trilha"
               aria-label="Buscar cliente"
             />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="label-h6 text-neutral-700">Ciclo</span>
+            <Select value={ciclo} onValueChange={(v) => setCiclo(v as FiltroCiclo)}>
+              <SelectTrigger className="w-[180px]" aria-label="Filtrar por ciclo de cobrança">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CICLOS.map((c) => (
+                  <SelectItem key={c.key} value={c.key}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
 
           <label className="flex flex-col gap-1">
@@ -397,7 +474,7 @@ function AdminClientesPage() {
 
         <div className="flex flex-wrap gap-2">
           {FILTROS.map((f) => {
-            const n = base.filter(f.conta).length;
+            const n = baseCiclo.filter(f.conta).length;
             const ativo = filtroEfetivo === f.key;
             return (
               <button
@@ -564,6 +641,17 @@ function LinhaCliente({ c, onAbrir }: { c: AdminSubscriber; onAbrir: () => void 
             {c.cancelAtPeriodEnd && c.accessNow ? (
               <Badge variant="outline">cancelamento agendado</Badge>
             ) : null}
+            {/* Chargeback e reembolso nunca viram o mesmo selo: um é
+                atendimento, o outro é contestação no banco. */}
+            {c.chargebackCount > 0 ? (
+              <Badge variant="danger">
+                chargeback{c.chargebackCount > 1 ? ` ${c.chargebackCount}×` : ""}
+              </Badge>
+            ) : c.refundedCount > 0 ? (
+              <Badge variant="warning">
+                reembolsado{c.refundedCount > 1 ? ` ${c.refundedCount}×` : ""}
+              </Badge>
+            ) : null}
             {c.devMode ? <Badge variant="outline">sandbox</Badge> : null}
             {c.isAdmin ? <Badge variant="outline">admin</Badge> : null}
           </div>
@@ -594,6 +682,14 @@ function LinhaCliente({ c, onAbrir }: { c: AdminSubscriber; onAbrir: () => void 
             ) : (
               <span>nunca pagou</span>
             )}
+            {/* A data é a do ESTORNO, não a da cobrança estornada — quem lê
+                precisa saber quando o dinheiro voltou. */}
+            {c.refundedCount > 0 ? (
+              <span className={cn("num", c.chargebackCount > 0 ? "text-danger" : "text-warning")}>
+                −{formatCents(c.refundedTotalCents)} devolvido
+                {c.lastRefundAt ? ` em ${fmtData(c.lastRefundAt)}` : ""}
+              </span>
+            ) : null}
           </p>
         </div>
 
@@ -954,12 +1050,27 @@ function Assinaturas({ d }: { d: AdminSubscriberDetail }) {
                       >
                         <span className="flex items-center gap-2 text-caption text-neutral-800">
                           <span className="num">{formatCents(p.amountCents)}</span>
-                          {p.estornado ? <Badge variant="danger">estornado</Badge> : null}
+                          {/* Mesmo vocabulário da lista: a linha do cliente diz
+                              "chargeback" e o dossiê não pode chamar a MESMA
+                              cobrança de "estornado". */}
+                          {p.estornoTipo === "chargeback" ? (
+                            <Badge variant="danger">chargeback</Badge>
+                          ) : p.estornado ? (
+                            <Badge variant="warning">reembolsado</Badge>
+                          ) : null}
                         </span>
                         <span className="flex items-center gap-3">
                           <span className="num font-mono text-caption text-neutral-500">
                             {fmtData(p.at)}
                           </span>
+                          {/* Duas datas quando houve estorno: quando entrou e
+                              quando voltou. Só `p.at` daria a entender que o
+                              dinheiro voltou no dia em que foi cobrado. */}
+                          {p.estornoAt ? (
+                            <span className="num font-mono text-caption text-warning">
+                              ↩ {fmtData(p.estornoAt)}
+                            </span>
+                          ) : null}
                           {p.receiptUrl ? (
                             <a
                               href={p.receiptUrl}
